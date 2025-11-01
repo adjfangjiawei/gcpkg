@@ -1,0 +1,1 @@
+docker run -itd --name gcc-test --gpus all --network host gcc sleep infinity

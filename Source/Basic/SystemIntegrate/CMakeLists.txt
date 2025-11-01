@@ -1,0 +1,3 @@
+add_subdirectory(CommandExecutor)
+add_library( SystemIntegrate INTERFACE)
+target_link_libraries(SystemIntegrate INTERFACE CommandExecutor)

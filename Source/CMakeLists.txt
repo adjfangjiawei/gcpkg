@@ -1,0 +1,5 @@
+add_subdirectory(Basic)
+add_subdirectory(MainProcess)
+add_executable(gcpkg main.cpp)
+target_link_libraries(gcpkg PUBLIC ${llvm_libs} ${LLVM_SYSTEM_LIBS} tomlplusplus::tomlplusplus Basic MainProcess)
+target_include_directories(gcpkg PUBLIC ${LLVM_INCLUDE_DIRS})

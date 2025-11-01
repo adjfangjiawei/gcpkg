@@ -1,0 +1,2 @@
+add_library(CommandExecutor CommandExecutor.cpp)
+target_include_directories(CommandExecutor PUBLIC ${PROJECT_ROOT_DIR})
