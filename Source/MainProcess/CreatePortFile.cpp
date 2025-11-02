@@ -31,8 +31,8 @@ namespace MainProcess {
         const std::string& ns = parts[1];
         const std::string& version = parts[2];
 
-        // --- 2. 构建并创建目录 (这部分保持不变) ---
-        std::filesystem::path dir_path = "port";
+        // --- 2. 构建并创建目录 ---
+        std::filesystem::path dir_path = "gcpkg/port";
         dir_path /= ns;
         dir_path /= name;
         dir_path /= version;
@@ -51,9 +51,7 @@ namespace MainProcess {
 
         // 创建 [packages] 表
         // packages = [{ dummy = { url = "", ref = "" } }]
-        root_tbl.emplace(
-            "packages",
-            toml::table{{"packages", toml::array{toml::table{{"dummy", toml::table{{"url", ""}, {"ref", ""}}}}}}});
+        root_tbl.emplace("packages", toml::table{{"url", ""}, {"ref", ""}});
 
         // 1. 先创建一个空的 toml::array 作为容器
         toml::array build_configs_array;

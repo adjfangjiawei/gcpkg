@@ -48,8 +48,8 @@ namespace MainProcess {
 
         try {
             std::cout << "正在创建 'buildtrees' 和 'packages' 目录..." << std::endl;
-            std::filesystem::create_directory("buildtrees");
-            std::filesystem::create_directory("packages");
+            std::filesystem::create_directory("gcpkg/buildtrees");
+            std::filesystem::create_directory("gcpkg/packages");
         } catch (const std::filesystem::filesystem_error& e) {
             std::cerr << "错误: 创建目录失败: " << e.what() << std::endl;
             // 即使目录创建失败，也可能不应该中止整个过程，所以我们只打印错误
