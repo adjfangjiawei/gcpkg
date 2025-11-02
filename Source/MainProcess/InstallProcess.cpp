@@ -78,7 +78,7 @@ namespace MainProcess {
         toml::table gcpkg_toml, port_toml;
         try {
             gcpkg_toml = toml::parse_file("gcpkg.toml");
-            fs::path port_path = fs::path("port") / ns / name / version / "port.toml";
+            fs::path port_path = fs::path("gcpkg/port") / ns / name / version / "port.toml";
             port_toml = toml::parse_file(port_path.string());
         } catch (const toml::parse_error& err) {
             std::cerr << "错误: 解析 TOML 文件失败: " << err << std::endl;
@@ -92,16 +92,26 @@ namespace MainProcess {
 
         // 4. 准备环境变量
         std::map<std::string, std::string> variables;
-        fs::path build_dir = fs::path("buildtrees") / name / version;
-        fs::path package_dir = fs::path("packages") / name / version;
+        fs::path build_dir = fs::path("gcpkg/buildtrees") / name / version;
+        fs::path package_dir = fs::path("gcpkg/packages") / name / version;
         fs::path gcpkg_root = fs::absolute(fs::current_path());
 
-        variables["${docker_proxy}"] = gcpkg_toml["docker"]["docker_proxy"].value_or("");
-        if (auto packages = port_toml["packages"]["packages"].as_array()) {
-            if (!packages->empty()) {
-                variables["${url}"] = (*packages)[0].as_table()->get("url")->value_or("");
+        // 安全地从 gcpkg.toml 获取 docker_proxy
+        if (auto docker_table = gcpkg_toml["docker"].as_table()) {
+            variables["${docker_proxy}"] = docker_table->get("docker_proxy")->value_or("");
+        }
+
+        // 安全地从 port_toml 获取 url
+        if (auto packages_table = port_toml["packages"].as_table()) {
+            if (auto packages_array = packages_table->get("packages")->as_array()) {
+                if (!packages_array->empty()) {
+                    if (auto first_package = packages_array->get(0)->as_table()) {
+                        variables["${url}"] = first_package->get("url")->value_or("");
+                    }
+                }
             }
         }
+
         variables["${build_dir}"] = fs::absolute(build_dir).string();
         variables["${package_install_dir}"] = fs::absolute(package_dir).string();
         variables["${gcpkg_root}"] = gcpkg_root.string();
@@ -110,8 +120,11 @@ namespace MainProcess {
         fs::create_directories(build_dir);
         fs::create_directories(package_dir);
 
-        // 5. 启动 Docker 容器 (这部分可以优化为只在需要时启动)
-        std::string image = gcpkg_toml["docker"]["build_mirror"].value_or("gcc:latest");
+        // 5. 启动 Docker 容器
+        std::string image = "gcc:latest";  // 默认值
+        if (auto docker_table = gcpkg_toml["docker"].as_table()) {
+            image = docker_table->get("build_mirror")->value_or("gcc:latest");
+        }
         std::string container_name = "gcpkg-build-" + name + "-" + version;
 
         std::vector<std::string> docker_opts = {"-itd",
@@ -139,14 +152,43 @@ namespace MainProcess {
 
         // 6. [新] 构建“构建计划”
         BuildPlan build_plan;
-        auto build_configs = *port_toml["build_configs"].as_array()->get(0)->as_table();
+
+        // --- 【核心安全修复】 ---
+        // 我们需要一个 toml::table 来引用有效的构建配置。
+        // 如果 port_toml 中没有，我们就创建一个空的临时 table，避免后续代码需要处理空指针。
+        toml::table build_configs_table;
+
+        // 1. 安全地获取 build_configs 节点
+        auto build_configs_node = port_toml.get("build_configs");
+        // 2. 检查节点是否存在、是否为数组、是否非空
+        if (build_configs_node && build_configs_node->is_array()) {
+            if (auto build_configs_array = build_configs_node->as_array()) {
+                if (!build_configs_array->empty()) {
+                    // 3. 检查数组的第一个元素是否存在且为表格
+                    if (auto first_config_node = build_configs_array->get(0)) {
+                        if (auto first_config_table = first_config_node->as_table()) {
+                            // 4. 只有在所有检查通过后，才进行拷贝赋值
+                            build_configs_table = *first_config_table;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 如果没有找到有效的 build_configs，打印一个提示信息，但继续执行
+        if (build_configs_table.empty()) {
+            std::cout << "--- Note: No valid [build_configs] table found in " << packageSpec
+                      << ". Proceeding without build steps. ---" << std::endl;
+        }
 
         const std::vector<std::string> build_steps = {
             "pre_configure", "configure", "pre_build", "build", "post_build", "pre_install", "install", "post_install"};
 
         // 6a. 加载当前包的命令
+        // 现在可以安全地使用 build_configs_table 了，即使它是空的。
         for (const auto& step : build_steps) {
-            if (auto cmds_node = build_configs.get(step)) {
+            auto cmds_node = build_configs_table.get(step);
+            if (cmds_node && cmds_node->is_array()) {
                 if (auto cmds_array = cmds_node->as_array()) {
                     for (const auto& cmd : *cmds_array) {
                         build_plan[step].push_back(cmd.value_or(""));
@@ -155,23 +197,26 @@ namespace MainProcess {
             }
         }
 
-        // 6b. 应用 inject
+        // 6b. 应用 inject (ApplyInjects 内部也必须是安全的)
         ApplyInjects(build_plan, port_toml);
 
-        // 6c. 应用 export_build_system (如果需要)
-        ApplyExportedBuildSystem(build_plan, build_configs, port_toml, variables);
+        // 6c. 应用 export_build_system (传入安全的 build_configs_table)
+        ApplyExportedBuildSystem(build_plan, build_configs_table, port_toml, variables);
 
         // 7. [修改] 按顺序执行“构建计划”
         GcpkgMetaCommand::MetaCommandContext meta_context{"", variables};
         variables["${last_file}"] = "";  // 初始化
 
-        for (auto& step : build_steps) {
+        for (const auto& step : build_steps) {
             if (build_plan.count(step) && !build_plan.at(step).empty()) {
                 std::cout << "--- Executing step: " << step << " ---" << std::endl;
 
                 std::string work_dir_key = step + "_work_dir";
                 std::string work_dir = gcpkg_root.string();
-                if (auto work_dir_node = build_configs.get(work_dir_key)) {
+
+                // 安全地获取 work_dir
+                auto work_dir_node = build_configs_table.get(work_dir_key);
+                if (work_dir_node && work_dir_node->is_array()) {
                     if (auto work_dir_arr = work_dir_node->as_array()) {
                         if (!work_dir_arr->empty()) {
                             work_dir = work_dir_arr->get(0)->value_or(work_dir);
@@ -182,15 +227,23 @@ namespace MainProcess {
                 for (const auto& cmd : build_plan.at(step)) {
                     if (cmd.empty()) continue;
 
-                    // 7a. [新] 元命令分发
+                    // 7a. 元命令分发
                     if (cmd.rfind("inner_download ", 0) == 0) {
-                        std::string url = cmd.substr(15);
-                        std::string downloaded_file = GcpkgMetaCommand::Download(meta_context, url);
-                        if (downloaded_file.empty()) return false;
+                        std::string url_arg = cmd.substr(15);
+                        std::string downloaded_file = GcpkgMetaCommand::Download(meta_context, url_arg);
+                        if (downloaded_file.empty()) {
+                            std::cerr << "错误: 元命令 'inner_download' 执行失败。" << std::endl;
+                            return false;
+                        }
                         variables["${last_file}"] = downloaded_file;
+
                     } else if (cmd.rfind("inner_decompress ", 0) == 0) {
                         std::string file_to_decompress = cmd.substr(17);
-                        if (!GcpkgMetaCommand::Decompress(meta_context, file_to_decompress)) return false;
+                        if (!GcpkgMetaCommand::Decompress(meta_context, file_to_decompress)) {
+                            std::cerr << "错误: 元命令 'inner_decompress' 执行失败。" << std::endl;
+                            return false;
+                        }
+
                     } else {
                         // 7b. 正常命令执行
                         std::string expanded_cmd = Utils::ExpandVariables(cmd, variables);
