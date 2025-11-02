@@ -16,4 +16,15 @@ namespace Basic::Utils {
         return result;
     }
 
+    // Implementation for ReplaceAll
+    void ReplaceAll(std::string& str, const std::string& from, const std::string& to) {
+        if (from.empty()) return;
+        std::string::size_type start_pos = 0;
+        while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+            str.replace(start_pos, from.length(), to);
+            // Advance past the replaced segment to avoid infinite loops if 'to' contains 'from'
+            start_pos += to.length();
+        }
+    }
+
 }  // namespace Basic::Utils

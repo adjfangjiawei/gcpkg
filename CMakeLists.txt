@@ -7,7 +7,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(VCPKG_MANIFEST_MODE OFF)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+# set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address -Wl,--no-undefined")
 project(gcpkg LANGUAGES C CXX)
 
 # 设置C++标准
@@ -23,5 +26,14 @@ add_definitions(${LLVM_DEFINITIONS})
 llvm_map_components_to_libnames(llvm_libs support core irreader)
 
 add_subdirectory(extern/tomlplusplus)
+set(ENABLE_WERROR OFF CACHE BOOL "Forcefully disable -Werror for the libarchive subproject" FORCE)
+add_subdirectory(external/libarchive)
+
+target_compile_options(archive_static PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wno-error=implicit-fallthrough>
+    $<$<C_COMPILER_ID:GNU,Clang>:-Wno-error=implicit-fallthrough>
+)
+
+find_package(CURL REQUIRED)
 
 add_subdirectory(Source)

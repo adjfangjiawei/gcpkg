@@ -1,14 +1,17 @@
-#pragma once
+#ifndef GCPKG_INSTALLPROCESS_H
+#define GCPKG_INSTALLPROCESS_H
+
+#include <set>
 #include <string>
 
 namespace MainProcess {
 
-    /**
-     * @brief 执行 gcpkg install 命令的核心逻辑。
-     *
-     * @param packageSpec 要安装的包的描述符 (例如, "make@gnu@latest")。
-     * @return 如果安装成功，返回 true；否则返回 false。
-     */
-    bool InstallPackage(std::string packageSpec);
+    // 主入口
+    bool InstallPackage(const std::string& packageSpec);
+
+    // 内部递归函数
+    bool InstallPackage(const std::string& packageSpec, std::set<std::string>& processed_packages);
 
 }  // namespace MainProcess
+
+#endif  // GCPKG_INSTALLPROCESS_H

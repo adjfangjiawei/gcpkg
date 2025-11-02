@@ -1,3 +1,6 @@
 [submodule "extern/tomlplusplus"]
 	path = extern/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
+[submodule "external/libarchive"]
+	path = external/libarchive
+	url = https://github.com/libarchive/libarchive.git

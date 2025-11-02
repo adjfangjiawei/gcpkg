@@ -1,5 +1,5 @@
-add_subdirectory(DockerExecutor)
 add_subdirectory(SystemIntegrate)
+add_subdirectory(DockerExecutor)
 add_subdirectory(Utils)
 add_library(Basic INTERFACE)
-target_link_libraries(Basic INTERFACE DockerExecutor SystemIntegrate Util)
+target_link_libraries(Basic INTERFACE DockerExecutor SystemIntegrate Utils)

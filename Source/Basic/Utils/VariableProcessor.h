@@ -14,4 +14,7 @@ namespace Basic::Utils {
      */
     std::string ExpandVariables(const std::string& input, const std::map<std::string, std::string>& variables);
 
+    // Replaces all occurrences of a substring within a string.
+    void ReplaceAll(std::string& str, const std::string& from, const std::string& to);
+
 }  // namespace Basic::Utils
