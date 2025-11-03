@@ -85,7 +85,7 @@ namespace MainProcess {
             return false;
         }
 
-        // 3. [新] 递归安装依赖项
+        // 3. 递归安装依赖项
         if (!InstallDependencies(packageSpec, port_toml, processed_packages)) {
             return false;  // 依赖安装失败
         }
@@ -120,6 +120,75 @@ namespace MainProcess {
         fs::create_directories(build_dir);
         fs::create_directories(package_dir);
 
+        std::vector<std::string> bin_paths, include_paths, lib_paths, pkgconfig_paths;
+        std::string env_prefix_command;
+
+        if (auto deps_node = port_toml.get("dependencies")) {
+            if (auto deps_array = deps_node->as_array()) {
+                for (const auto& dep_node : *deps_array) {
+                    if (auto dep_table = dep_node.as_table()) {
+                        std::string dep_name = dep_table->get("name")->value_or("");
+                        std::string dep_version = dep_table->get("version")->value_or("latest");
+
+                        if (!dep_name.empty()) {
+                            fs::path dep_package_dir =
+                                fs::absolute(fs::path("gcpkg/packages") / dep_name / dep_version);
+
+                            // 检查并添加存在的标准目录路径
+                            if (fs::exists(dep_package_dir / "bin"))
+                                bin_paths.push_back((dep_package_dir / "bin").string());
+                            if (fs::exists(dep_package_dir / "include"))
+                                include_paths.push_back((dep_package_dir / "include").string());
+                            if (fs::exists(dep_package_dir / "lib"))
+                                lib_paths.push_back((dep_package_dir / "lib").string());
+                            if (fs::exists(dep_package_dir / "lib64"))
+                                lib_paths.push_back((dep_package_dir / "lib64").string());
+                            if (fs::exists(dep_package_dir / "lib" / "pkgconfig"))
+                                pkgconfig_paths.push_back((dep_package_dir / "lib" / "pkgconfig").string());
+                            if (fs::exists(dep_package_dir / "share" / "pkgconfig"))
+                                pkgconfig_paths.push_back((dep_package_dir / "share" / "pkgconfig").string());
+                        }
+                    }
+                }
+            }
+        }
+
+        // 用于将路径向量合并为单个字符串的辅助 lambda
+        auto join_paths = [](const std::vector<std::string>& paths, const std::string& env_var) -> std::string {
+            if (paths.empty()) return "";
+            std::stringstream ss;
+            for (size_t i = 0; i < paths.size(); ++i) {
+                ss << paths[i] << (i == paths.size() - 1 ? "" : ":");
+            }
+            if (!env_var.empty()) {
+                ss << ":$" << env_var;
+            }
+            return ss.str();
+        };
+
+        // 构建 `env` 命令前缀
+        std::stringstream env_builder;
+        bool has_env_vars = false;
+
+        auto add_env_var = [&](const std::string& var_name, const std::vector<std::string>& paths) {
+            std::string value = join_paths(paths, var_name);
+            if (!value.empty()) {
+                env_builder << " " << var_name << "=\"" << value << "\"";
+                has_env_vars = true;
+            }
+        };
+
+        add_env_var("PATH", bin_paths);
+        add_env_var("LD_LIBRARY_PATH", lib_paths);
+        add_env_var("LIBRARY_PATH", lib_paths);
+        add_env_var("C_INCLUDE_PATH", include_paths);
+        add_env_var("CPLUS_INCLUDE_PATH", include_paths);
+        add_env_var("PKG_CONFIG_PATH", pkgconfig_paths);
+
+        if (has_env_vars) {
+            env_prefix_command = "env" + env_builder.str() + " ";
+        }
+
         // 5. 启动 Docker 容器
         std::string image = "gcc:latest";  // 默认值
         if (auto docker_table = gcpkg_toml["docker"].as_table()) {
@@ -150,24 +219,15 @@ namespace MainProcess {
         }
         DockerContainerGuard guard(container_name);
 
-        // 6. [新] 构建“构建计划”
+        // 6. 构建“构建计划”
         BuildPlan build_plan;
-
-        // --- 【核心安全修复】 ---
-        // 我们需要一个 toml::table 来引用有效的构建配置。
-        // 如果 port_toml 中没有，我们就创建一个空的临时 table，避免后续代码需要处理空指针。
         toml::table build_configs_table;
-
-        // 1. 安全地获取 build_configs 节点
         auto build_configs_node = port_toml.get("build_configs");
-        // 2. 检查节点是否存在、是否为数组、是否非空
         if (build_configs_node && build_configs_node->is_array()) {
             if (auto build_configs_array = build_configs_node->as_array()) {
                 if (!build_configs_array->empty()) {
-                    // 3. 检查数组的第一个元素是否存在且为表格
                     if (auto first_config_node = build_configs_array->get(0)) {
                         if (auto first_config_table = first_config_node->as_table()) {
-                            // 4. 只有在所有检查通过后，才进行拷贝赋值
                             build_configs_table = *first_config_table;
                         }
                     }
@@ -175,7 +235,6 @@ namespace MainProcess {
             }
         }
 
-        // 如果没有找到有效的 build_configs，打印一个提示信息，但继续执行
         if (build_configs_table.empty()) {
             std::cout << "--- Note: No valid [build_configs] table found in " << packageSpec
                       << ". Proceeding without build steps. ---" << std::endl;
@@ -185,7 +244,6 @@ namespace MainProcess {
             "pre_configure", "configure", "pre_build", "build", "post_build", "pre_install", "install", "post_install"};
 
         // 6a. 加载当前包的命令
-        // 现在可以安全地使用 build_configs_table 了，即使它是空的。
         for (const auto& step : build_steps) {
             auto cmds_node = build_configs_table.get(step);
             if (cmds_node && cmds_node->is_array()) {
@@ -197,13 +255,13 @@ namespace MainProcess {
             }
         }
 
-        // 6b. 应用 inject (ApplyInjects 内部也必须是安全的)
+        // 6b. 应用 inject
         ApplyInjects(build_plan, port_toml);
 
-        // 6c. 应用 export_build_system (传入安全的 build_configs_table)
+        // 6c. 应用 export_build_system
         ApplyExportedBuildSystem(build_plan, build_configs_table, port_toml, variables);
 
-        // 7. [修改] 按顺序执行“构建计划”
+        // 7. 按顺序执行“构建计划”
         GcpkgMetaCommand::MetaCommandContext meta_context{"", variables};
         variables["${last_file}"] = "";  // 初始化
 
@@ -214,7 +272,6 @@ namespace MainProcess {
                 std::string work_dir_key = step + "_work_dir";
                 std::string work_dir = gcpkg_root.string();
 
-                // 安全地获取 work_dir
                 auto work_dir_node = build_configs_table.get(work_dir_key);
                 if (work_dir_node && work_dir_node->is_array()) {
                     if (auto work_dir_arr = work_dir_node->as_array()) {
@@ -227,7 +284,6 @@ namespace MainProcess {
                 for (const auto& cmd : build_plan.at(step)) {
                     if (cmd.empty()) continue;
 
-                    // 7a. 元命令分发
                     if (cmd.rfind("inner_download ", 0) == 0) {
                         std::string url_arg = cmd.substr(15);
                         std::string downloaded_file = GcpkgMetaCommand::Download(meta_context, url_arg);
@@ -245,13 +301,16 @@ namespace MainProcess {
                         }
 
                     } else {
-                        // 7b. 正常命令执行
+                        // 【修改】正常命令执行
                         std::string expanded_cmd = Utils::ExpandVariables(cmd, variables);
                         std::string expanded_work_dir = Utils::ExpandVariables(work_dir, variables);
 
+                        // 【新】将依赖的环境变量前缀添加到最终命令中
+                        std::string final_command = env_prefix_command + expanded_cmd;
+
                         if (!Basic::DockerExecutor::ExecuteInContainer(
-                                container_name, expanded_work_dir, expanded_cmd)) {
-                            std::cerr << "错误: 在步骤 '" << step << "' 中执行命令失败: " << expanded_cmd << std::endl;
+                                container_name, expanded_work_dir, final_command)) {
+                            std::cerr << "错误: 在步骤 '" << step << "' 中执行命令失败: " << final_command << std::endl;
                             return false;
                         }
                     }
@@ -265,5 +324,4 @@ namespace MainProcess {
         CommandExecutor::executeCommand("docker stop " + container_name);  // 成功后停止容器
         return true;
     }
-
 }  // namespace MainProcess

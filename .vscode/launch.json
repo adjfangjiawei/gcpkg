@@ -8,7 +8,7 @@
             "program": "Build/Source/gcpkg",
             "args": [
                 "install",
-                "make@gnu@latest"
+                "cmake@kitware@latest"
             ],
             "cwd": "${workspaceFolder}/Library"
         }

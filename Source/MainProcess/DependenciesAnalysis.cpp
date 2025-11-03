@@ -8,41 +8,63 @@
 namespace fs = std::filesystem;
 
 namespace MainProcess {
-
+    /**
+     * @brief [主函数] 递归地安装一个 port 文件的所有依赖项。
+     *        (此版本经过安全加固和结构优化)
+     */
     bool InstallDependencies(const std::string& current_package_spec,
                              const toml::table& port_toml,
                              std::set<std::string>& processed_packages) {
-        // 1. 先获取 build_configs 节点
-        auto build_configs_node = port_toml.get("build_configs");
+        // --- 使用卫语句 (Guard Clauses) 来避免嵌套 ---
 
-        // 2. 检查节点是否存在且为数组
-        if (build_configs_node && build_configs_node->is_array()) {
-            if (auto build_configs_array = build_configs_node->as_array()) {
-                for (const auto& config_node : *build_configs_array) {
-                    if (auto config_table = config_node.as_table()) {
-                        // 在表格内部安全地获取 dependencies
-                        auto deps_node = config_table->get("dependencies");
-                        if (deps_node && deps_node->is_array()) {
-                            if (auto deps_array = deps_node->as_array()) {
-                                std::cout << "--- [" << current_package_spec << "] Resolving dependencies ---"
-                                          << std::endl;
-                                for (const auto& dep_node : *deps_array) {
-                                    std::string dep_spec = dep_node.value_or("");
-                                    if (!dep_spec.empty()) {
-                                        std::cout << "--- [" << current_package_spec
-                                                  << "] Found dependency: " << dep_spec << " ---" << std::endl;
-                                        if (!InstallPackage(dep_spec, processed_packages)) {
-                                            std::cerr << "错误: 依赖项 '" << dep_spec << "' 安装失败。" << std::endl;
-                                            return false;
-                                        }
-                                    }
-                                }
-                            }
+        // 1. 安全地获取 build_configs 数组
+        auto build_configs_node = port_toml.get("build_configs");
+        if (!build_configs_node || !build_configs_node->is_array()) {
+            return true;  // 卫语句：没有 build_configs，意味着没有依赖，操作成功
+        }
+        auto build_configs_array = build_configs_node->as_array();
+        if (!build_configs_array) {
+            return true;
+        }
+
+        // --- 主干逻辑：遍历所有 build_configs 并安装其依赖 ---
+        for (const auto& config_node : *build_configs_array) {
+            auto config_table = config_node.as_table();
+            if (!config_table) {
+                continue;  // 跳过非表格的元素
+            }
+
+            // 2. 安全地获取 dependencies 数组
+            auto deps_node = config_table->get("dependencies");
+            if (!deps_node || !deps_node->is_array()) {
+                continue;  // 卫语句：这个 config 中没有依赖，继续检查下一个 config
+            }
+            auto deps_array = deps_node->as_array();
+            if (!deps_array) {
+                continue;
+            }
+
+            // 3. 遍历并安装每一个依赖项
+            std::cout << "--- [" << current_package_spec << "] Resolving dependencies ---" << std::endl;
+            for (const auto& dep_node : *deps_array) {
+                // 使用 value<T>() 获取值，如果不是字符串类型则返回空 optional，更安全
+                if (auto dep_spec_opt = dep_node.value<std::string>()) {
+                    const std::string& dep_spec = *dep_spec_opt;
+                    if (!dep_spec.empty()) {
+                        std::cout << "--- [" << current_package_spec << "] Found dependency: " << dep_spec << " ---"
+                                  << std::endl;
+
+                        // 核心递归调用
+                        if (!InstallPackage(dep_spec, processed_packages)) {
+                            std::cerr << "错误: 依赖项 '" << dep_spec << "' 安装失败。" << std::endl;
+                            return false;  // 一个依赖失败，则整个过程失败
                         }
                     }
                 }
             }
         }
+
+        // 所有依赖都成功安装
         return true;
     }
 

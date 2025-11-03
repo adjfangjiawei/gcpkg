@@ -27,7 +27,7 @@ llvm_map_components_to_libnames(llvm_libs support core irreader)
 
 add_subdirectory(extern/tomlplusplus)
 set(ENABLE_WERROR OFF CACHE BOOL "Forcefully disable -Werror for the libarchive subproject" FORCE)
-add_subdirectory(external/libarchive)
+add_subdirectory(extern/libarchive)
 
 target_compile_options(archive_static PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wno-error=implicit-fallthrough>
