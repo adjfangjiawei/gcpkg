@@ -1,0 +1,7 @@
+project: diskinfo-smoke
+
+# Project-level feature selection propagates into each library's features.yaml.
+features:
+  libnvme: [no-tests, static]
+  libatasmart: [no-tests, static]
+  pciutils: [no-tests, static]

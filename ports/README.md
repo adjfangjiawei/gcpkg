@@ -1,7 +1,7 @@
 # Port 注册表
 
 每个库恰好两个文件：`build.lua`（构建描述）+ `features.yaml`（特性描述）。
-当前共 **111 个 port**（第四轮 +36 个 Linux 底层库，第五轮 +23 个媒体/AI/SDK port，第六轮 +37 个基础库）。`gcpkg ports` 按依赖层级列出，`gcpkg graph <port>` 打印
+当前共 **145 个 port**（第四轮 +36，第五轮 +23，第六轮 +37，第七轮 +34 个内核/磁盘库）。`gcpkg ports` 按依赖层级列出，`gcpkg graph <port>` 打印
 自底向上的构建顺序，`gcpkg check` 校验文件齐全、Lua 可加载、依赖可解析；
 三者都接受 `--feature=...`，会把特性 `requires:` 引入的条件依赖算进图里。
 
@@ -241,3 +241,52 @@ libidn2 → zlib → gnutls）、`graph libbpf` 5 步（zlib / zstd / xz → elf
 → libbpf）、`graph fontconfig` 7 步。真编译子集用 `GCPKG_BASE_DYNAMIC=1
 ./tests/linux-base.sh` 复现；上游源码始终不改，适配全在 `build.lua`
 的选项 / `pre_build` / 自定义 `build(ctx)` 里。
+
+## 第七轮：内核接口与磁盘信息查询（34 个 port）
+
+`gcpkg check` = **145 ports OK**。34 个 tarball 的 URL/SHA256 均为实测值，
+构建系统种类逐个解压核对（`tools/linux-kernel-catalog.tsv`，
+`tools/gen-linux-kernel-ports.py` 可重新生成）。默认静态验证
+（`tests/linux-kernel.sh`）；22 个在这里真编译（含第四轮已有的 `liburing`
+复核），合计 **1061 条编译命令**。用法见 [docs/DISK_INFO.md](../docs/DISK_INFO.md)。
+
+| port | 版本 | 构建系统 | 依赖（gcpkg） | 本轮验证 |
+| --- | --- | --- | --- | --- |
+| `libnvme` | 1.16.2 | meson | liburing | ✅ 真编译 123 条 |
+| `nvme-cli` | 2.16 | meson | libnvme | ✅ 真编译 115 条 |
+| `libgudev` | 238 | meson | glib | 静态 |
+| `udisks2` | 2.11.2 | autotools | glib, dbus, libgudev, libatasmart, libnvme, libparted, util-linux, libacl | 静态 |
+| `libstoragemgmt` | 1.11.0 | autotools | glib, libnvme | 静态 |
+| `btrfs-progs` | 6.19.1 | autotools | util-linux, zlib, zstd, lz4 | 静态 |
+| `e2fsprogs` | 1.47.4 | autotools | util-linux | 静态 |
+| `lvm2` | 2.03.43 | autotools | util-linux, libaio | 静态 |
+| `pciutils` | 3.15.0 | custom-make | zlib | ✅ 真编译 36 条 |
+| `libgpiod` | 2.3.2 | meson | — | ✅ 真编译 154 条 |
+| `libiio` | 0.26 | cmake | libusb, libxml2 | ✅ 真编译 46 条 |
+| `hidapi` | 0.15.0 | cmake | libusb | ✅ 真编译 6 条 |
+| `libserialport` | 0.1.2 | autotools | — | ✅ 真编译 4 条 |
+| `libaudit` | 3.1.5 | autotools | — | 静态 |
+| `libunwind` | 1.8.3 | autotools | zlib, xz | ✅ 真编译 179 条 |
+| `rpcsvc-proto` | 1.4.4 | autotools | — | ✅ 真编译 0 条 |
+| `libconfuse` | 3.4 | autotools | — | ✅ 真编译 12 条 |
+| `sg3_utils` | 1.48 | autotools | — | ✅ 真编译 94 条 |
+| `smartmontools` | 7.4 | autotools | — | ✅ 真编译 2 条 |
+| `libtraceevent` | 1.8.4 | meson | — | ✅ 真编译 45 条 |
+| `libtracefs` | 1.8.2 | meson | libtraceevent | ✅ 真编译 97 条 |
+| `xfsprogs` | 6.12.0 | autotools | util-linux, libattr | 静态 |
+| `lm-sensors` | 3.6.0 | custom-make | — | 静态 |
+| `i2c-tools` | 4.4 | custom-make | — | 静态 |
+| `dmidecode` | 3.6 | custom-make | — | ✅ 真编译 0 条 |
+| `mdadm` | 4.4 | custom-make | — | ✅ 真编译 0 条 |
+| `libparted` | 3.6 | autotools | util-linux | ✅ 真编译 123 条 |
+| `libmicrohttpd` | 1.0.1 | autotools | gnutls, libgcrypt | 静态 |
+| `libdaemon` | 0.14 | autotools | — | ✅ 真编译 7 条 |
+| `hdparm` | 9.65 | custom-make | — | ✅ 真编译 0 条 |
+| `libatasmart` | 0.19 | autotools | — | ✅ 真编译 4 条 |
+| `keyutils` | 1.6.3 | custom-make | — | ✅ 真编译 0 条 |
+| `libtirpc` | 1.3.6 | autotools | rpcsvc-proto | 静态 |
+| `libselinux` | 3.8 | custom-make | pcre2, libseccomp | 静态 |
+
+依赖图：`graph udisks2` 15 步（含 `liburing → libnvme`）、`graph nvme-cli`
+3 步、`graph libtracefs` 2 步。上游源码始终不改，适配全在 `build.lua`
+的选项 / `pre_build` / 自定义 `build(ctx)` 与 `features.yaml` 的 env 里。

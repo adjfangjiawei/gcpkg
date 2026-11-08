@@ -349,3 +349,30 @@ GCPKG_BASE_DYNAMIC=1 ./tests/linux-base.sh         # 可选：真编译子集
   `grep | tail` 会让 `set -euo pipefail` 提前退出，记得 `|| N="cached"`。
 - **镜像失效就剔除**：`isl` 的 SourceForge / GCC 镜像全部 403/404，
   与其写占位 SHA256 不如不收（校验和必须是真实下载计算值）。
+
+## 9. 内核 / 磁盘类库的适配要点
+
+第七轮 34 个库（NVMe、SMART、分区、文件系统、ftrace、keyring、GPIO、IIO…）
+又验证了几个常见形态，全部不改上游：
+
+- **先解压看再写配方**：`kind`（autotools / cmake / meson / 手写 Makefile）
+  是逐包检查 tarball 顶层 `configure` / `CMakeLists.txt` / `meson.build` /
+  `Makefile` 得到的。`libunwind` 同时有 CMakeLists 和 configure.ac，但它的
+  CMakeLists 明确只支持 Visual Studio，所以必须选 autotools。
+- **只发 tag 的 GitHub 仓库**：`configure.ac` 存在而 `configure` 不在时，
+  `pre_build` 条件跑 `autoreconf -fi`（本轮 10+ 个库都这样）。
+- **install 写系统绝对路径**：非 root 构建遇到 `/lib/udev/rules.d`
+  （libiio）、`/etc/depmod.d`（kmod）、`/sbin`（pciutils/dmidecode/hdparm）。
+  前两类关选项或把目录指进 prefix；手写 Makefile 用自定义 `build(ctx)`
+  编译后把 `.a` / `.h` / 二进制收集到 `<prefix>/lib|include|sbin`。
+- **shared 链非 PIC 静态库**：`-DBUILD_SHARED_LIBS=OFF`（CMake）或
+  `--disable-shared --enable-static`（autotools）。
+- **compdb 为 0 不代表失败**：少数 Makefile 直接写 `gcc` 字面量，
+  命令行 `CC=<wrapper>` 也拦不到，manifest 会如实记 0 条。
+- **复核已有库**：用户点名 `liburing` 时它已在注册表里；清掉 store 的
+  `src/` + `build/` 后重新 `install`，确认 14 条 compdb，再把它声明为
+  `libnvme` 的依赖，让它进入新的磁盘信息链。
+
+生成器 `tools/gen-linux-kernel-ports.py` + `tools/linux-kernel-catalog.tsv`；
+静态验证 `tests/linux-kernel.sh`，动态子集 `GCPKG_KERNEL_DYNAMIC=1`。
+磁盘信息相关的 port 清单与用法见 `docs/DISK_INFO.md`。

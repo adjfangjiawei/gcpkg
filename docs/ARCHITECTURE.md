@@ -468,7 +468,82 @@ Autotools / CMake / Meson / 手写 Makefile 四种形态都有，全部通过
 按约定由用户在本机验证 —— 它们需要更多系统组件或更长构建时间。
 六个回归脚本全部 exit=0。
 
-## 12. 构建 gcpkg 本体
+## 12. 内核接口与磁盘信息查询（2026-11-08 第七轮）
+
+第七轮新增 **34 个 port**，注册表 111 → **145**（`gcpkg check` = 145 ports OK）。
+方向是用户点名的「内核和底层库 / 磁盘信息查询」。`liburing` 早在第四轮就已
+纳入并真编译过，这一轮把它**从干净源码重新复核**（14 条 compdb），并让它成为
+新依赖链的一环：`libnvme` 声明依赖 `liburing`，所以 `graph udisks2` 里能直接看到。
+
+### 覆盖面
+
+| 组 | port |
+| --- | --- |
+| NVMe / D-Bus 磁盘信息 | `libnvme` `nvme-cli` `libgudev` `udisks2` `libstoragemgmt` |
+| SMART / ATA / SCSI / RAID | `libatasmart` `smartmontools` `hdparm` `sg3_utils` `mdadm` |
+| 分区 / 文件系统 | `libparted` `e2fsprogs` `xfsprogs` `btrfs-progs` `lvm2` |
+| 硬件枚举 | `pciutils` `dmidecode` `lm-sensors` `i2c-tools` |
+| 内核接口 | `libtraceevent` `libtracefs` `keyutils` `libgpiod` `libiio` `hidapi` `libserialport` `libaudit` `libselinux` `libtirpc` `libunwind` |
+| 其它底层 | `libmicrohttpd` `libdaemon` `libconfuse` `rpcsvc-proto` |
+
+Autotools / CMake / Meson / 手写 Makefile 四类配方都有；构建系统种类是**逐个
+解压 tarball 检查顶层文件**后确定的，不靠猜。34 个 URL/SHA256 均为实测值；
+`libhugetlbfs`（只有 2006 年的 dev tag）、`lsscsi`（镜像全失效）被剔除，
+`mdadm` / `libserialport` / `lm-sensors` 换成正式 release tarball。
+详见 `tools/linux-kernel-catalog.tsv` 与 `tools/gen-linux-kernel-ports.py`。
+
+### 依赖图（静态）
+
+`gcpkg graph udisks2` = **15 步**：
+`libffi → zlib → pcre2 → glib → expat → dbus → libgudev → libatasmart →
+liburing → libnvme → util-linux → libparted → libattr → libacl → udisks2`。
+`graph nvme-cli` = 3 步（`liburing → libnvme → nvme-cli`），
+`graph libtracefs` = 2 步（`libtraceevent → libtracefs`）。
+一条磁盘信息查询链把前六轮的 L0（libffi/zlib/pcre2/glib/expat/dbus/
+util-linux/libattr/libacl）与内核库串在一起，而不是重复声明。
+
+### 真编译（22 个，1061 条编译命令）
+
+`GCPKG_KERNEL_DYNAMIC=1 ./tests/linux-kernel.sh` = 22 PASS / 0 FAIL：
+`liburing` 14、`libnvme` 123、`nvme-cli` 115、`libatasmart` 4、
+`libtraceevent` 45、`libtracefs` 97、`pciutils` 36、`libconfuse` 12、
+`libdaemon` 7、`libserialport` 4、`hidapi` 6、`libunwind` 179、
+`sg3_utils` 94、`smartmontools` 2、`libgpiod` 154、`libparted` 123、
+`libiio` 46，外加 `keyutils` / `dmidecode` / `hdparm` / `mdadm` /
+`rpcsvc-proto`（这几个手写 Makefile 硬编码 `gcc`，编译成功但 compdb 为 0，
+如实记录）。store 累计 10034 条。
+
+修过的上游差异仍全部落在生成的 `build.lua` / `features.yaml` 里：
+
+- `libtraceevent` / `libtracefs` 的 Meson 默认构建文档并强制要 `asciidoc`
+  → `-Ddoc=false`。
+- `hidapi` / `libiio` 默认 shared，把非 PIC 的 `libusb-1.0.a` 链进 `.so`
+  → `-DBUILD_SHARED_LIBS=OFF`；`libiio` 还关掉 `HAVE_DNS_SD` / `WITH_AIO`
+  与 `INSTALL_UDEV_RULE`（否则 install 写 `/lib/udev/rules.d` 需要 root）。
+- `libunwind` 的 CMakeLists.txt 明确写着「只支持 Visual Studio」
+  → 改用 autotools 配方（tag archive 里 `pre_build` 跑 `autoreconf`）。
+- 手写 Makefile 的内核工具（pciutils/dmidecode/hdparm/mdadm…）的
+  `install` 目标写 `/sbin` → 自定义 `build(ctx)` 先 `make`，再把 `.a` /
+  `.h` / 二进制收集进 gcpkg prefix，不改上游；同时命令行传
+  `CC=<wrapper>` 让部分 Makefile 也能产出 compdb。
+
+### 项目模式
+
+`examples/diskinfo/` 依赖 `libnvme` / `libatasmart` / `pciutils`，实测
+`gcpkg build examples/diskinfo` 生成合并的 `compile_commands.json`
+（240 条、21 个源目录），`clangd-22 --check` 对项目文件 0 个 `error:`，
+可从项目源码跳进 NVMe / SMART / PCI / liburing / zlib 的依赖源码。
+详见 `docs/DISK_INFO.md`。
+
+### 验证边界
+
+`tests/linux-kernel.sh` 默认纯静态：145 ports OK、三张自底向上图（含
+`liburing` 在磁盘链里的断言）、34 份两文件、真实 SHA256、无沙箱绝对路径、
+依赖可解析、`features udisks2` 可加载、`liburing` 声明仍在。不下载不编译。
+其余 12 个新 port（udisks2 / libstoragemgmt / 文件系统工具 / libselinux 等）
+按约定由用户在本机真编译。七个回归脚本全部 exit=0。
+
+## 13. 构建 gcpkg 本体
 
 ```bash
 cmake -S . -B build            # 需要 Lua 5.4 开发库、yaml-cpp、pkg-config
