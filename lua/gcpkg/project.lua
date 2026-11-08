@@ -125,7 +125,8 @@ function M.build(projectDir, cfg, opts)
         jobs = cfg.jobs or gcpkg.sys.nproc(),
         includes = util.uniq(includes),
         libdirs = util.uniq(libdirs),
-        libs = util.uniq(libs),
+        -- static linking needs dependents before their dependencies
+        libs = util.reverse(util.uniq(libs)),
         defines = util.uniq(defines),
         link_flags = util.uniq(linkFlags),
         dependencies = ordered,

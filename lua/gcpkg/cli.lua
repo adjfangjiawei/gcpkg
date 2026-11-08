@@ -12,6 +12,9 @@ Usage:
   gcpkg compdb [PROJECT_DIR]       rebuild merged compile_commands.json only
   gcpkg features PORT              list a library's YAML features
   gcpkg backends                   list external package-manager adapters
+  gcpkg ports                      list ports grouped by dependency layer
+  gcpkg graph PORT                 print the bottom-up build order for a port
+  gcpkg check                      validate all ports (files + dependencies)
   gcpkg doctor                     show toolchain / paths / wrapper status
   gcpkg port new NAME              scaffold build.lua + features.yaml
 
@@ -203,6 +206,54 @@ function M.main(args)
             log.info(string.format("  %-12s %-8s %s", b.name,
                                    b.available and "ready" or "n/a", b.detail))
         end
+        return 0
+    elseif cmd == "ports" then
+        local graph = require("gcpkg.graph")
+        local ports = graph.ports(roots)
+        local layers = graph.layers(ports)
+        local names = util.keys(ports)
+        table.sort(names, function(a, b)
+            if layers[a] ~= layers[b] then
+                return layers[a] < layers[b]
+            end
+            return a < b
+        end)
+        log.info(#names .. " ports (L0 = no gcpkg dependencies)")
+        for _, n in ipairs(names) do
+            local e = ports[n]
+            local deps = {}
+            for _, d in ipairs((e.spec or {}).dependencies or {}) do
+                deps[#deps + 1] = graph.dep_name(d)
+            end
+            log.info(string.format("  L%-2d %-14s %-10s deps=[%s]%s", layers[n], n,
+                (e.spec or {}).version or "?", table.concat(deps, ","),
+                e.error and (" ERROR: " .. e.error) or ""))
+        end
+        return 0
+    elseif cmd == "graph" then
+        local name = o.positional[2]
+        if not name then
+            error("graph needs a port name")
+        end
+        local graph = require("gcpkg.graph")
+        local order = graph.order(name, graph.ports(roots))
+        log.step("bottom-up build order for " .. name .. ":")
+        for i, n in ipairs(order) do
+            log.info(string.format("  %2d. %s", i, n))
+        end
+        return 0
+    elseif cmd == "check" then
+        local graph = require("gcpkg.graph")
+        local ports = graph.ports(roots)
+        local problems = graph.validate(ports)
+        for _, p in ipairs(problems) do
+            log.warn("  " .. p)
+        end
+        if #problems > 0 then
+            log.error(#problems .. " problem(s) found")
+            return 1
+        end
+        log.step(#util.keys(ports) .. " ports OK (build.lua + features.yaml + resolvable deps)")
         return 0
     elseif cmd == "port" and o.positional[2] == "new" then
         local name = o.positional[3]

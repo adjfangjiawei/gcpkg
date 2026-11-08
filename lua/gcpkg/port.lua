@@ -71,6 +71,73 @@ local function parseDep(dep)
     return { name = name or tostring(dep), version = version, features = {} }
 end
 
+-- All transitive dependency manifests, dependencies first (bottom-up).
+function M.transitive(manifests, st)
+    local ordered, seen = {}, {}
+    local function visit(m)
+        if not m or not m.key or seen[m.key] then
+            return
+        end
+        seen[m.key] = true
+        for _, depKey in ipairs(m.deps or {}) do
+            visit(store.read_manifest(st, depKey))
+        end
+        ordered[#ordered + 1] = m
+    end
+    for _, m in ipairs(manifests) do
+        visit(m)
+    end
+    return ordered
+end
+
+-- Make lower-level libraries visible to higher-level builds *without* editing
+-- the upstream project: standard env vars understood by CMake, autotools,
+-- pkg-config and most hand-written Makefiles.
+function M.dependency_env(ordered)
+    if #ordered == 0 then
+        return {}
+    end
+    local includes, libdirs, defines, prefixes = {}, {}, {}, {}
+    local pkgdirs = {}
+    for _, m in ipairs(ordered) do
+        includes = util.concat(includes, m.includes or {})
+        libdirs = util.concat(libdirs, m.libdirs or {})
+        defines = util.concat(defines, m.defines or {})
+        if m.prefix then
+            prefixes[#prefixes + 1] = m.prefix
+        end
+    end
+    local cpp, ld = {}, {}
+    for _, i in ipairs(util.uniq(includes)) do
+        cpp[#cpp + 1] = "-I" .. i
+    end
+    for _, d in ipairs(util.uniq(defines)) do
+        cpp[#cpp + 1] = "-D" .. d
+    end
+    for _, l in ipairs(util.uniq(libdirs)) do
+        ld[#ld + 1] = "-L" .. l
+        pkgdirs[#pkgdirs + 1] = util.join(l, "pkgconfig")
+    end
+    for _, p in ipairs(util.uniq(prefixes)) do
+        pkgdirs[#pkgdirs + 1] = util.join(p, "lib", "pkgconfig")
+        pkgdirs[#pkgdirs + 1] = util.join(p, "lib64", "pkgconfig")
+    end
+    local env = {}
+    if #cpp > 0 then
+        env.CPPFLAGS = table.concat(cpp, " ")
+    end
+    if #ld > 0 then
+        env.LDFLAGS = table.concat(ld, " ")
+    end
+    if #pkgdirs > 0 then
+        env.PKG_CONFIG_PATH = table.concat(util.uniq(pkgdirs), ":")
+    end
+    if #prefixes > 0 then
+        env.CMAKE_PREFIX_PATH = table.concat(util.uniq(prefixes), ":")
+    end
+    return env
+end
+
 local function compilerValue(kind, fallback)
     local v = gcpkg.sys.compiler(kind)
     if not v or v == "" or v:find("gcpkg-intercept") or v:find("/cc$") or v:find("/c%+%+$") then
@@ -137,6 +204,15 @@ function M.install(spec_name, cfg)
             depKeys[#depKeys + 1] = manifest.key
         end
     end
+    local ordered = M.transitive(manifests, st)
+    local depIncludes, depLibdirs, depLibs, depDefines, depLinkFlags = {}, {}, {}, {}, {}
+    for _, m in ipairs(ordered) do
+        depIncludes = util.concat(depIncludes, m.includes or {})
+        depLibdirs = util.concat(depLibdirs, m.libdirs or {})
+        depLibs = util.concat(depLibs, m.libs or {})
+        depDefines = util.concat(depDefines, m.defines or {})
+        depLinkFlags = util.concat(depLinkFlags, m.link_flags or {})
+    end
 
     local fingerprint = store.fingerprint(util.concat({
         portName, version, f.hash,
@@ -187,7 +263,7 @@ function M.install(spec_name, cfg)
     fs.write(jsonl, "")
     local ccReal = compilerValue("cc", "cc")
     local cxxReal = compilerValue("cxx", "c++")
-    local env = util.merge(f.env, {
+    local env = util.merge(M.dependency_env(ordered), f.env, {
         CC = ccLink,
         CXX = cxxLink,
         GCPKG_CC_REAL = ccReal,
@@ -213,6 +289,12 @@ function M.install(spec_name, cfg)
         features = f,
         env = env,
         dependencies = manifests,
+        all_dependencies = ordered,
+        includes = util.uniq(depIncludes),
+        libdirs = util.uniq(depLibdirs),
+        libs = util.uniq(depLibs),
+        defines = util.uniq(depDefines),
+        link_flags = util.uniq(depLinkFlags),
         compiler = { cc = ccReal, cxx = cxxReal, wrapper_cc = ccLink, wrapper_cxx = cxxLink },
         intercept_log = jsonl,
         feature_args = function()

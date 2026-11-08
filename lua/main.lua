@@ -20,6 +20,8 @@ gcpkg.port = require("gcpkg.port")
 gcpkg.project = require("gcpkg.project")
 gcpkg.backends = require("gcpkg.backends")
 gcpkg.detect = require("gcpkg.detect")
+gcpkg.recipe = require("gcpkg.recipe")
+gcpkg.graph = require("gcpkg.graph")
 
 -- "One library's build may include another": import another port's build.lua
 -- as a normal Lua value (its table/hooks/helpers are then reusable). Loaded

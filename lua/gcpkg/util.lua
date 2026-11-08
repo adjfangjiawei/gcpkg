@@ -184,6 +184,14 @@ function U.merge(...)
     return out
 end
 
+function U.reverse(list)
+    local out = {}
+    for i = #list, 1, -1 do
+        out[#out + 1] = list[i]
+    end
+    return out
+end
+
 function U.deepcopy(v)
     if type(v) ~= "table" then
         return v
