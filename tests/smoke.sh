@@ -5,13 +5,14 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 BIN=${GCPKG_BIN:-"$ROOT/build/bin/gcpkg"}
-STORE=${GCPKG_STORE:-"/tmp/gcpkg-smoke-store"}
+STORE=${GCPKG_STORE:-"$HOME/.cache/gcpkg-smoke-store"}
 PROJECT="$ROOT/examples/hello"
 
 if [[ ! -x "$BIN" ]]; then
     echo "build gcpkg first: cmake -S $ROOT -B $ROOT/build && cmake --build $ROOT/build -j" >&2
     exit 1
 fi
+mkdir -p "$HOME/.cache"
 
 "$BIN" doctor
 "$BIN" build "$PROJECT" --store "$STORE" --ports "$ROOT/ports" -j "$(nproc)"

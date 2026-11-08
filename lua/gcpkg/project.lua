@@ -81,9 +81,14 @@ function M.build(projectDir, cfg, opts)
     for _, m in ipairs(ordered) do
         includes = util.concat(includes, m.includes or {})
         libdirs = util.concat(libdirs, m.libdirs or {})
-        libs = util.concat(libs, m.libs or {})
         defines = util.concat(defines, m.defines or {})
         linkFlags = util.concat(linkFlags, m.link_flags or {})
+    end
+    -- Static linking: dependents before dependencies, BUT keep the order of
+    -- libs inside one manifest (libssl before libcrypto, brotlidec before
+    -- brotlicommon, ...). Reversing a flat list would break those pairs.
+    for i = #ordered, 1, -1 do
+        libs = util.concat(libs, ordered[i].libs or {})
     end
 
     local gdir = util.join(projectDir, ".gcpkg")
@@ -125,8 +130,7 @@ function M.build(projectDir, cfg, opts)
         jobs = cfg.jobs or gcpkg.sys.nproc(),
         includes = util.uniq(includes),
         libdirs = util.uniq(libdirs),
-        -- static linking needs dependents before their dependencies
-        libs = util.reverse(util.uniq(libs)),
+        libs = util.uniq(libs),
         defines = util.uniq(defines),
         link_flags = util.uniq(linkFlags),
         dependencies = ordered,
@@ -183,9 +187,13 @@ function M.build(projectDir, cfg, opts)
     -- Merge: project entries + every dependency's entries (transitively).
     local entries = compdb.read(jsonl)
     for _, m in ipairs(ordered) do
+        -- Both sources are merged (dedup makes this idempotent): native build
+        -- systems such as CMake emit compile_commands.json, while hand-written
+        -- Makefiles are captured by gcpkg-intercept into JSONL.
         if m.compdb_jsonl then
             entries = util.concat(entries, compdb.read(m.compdb_jsonl))
-        elseif m.compdb then
+        end
+        if m.compdb then
             entries = util.concat(entries, compdb.read(m.compdb, "json"))
         end
     end

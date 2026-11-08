@@ -1,0 +1,21 @@
+schema: 1
+port: libssh2
+features:
+  no-tests:
+    default: true
+    description: Do not build the upstream test suite
+    args: ["-DBUILD_TESTING=OFF"]
+  static:
+    default: true
+    description: Build libssh2.a
+    args: ["-DBUILD_SHARED_LIBS=OFF", "-DBUILD_STATIC_LIBS=ON"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build libssh2.so
+    args: ["-DBUILD_SHARED_LIBS=ON", "-DBUILD_STATIC_LIBS=OFF"]
+    conflicts: ["static"]
+  zlib:
+    default: true
+    description: Use zlib compression (provided by the zlib L0 port)
+    args: ["-DENABLE_ZLIB_COMPRESSION=ON"]

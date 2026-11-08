@@ -143,7 +143,7 @@ merge(project.jsonl + 每个传递依赖的 compdb_jsonl)
 <store>/bin/{cc,c++}            → gcpkg-intercept 的符号链接
 ```
 
-manifest 的 `fingerprint` 由 name/version/特性集合/源 URL/平台/依赖 key 组成；命中且产物路径仍存在时直接复用，避免重复编译 OpenSSL。`--no-cache` 强制重建。
+manifest 的 `fingerprint` 由 name/version/特性集合/源 URL/平台/依赖 key，以及 `build.lua` + `features.yaml` 的 SHA256 组成（改 port 文件会触发重建，否则 CMake defines 会陈旧）；命中且产物路径仍存在时直接复用。`--no-cache` 强制重建。缓存命中时也会从 JSONL 重新物化该库自己的 `compile_commands.json`，并把它与构建系统原生生成的 compdb 合并写回，避免 CMake/Meson 条目在复用时丢失。
 
 ## 4. 生命周期（OpenSSL 实例）
 
@@ -170,13 +170,13 @@ gcpkg build examples/hello
 - Rust / Go / Java 的编译单元不属于 clangd 的 C/C++ 模型；`cargo` adapter 只接管构建产物，Rust 跳转仍应交给 rust-analyzer。
 - `vcpkg` / `system` adapter 不猜 `-l<name>`，项目里显式写 `libs`。
 - 旧 `Source/MainProcess`（TOML + LLVM + Docker 原型）保留作参考，不参与构建；Docker 隔离执行可作为后续 `exec` 后端接回来。
-- 特性目前是「每包一组布尔开关」，还没做跨包特性传播（`openssl+zlib` 这类联动）与条件依赖的完整求值。
+- 特性是「每包一组布尔开关」；`requires:` 条件依赖已在 `install` / `graph` / `check` / `ports` 全链路求值（见第 8 节），但跨包特性传播（启用 A 时自动为依赖 B 启用某特性）仍只支持在 `dependencies = {{name=..., features={...}}}` 里显式声明。
 
 ## 6. 实测记录（2026-11-08，Linux x86_64 / gcc 14 / Lua 5.4 / yaml-cpp 0.8）
 
 ```bash
 cmake -S . -B build && cmake --build build -j
-./build/bin/gcpkg build examples/hello --store /tmp/gcpkg-store --ports ./ports
+./build/bin/gcpkg build examples/hello --store ~/.cache/gcpkg-store --ports ./ports
 ```
 
 结果：
@@ -193,7 +193,98 @@ cmake -S . -B build && cmake --build build -j
 > `directory` / `file` / `arguments`（或 `command`）。内部 JSONL 里的
 > `tag` / `output` 等元数据在输出时被 `compdb.clean()` 剥离。
 
-## 7. 构建 gcpkg 本体
+## 7. 自底向上扩展（2026-11-08 第二轮）
+
+第二轮按依赖层次从最底层往上加库，并把底层能力补齐：
+
+**底层能力**
+
+- `gcpkg.recipe`：声明式 `recipe.cmake / autotools / make`，新增普通库只需 ~20 行 Lua；`defines`、`vars` 支持 `function(ctx)` 以引用依赖安装前缀。
+- 依赖向上传导：`port.install` 汇总**所有传递依赖**的 manifest，自动注入 `CPPFLAGS` / `LDFLAGS` / `PKG_CONFIG_PATH` / `CMAKE_PREFIX_PATH`，`ctx.all_dependencies` / `includes` / `libdirs` / `libs` 可供任意构建脚本使用。
+- 缓存正确性：manifest fingerprint 现在包含 `build.lua` + `features.yaml` 的 SHA256，改 port 文件会触发重建。
+- 编译数据库双来源统一：CMake/Meson 原生的 `compile_commands.json` 与拦截日志 JSONL 在构建时合并写回 JSONL，缓存命中与项目合并都不会丢条目。
+- 静态链接顺序：项目链接按 manifest 逆序（依赖者在前）排列，但保持单个库内部的库顺序（`libssl` 在 `libcrypto` 前、`libbrotlidec` 在 `libbrotlicommon` 前）。
+- `gcpkg ports` / `graph` / `check`：按依赖层级列出、打印自底向上构建顺序、校验 port 完整性。
+
+**层次**
+
+```
+L0  zlib zstd lz4 brotli cares expat xz pcre2 libffi bzip2 openssl
+L1  libssh2 (openssl+zlib)   nghttp2 (zlib)
+    libarchive (zlib,bzip2,xz,zstd,lz4,openssl,expat,pcre2)
+L2  curl (openssl,zlib,brotli,zstd,cares,nghttp2,libssh2)
+L3  examples/web (curl)
+```
+
+`gcpkg install curl --store <fresh>` 实测一次从零构建 8 个包（2m42s），
+`gcpkg build examples/web` 从零生成 2115 条编译命令、覆盖 134 个源码目录（复用旧缓存的 store 为 1689 条 / 124 目录），
+所有 `file` 绝对路径有效；项目二进制运行输出：
+
+```
+libcurl       : 8.13.0
+  SSL backend : OpenSSL/3.4.1
+  HTTP2       : yes       async DNS : yes
+  brotli/zstd : yes / yes
+OpenSSL       : 3.4.1
+```
+
+clangd-22 对项目文件、curl、OpenSSL、zlib、libssh2 等各层源文件均能用同一份
+`compile_commands.json` 加载编译命令并解析（部分文件出现的是 clangd 自身
+`SwapBinaryOperands` tweak 的内部告警，不是编译诊断）。`tests/chain.sh` 固化了
+这条回归链路。
+
+> 途中修掉的真实问题：生成器 JSON/Lua 数组语法、libffi 多余的 include 路径、
+> curl 默认启用系统 OpenLDAP 导致静态链接缺 `-lldap`、以及 CMake 类库编译数据库
+> 在缓存命中时被丢弃。这些都已写入代码与测试，不是纸面设计。
+
+## 8. 条件依赖与更宽的 L1 面（2026-11-08 第三轮）
+
+**特性引入的依赖必须像静态依赖一样真实存在。** `features.yaml` 的 `requires:`
+不只是给 Configure 传参数：启用 `openssl:zlib` 时，zlib 必须先编译、其
+`-I` / `-L` / `PKG_CONFIG_PATH` / `CMAKE_PREFIX_PATH` 必须注入 OpenSSL 的构建环境，
+而且依赖图、校验、缓存 fingerprint 都要同步。
+
+实现上三处保持同一条规则：
+
+- `port.install()`：`deps = spec.dependencies ∪ f.requires`，递归安装后写进 manifest 的 `deps`；
+- `graph.deps(entry, requests, name)`：用相同的 `features.resolve()` 求有效依赖，`order()` / `layers()` / `validate()` 全部走它；
+- CLI 把 `--feature` 请求透传给 `graph` / `ports` / `check`，所以
+  `gcpkg graph openssl --feature=openssl:zlib` 得到 `zlib → openssl`，而不是只有 openssl。
+
+真编译验证（`tests/features.sh`）：
+
+```
+manifest deps: ['zlib-1.3.1'] features: ['no-docs','no-shared','no-tests','zlib']
+Configure ... no-docs no-shared no-tests zlib     → enable-zlib
+compdb 里出现 -DZLIB 与 -I<store>/pkg/zlib-1.3.1/include
+libcrypto.a 含 BIO_f_zlib / COMP_zlib 符号
+```
+
+也就是说，`CPPFLAGS` / `LDFLAGS` 里来自依赖 manifest 的路径让未修改的 OpenSSL
+Configure 找到了 gcpkg 自己编译的 zlib。
+
+**更宽的依赖面**：`ports/libarchive`（3.7.9）一次声明 8 个 L0 依赖，CMake 的
+`find_package()` 全部命中 gcpkg 前缀（实测 `CMakeCache.txt`）：
+
+```
+ZLIB   → <store>/pkg/zlib-1.3.1/lib/libz.so
+BZip2  → <store>/pkg/bzip2-1.0.8/lib/libbz2.a
+LibLZMA→ <store>/pkg/xz-5.8.1/lib/liblzma.a
+zstd   → <store>/pkg/zstd-1.5.7/lib/libzstd.a
+LZ4    → <store>/pkg/lz4-1.10.0/lib/liblz4.a
+OpenSSL→ <store>/pkg/openssl-3.4.1/lib64/libcrypto.a
+EXPAT  → <store>/pkg/expat-2.7.1/lib/libexpat.a
+```
+
+`gcpkg install libarchive --store <fresh>` 从零构建 9 个包（2m38s），产出
+`libarchive.a` 与 327 条编译命令；`gcpkg graph libarchive` 给出 9 步自底向上顺序。
+上游 CMake 一行未改，只靠 `CMAKE_PREFIX_PATH` 与 `ENABLE_*` 宏。
+
+> 环境注意：沙箱 `/tmp` 是 992M 的 tmpfs，多个源码树并行构建会报
+> `No space left on device`。测试脚本默认 store 已迁到 `$HOME/.cache/gcpkg-*-store`
+> （真实磁盘）；`GCPKG_STORE` 环境变量可覆盖。
+
+## 9. 构建 gcpkg 本体
 
 ```bash
 cmake -S . -B build            # 需要 Lua 5.4 开发库、yaml-cpp、pkg-config

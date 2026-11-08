@@ -54,6 +54,38 @@ features:
     provides: ["zlib:shared"]
 ```
 
+### 条件依赖：让特性拉起下层库
+
+特性的 `requires:` 不只是构建参数，它会变成真实的传递依赖。以
+`ports/openssl/features.yaml` 为例（不需要改 `build.lua`）：
+
+```yaml
+features:
+  zlib:
+    default: false
+    description: Enable zlib compression (pulls in the zlib port)
+    args: ["zlib"]          # perl Configure 的 enable-zlib
+    requires: ["zlib"]      # 先编译 zlib，再把它的 -I/-L 注入 OpenSSL
+```
+
+启用后：
+
+```bash
+gcpkg graph openssl --feature=openssl:zlib   # 1. zlib  2. openssl
+gcpkg check --feature=openssl:zlib           # 含条件依赖的完整性校验
+gcpkg install openssl --feature=openssl:zlib --store ~/.cache/gcpkg-store
+```
+
+`port.install()`、`graph.deps()`、`gcpkg ports` / `check` 用同一套
+`features.resolve()` 求有效依赖，所以依赖图、构建顺序、manifest 的 `deps`
+和缓存 fingerprint 始终一致。`tests/features.sh` 会真编译这条链并断言
+`-DZLIB`、zlib 的 include 路径以及 `libcrypto.a` 里的 `BIO_f_zlib` 符号。
+
+想让一个库依赖多个下层库，直接在 `dependencies` 里列全即可；配方会把它们
+汇总成 `CMAKE_PREFIX_PATH` / `CPPFLAGS` / `LDFLAGS` / `PKG_CONFIG_PATH`。
+`ports/libarchive` 就是这样一次挂上 8 个 L0 库，CMake 的 `find_package()`
+全部命中 gcpkg 自己编译的产物。
+
 要点：
 
 - `source` 支持 `url`（+`sha256` / `strip`）、`git`（+`ref`）、`dir`（本地目录）或一个 `function(ctx)`，用于任意获取方式。
@@ -147,3 +179,8 @@ M.register("conan", {
 | `GCPKG_INTERCEPT_BIN` | 覆盖 `gcpkg-intercept` 路径 |
 | `GCPKG_SYSTEM_PREFIX` | `system` adapter 的前缀 |
 | `GCPKG_VERBOSE` / `GCPKG_DEBUG` | 打印每条命令 / 调试日志 |
+| `GCPKG_STORE`（测试脚本） | 覆盖 `tests/{smoke,chain,features}.sh` 的 store 路径 |
+| `GCPKG_BIN`（测试脚本） | 覆盖测试使用的 gcpkg 可执行文件 |
+
+> store 建议放在真实磁盘（`~/.cache/...`）：本沙箱 `/tmp` 只有 992M tmpfs，
+> 并行编译多个库时会耗尽空间。

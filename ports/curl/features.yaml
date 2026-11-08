@@ -1,0 +1,37 @@
+schema: 1
+port: curl
+
+# Each feature maps directly to a curl CMake switch. Disabling one here also
+# should remove the corresponding dependency from build.lua (the dependency
+# graph and the feature set are separate concerns by design).
+features:
+  no-tests:
+    default: true
+    description: Do not build curl's test suite
+    args: ["-DBUILD_TESTING=OFF"]
+  static:
+    default: true
+    description: Build libcurl.a
+    args: ["-DBUILD_SHARED_LIBS=OFF", "-DBUILD_STATIC_LIBS=ON"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build libcurl.so
+    args: ["-DBUILD_SHARED_LIBS=ON", "-DBUILD_STATIC_LIBS=OFF"]
+    conflicts: ["static"]
+  http2:
+    default: true
+    description: HTTP/2 support via nghttp2
+    args: ["-DUSE_NGHTTP2=ON"]
+  ares:
+    default: true
+    description: Asynchronous DNS via c-ares
+    args: ["-DENABLE_ARES=ON"]
+  ssh:
+    default: true
+    description: SCP/SFTP via libssh2
+    args: ["-DUSE_LIBSSH2=ON"]
+  compression:
+    default: true
+    description: brotli / zstd / zlib content encoding
+    args: ["-DCURL_BROTLI=ON", "-DCURL_ZSTD=ON", "-DCURL_ZLIB=ON"]

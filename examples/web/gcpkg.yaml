@@ -1,0 +1,7 @@
+project: web-smoke
+
+# Project-level feature selection propagates down to each library's YAML.
+features:
+  curl: [static, no-tests, http2, ares, ssh, compression]
+  openssl: [no-shared, no-tests, no-docs]
+  zlib: [no-examples]

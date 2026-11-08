@@ -29,8 +29,9 @@ Options:
   -h, --help                      this help
 
 Examples:
-  gcpkg build examples/hello --store /tmp/gcpkg-store
+  gcpkg build examples/hello --store ~/.cache/gcpkg-store
   gcpkg install openssl --feature=openssl:shared
+  gcpkg graph openssl --feature=openssl:zlib   # feature-conditional deps
   gcpkg compdb . --ports ./ports:~/my-ports
   gcpkg backends
 ]]
@@ -210,7 +211,7 @@ function M.main(args)
     elseif cmd == "ports" then
         local graph = require("gcpkg.graph")
         local ports = graph.ports(roots)
-        local layers = graph.layers(ports)
+        local layers = graph.layers(ports, o.requests)
         local names = util.keys(ports)
         table.sort(names, function(a, b)
             if layers[a] ~= layers[b] then
@@ -222,7 +223,7 @@ function M.main(args)
         for _, n in ipairs(names) do
             local e = ports[n]
             local deps = {}
-            for _, d in ipairs((e.spec or {}).dependencies or {}) do
+            for _, d in ipairs(graph.deps(e, o.requests, n)) do
                 deps[#deps + 1] = graph.dep_name(d)
             end
             log.info(string.format("  L%-2d %-14s %-10s deps=[%s]%s", layers[n], n,
@@ -236,7 +237,7 @@ function M.main(args)
             error("graph needs a port name")
         end
         local graph = require("gcpkg.graph")
-        local order = graph.order(name, graph.ports(roots))
+        local order = graph.order(name, graph.ports(roots), o.requests)
         log.step("bottom-up build order for " .. name .. ":")
         for i, n in ipairs(order) do
             log.info(string.format("  %2d. %s", i, n))
@@ -245,7 +246,7 @@ function M.main(args)
     elseif cmd == "check" then
         local graph = require("gcpkg.graph")
         local ports = graph.ports(roots)
-        local problems = graph.validate(ports)
+        local problems = graph.validate(ports, o.requests)
         for _, p in ipairs(problems) do
             log.warn("  " .. p)
         end

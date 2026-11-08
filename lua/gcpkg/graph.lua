@@ -1,6 +1,11 @@
 -- Port registry inspection + bottom-up dependency ordering.
+-- Feature requests can add dependencies (`requires:` in features.yaml), so the
+-- graph is computed from *effective* dependencies, not just build.lua's static
+-- `dependencies` list. port.install() uses the same rule.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
+local yaml = require("gcpkg.yaml")
+local features = require("gcpkg.features")
 local M = {}
 
 function M.dep_name(dep)
@@ -35,9 +40,30 @@ function M.ports(roots)
     return out
 end
 
+-- build.lua dependencies + `requires:` of every currently enabled feature.
+function M.deps(entry, requests, name)
+    local out = util.deepcopy((entry and entry.spec or {}).dependencies or {})
+    if not entry or not fs.isfile(util.join(entry.dir, "features.yaml")) then
+        return out
+    end
+    local ok, fspec = pcall(yaml.parse_file, util.join(entry.dir, "features.yaml"))
+    if not ok or type(fspec) ~= "table" then
+        return out
+    end
+    local portName = name or (entry.spec or {}).name
+    local resolved, f = pcall(features.resolve, fspec.features or fspec,
+                              portName, requests or {})
+    if resolved then
+        for _, r in ipairs(f.requires or {}) do
+            out[#out + 1] = r
+        end
+    end
+    return out
+end
+
 -- DFS post-order: dependencies first ("bottom-up"), i.e. the exact order in
 -- which gcpkg will build them.
-function M.order(name, ports)
+function M.order(name, ports, requests)
     local order, seen, stack = {}, {}, {}
     local function visit(n)
         if seen[n] then
@@ -49,7 +75,7 @@ function M.order(name, ports)
         stack[n] = true
         local entry = ports[n]
         if entry and entry.spec then
-            for _, dep in ipairs(entry.spec.dependencies or {}) do
+            for _, dep in ipairs(M.deps(entry, requests, n)) do
                 local d = M.dep_name(dep)
                 if not M.is_external(d) and ports[d] then
                     visit(d)
@@ -64,7 +90,7 @@ function M.order(name, ports)
     return order
 end
 
-function M.layers(ports)
+function M.layers(ports, requests)
     local memo = {}
     local function layer(n, path)
         if memo[n] then
@@ -77,7 +103,7 @@ function M.layers(ports)
         local entry = ports[n]
         local best = 0
         if entry and entry.spec then
-            for _, dep in ipairs(entry.spec.dependencies or {}) do
+            for _, dep in ipairs(M.deps(entry, requests, n)) do
                 local d = M.dep_name(dep)
                 if not M.is_external(d) and ports[d] then
                     best = math.max(best, layer(d, path) + 1)
@@ -95,7 +121,7 @@ function M.layers(ports)
     return out
 end
 
-function M.validate(ports)
+function M.validate(ports, requests)
     local problems = {}
     for name, entry in pairs(ports) do
         if entry.error then
@@ -104,8 +130,7 @@ function M.validate(ports)
         if not fs.isfile(util.join(entry.dir, "features.yaml")) then
             problems[#problems + 1] = name .. ": missing features.yaml"
         end
-        local spec = entry.spec or {}
-        for _, dep in ipairs(spec.dependencies or {}) do
+        for _, dep in ipairs(M.deps(entry, requests, name)) do
             local d = M.dep_name(dep)
             if not M.is_external(d) and not ports[d] then
                 problems[#problems + 1] = name .. ": unknown dependency '" .. d .. "'"

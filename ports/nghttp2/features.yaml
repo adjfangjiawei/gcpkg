@@ -1,0 +1,21 @@
+schema: 1
+port: nghttp2
+features:
+  no-tests:
+    default: true
+    description: Do not build the test suite
+    args: ["-DBUILD_TESTING=OFF"]
+  lib-only:
+    default: true
+    description: Build only libnghttp2 (no h2load / nghttpd tools)
+    args: ["-DENABLE_LIB_ONLY=ON"]
+  static:
+    default: true
+    description: Build libnghttp2.a
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build libnghttp2.so
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+    conflicts: ["static"]

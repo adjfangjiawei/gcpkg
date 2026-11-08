@@ -6,6 +6,7 @@
 -- -> write a manifest that projects and other ports can consume.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
+local json = require("gcpkg.json")
 local yaml = require("gcpkg.yaml")
 local features = require("gcpkg.features")
 local store = require("gcpkg.store")
@@ -214,10 +215,16 @@ function M.install(spec_name, cfg)
         depLinkFlags = util.concat(depLinkFlags, m.link_flags or {})
     end
 
+    -- Port files are part of the build recipe: editing build.lua or
+    -- features.yaml must invalidate the cached build (CMake defines live in
+    -- build.lua, so a stale cache would silently keep old options).
+    local buildHash = net.sha256(util.join(dir, "build.lua")) or ""
+    local featureHash = net.sha256(util.join(dir, "features.yaml")) or ""
     local fingerprint = store.fingerprint(util.concat({
         portName, version, f.hash,
         (type(spec.source) == "table" and (spec.source.url or spec.source.git or spec.source.dir)) or "custom",
         gcpkg.sys.os(), gcpkg.sys.arch(), table.concat(depKeys, ","),
+        "build=" .. buildHash, "features=" .. featureHash,
     }))
 
     local cached = store.read_manifest(st, key)
@@ -307,7 +314,7 @@ function M.install(spec_name, cfg)
             return util.deepcopy(f.defines)
         end,
         dep = function(depName)
-            for _, m in ipairs(manifests) do
+            for _, m in ipairs(ordered) do
                 if m.name == depName or m.key == depName then
                     return m
                 end
@@ -339,10 +346,17 @@ function M.install(spec_name, cfg)
     gcpkg.log.step("building " .. key .. " features=[" .. table.concat(f.list, ",") .. "]")
     local exports = spec.build(ctx) or {}
 
-    -- 5. compilation database (intercepted + any build-system-native ones)
+    -- 5. compilation database (intercepted + build-system-native ones).
+    -- Rewrite the JSONL with the UNION so it is the single source of truth:
+    -- cache hits (and project merges) then never lose CMake/Meson entries.
     local entries = compdb.read(jsonl)
     for _, extra in ipairs(exports.compdb_files or {}) do
         entries = util.concat(entries, compdb.read(extra, "json"))
+    end
+    entries = compdb.dedup(entries)
+    fs.write(jsonl, "")
+    for _, e in ipairs(entries) do
+        fs.append(jsonl, json.encode(e) .. "\n")
     end
     local compdbJson = store.compdb_json(st, key)
     entries = compdb.write(entries, compdbJson)

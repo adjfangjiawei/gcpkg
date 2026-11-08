@@ -1,0 +1,22 @@
+schema: 1
+port: libarchive
+features:
+  no-tests:
+    default: true
+    description: Do not build the upstream test suite
+    args: ["-DENABLE_TEST=OFF"]
+  static:
+    default: true
+    description: Build libarchive.a
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build libarchive.so
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+    conflicts: ["static"]
+  full-codecs:
+    default: true
+    description: Enable all L0 codec/crypto backends
+    args: ["-DENABLE_ZLIB=ON", "-DENABLE_BZip2=ON", "-DENABLE_LZMA=ON",
+           "-DENABLE_ZSTD=ON", "-DENABLE_LZ4=ON", "-DENABLE_OPENSSL=ON"]

@@ -72,7 +72,10 @@ function M.define(spec)
         if kind == "cmake" then
             local cmake = require("gcpkg.build.cmake")
             local cfg = spec.cmake or {}
-            local defines = util.deepcopy(cfg.defines or {})
+            -- defines may be a function(ctx) when a value depends on an
+            -- installed dependency prefix (e.g. -DOPENSSL_ROOT_DIR=...).
+            local defines = util.deepcopy(type(cfg.defines) == "function" and cfg.defines(ctx)
+                                          or cfg.defines or {})
             local args = util.concat(util.deepcopy(cfg.args or {}), featureArgs)
             local prefixes = dependencyPrefixes(ctx)
             if #prefixes > 0 and not defines.CMAKE_PREFIX_PATH then
