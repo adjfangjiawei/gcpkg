@@ -9,6 +9,9 @@
 -- `recipe.define` takes care of prefix, feature args, dependency propagation,
 -- compiler interception and compdb import. Anything unusual can still provide
 -- its own build(ctx) function -- the recipe layer never takes that away.
+--
+-- Supported kinds: cmake, meson, autotools, make. Meson matters for the Linux
+-- plumbing stack (wayland / X11 / systemd / libinput / libdrm / ...).
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local M = {}
@@ -69,6 +72,14 @@ function M.define(spec)
         local featureArgs = ctx.feature_args()
         local result = {}
 
+        -- Some tarballs ship only configure.ac (no generated ./configure) or
+        -- need generated sources before the stock build system can run.
+        -- pre_build is ordinary Lua, so the recipe stays declarative for the
+        -- 99% case without taking anything away from the 1%.
+        if spec.pre_build then
+            spec.pre_build(ctx)
+        end
+
         if kind == "cmake" then
             local cmake = require("gcpkg.build.cmake")
             local cfg = spec.cmake or {}
@@ -92,6 +103,32 @@ function M.define(spec)
                 defines = defines,
                 args = args,
                 generator = cfg.generator,
+            }
+
+        elseif kind == "meson" then
+            local meson = require("gcpkg.build.meson")
+            local cfg = spec.meson or {}
+            -- options may be a function(ctx), e.g. to point -Dxkb-config-root
+            -- at a dependency's installed prefix.
+            local options = util.deepcopy(type(cfg.options) == "function" and cfg.options(ctx)
+                                          or cfg.options or {})
+            local args = util.concat(util.deepcopy(cfg.args or {}), featureArgs)
+            if cfg.auto_features then
+                options.auto_features = cfg.auto_features
+            end
+            result = meson.all {
+                src = cfg.source and util.join(ctx.src, cfg.source) or ctx.src,
+                build_dir = ctx.build_dir,
+                prefix = ctx.prefix,
+                exec = ctx.exec,
+                log = ctx.log,
+                jobs = ctx.jobs,
+                env = ctx.env,
+                options = options,
+                args = args,
+                libdir = cfg.libdir,
+                buildtype = cfg.buildtype,
+                wrap_mode = cfg.wrap_mode,
             }
 
         elseif kind == "autotools" then
@@ -133,12 +170,12 @@ function M.define(spec)
             end
             make.run {
                 cwd = ctx.src, exec = ctx.exec, log = ctx.log,
-                jobs = ctx.jobs, env = ctx.env, vars = vars, targets = targets,
+                jobs = cfg.jobs or ctx.jobs, env = ctx.env, vars = vars, targets = targets,
             }
             if cfg.install_target then
                 make.run {
                     cwd = ctx.src, exec = ctx.exec, log = ctx.log,
-                    jobs = ctx.jobs, env = ctx.env, vars = vars,
+                    jobs = cfg.jobs or ctx.jobs, env = ctx.env, vars = vars,
                     targets = { cfg.install_target },
                 }
             end
@@ -169,6 +206,11 @@ end
 
 function M.cmake(spec)
     spec.kind = "cmake"
+    return M.define(spec)
+end
+
+function M.meson(spec)
+    spec.kind = "meson"
     return M.define(spec)
 end
 

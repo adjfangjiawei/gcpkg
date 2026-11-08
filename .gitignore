@@ -4,7 +4,9 @@ Library
 temp
 
 # gcpkg build outputs
-build/
+# NOTE: anchored to the repo root. A bare `build/` also matched
+# lua/gcpkg/build/, which is SOURCE CODE (the build-system adapters).
+/build/
 compile_commands.json
 .clangd
 .gcpkg/

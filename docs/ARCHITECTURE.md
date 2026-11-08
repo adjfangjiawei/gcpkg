@@ -170,6 +170,7 @@ gcpkg build examples/hello
 - Rust / Go / Java 的编译单元不属于 clangd 的 C/C++ 模型；`cargo` adapter 只接管构建产物，Rust 跳转仍应交给 rust-analyzer。
 - `vcpkg` / `system` adapter 不猜 `-l<name>`，项目里显式写 `libs`。
 - 旧 `Source/MainProcess`（TOML + LLVM + Docker 原型）保留作参考，不参与构建；Docker 隔离执行可作为后续 `exec` 后端接回来。
+- 第四轮已支持 Meson / Autotools / 手写 Makefile 与系统 `-dev` 依赖混用（见第 9 节）；系统组件通过 `pkgconfig` backend 提供，纯数据 port 允许零编译命令。
 - 特性是「每包一组布尔开关」；`requires:` 条件依赖已在 `install` / `graph` / `check` / `ports` 全链路求值（见第 8 节），但跨包特性传播（启用 A 时自动为依赖 B 启用某特性）仍只支持在 `dependencies = {{name=..., features={...}}}` 里显式声明。
 
 ## 6. 实测记录（2026-11-08，Linux x86_64 / gcc 14 / Lua 5.4 / yaml-cpp 0.8）
@@ -284,7 +285,70 @@ EXPAT  → <store>/pkg/expat-2.7.1/lib/libexpat.a
 > `No space left on device`。测试脚本默认 store 已迁到 `$HOME/.cache/gcpkg-*-store`
 > （真实磁盘）；`GCPKG_STORE` 环境变量可覆盖。
 
-## 9. 构建 gcpkg 本体
+## 9. Linux 底层库栈（2026-11-08 第四轮）
+
+第四轮把「能管理几乎所有库」从网络库推到系统层：**36 个新 port**，全部真实下载、
+编译、安装（不是纸面声明）。`gcpkg check --ports ./ports` = 51 ports OK，`gcpkg ports`
+按依赖层级给出 L0 31 / L1 11 / L2 5 / L3 2 / L4 1（含旧 15 个），`gcpkg graph xserver`
+给出 16 步自底向上顺序，`systemd` 是 L0 里体量最大的一个。
+
+### 覆盖面
+
+| 组 | port |
+| --- | --- |
+| 权限 / 沙箱 / NUMA | `libnuma` `libcap` `libcap-ng` `libseccomp` `libaio` `liburing` |
+| 网络 / netfilter / IPVS | `libmnl` `libnl` `libnftnl` `iptables` `ipvsadm` `libpcap` |
+| 数据 / XML / 系统工具 | `popt` `json-c` `libyaml` `libxml2` `kmod` `util-linux` `dbus` |
+| X11 / Xserver | `xorgproto` `xcb-proto` `libXau` `libXdmcp` `libxcb` `libX11` `pixman` `libpciaccess` `libxkbcommon` `fontutil` `xserver` |
+| Wayland / DRM / 输入 | `wayland-protocols` `wayland` `libdrm` `libevdev` `libinput` |
+| init / 服务管理 | `systemd` |
+
+### 引擎新增能力（都不是针对某个库的特判）
+
+- `lua/gcpkg/build/meson.lua`：完整的 meson setup/compile/install，`--libdir=lib`
+  （绕开 Debian 多架构目录）、`--wrap-mode=nodownload`、`--reconfigure`、原生
+  `compile_commands.json`；`--sysconfdir=<prefix>/etc` 与
+  `--localstatedir=<prefix>/var` 把系统组件的配置安装收进自包含 prefix，
+  非 root 也能装 systemd / dbus / util-linux。
+- `lua/gcpkg/recipe.lua`：`recipe.meson`；`options(ctx)` 允许选项依赖运行时 prefix
+  （kmod 把 `distconfdir` / `moduledir` 指向 prefix，避免写 `/etc/depmod.d`）；
+  `pre_build(ctx)` 在构建前跑任意钩子（libcap-ng / popt 补 `NEWS` 再 `autoreconf -fi`）；
+  `make.jobs` 控制手写 Makefile 的并行度（ipvsadm 的 `all: libs ipvsadm` 无依赖边，
+  必须 `jobs=1`）。
+- `lua/gcpkg/port.lua`：依赖环境补 `CPATH` / `LIBRARY_PATH` / `PYTHONPATH` /
+  `ACLOCAL_PATH` / `share/pkgconfig`，`CMAKE_PREFIX_PATH` 改用 `;` 分隔；
+  Meson 与 Autotools 的 pkg-config 探测因此能跨 gcpkg 前缀工作。
+- `fontutil` / `xcb-proto` 这类**纯数据 port**合法：只装 `.pc` / 头文件 / XML，
+  零编译命令，但下游 `dependency('fontutil')` 能解析。
+- 宽依赖面里没法（也不必）纳入 gcpkg 的宿主组件（xtrans / xfont2 / libudev /
+  libmount / libaudit / libpam / libgcrypt / glib …）仍由系统 `-dev` 提供，
+  通过 `pkgconfig` backend 参与 `find_package` / `dependency()`；上游源码一行未改。
+
+### 真实编译结果（store `~/.cache/gcpkg-linux-store`）
+
+36 个 port 合计 6718 条编译命令，全部由 `tests/linux.sh` 校验。代表性数字：
+`systemd` 3272、`util-linux` 833、`xserver` 596（产出 `Xvfb`）、`libX11` 410、
+`dbus` 255、`libxkbcommon` 185、`libinput` 166、`iptables` 161、`libnl` 135、
+`libxml2` 82、`pixman` 65、`libnftnl` 65、`wayland-protocols` 59、`kmod` 46、
+`libxcb` 35、`json-c` 32、`wayland` 29、`libaio` 25、`libpciaccess` 25、
+`libcap-ng` / `popt` 都因 GitHub/归档 tarball 缺自动生成文件而通过 `pre_build` 修复。
+链内 `openssl` 仍为 1128 条 / 98 目录，说明新引擎未破坏旧链。
+
+### 适配决策（全部落在 build.lua 里，不改上游）
+
+`libyaml` 0.2.5 release tarball 缺 CMake 模板 → 改用 autotools；`libxcb` 同时产出
+`.a` / `.so`，`xserver` 用 `default_library=shared` 链接，避免静态 XCB 丢失
+`Requires.private` 的 Xau/Xdmcp 符号；`systemd` 关 `hwdb`（否则 install 阶段要
+以 root 跑 `systemd-hwdb update`）；`ipvsadm` 的 `INCLUDE` 需 `-I` 前缀、`LIBS`
+需显式 `-lpopt -lnl-genl-3 -lnl-3`；Meson 选项名按各 tarball 的
+`meson_options.txt` 逐个核对（wayland 是 `dtd_validation`，xorg-server 是
+`mitshm`，dbus 用下划线……）。
+
+回归：`tests/{smoke,chain,features}.sh` 全部 exit=0（1127 / 1689 条项目级 compdb），
+`tests/linux.sh` 额外校验 36 个 manifest、6718 条 JSONL 的绝对路径、
+12 个关键产物及 clangd 对 5 个库 compdb 的加载。
+
+## 10. 构建 gcpkg 本体
 
 ```bash
 cmake -S . -B build            # 需要 Lua 5.4 开发库、yaml-cpp、pkg-config

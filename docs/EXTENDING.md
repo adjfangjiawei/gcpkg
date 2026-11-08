@@ -179,8 +179,86 @@ M.register("conan", {
 | `GCPKG_INTERCEPT_BIN` | 覆盖 `gcpkg-intercept` 路径 |
 | `GCPKG_SYSTEM_PREFIX` | `system` adapter 的前缀 |
 | `GCPKG_VERBOSE` / `GCPKG_DEBUG` | 打印每条命令 / 调试日志 |
-| `GCPKG_STORE`（测试脚本） | 覆盖 `tests/{smoke,chain,features}.sh` 的 store 路径 |
+| `GCPKG_STORE`（测试脚本） | 覆盖 `tests/{smoke,chain,features,linux}.sh` 的 store 路径 |
 | `GCPKG_BIN`（测试脚本） | 覆盖测试使用的 gcpkg 可执行文件 |
 
 > store 建议放在真实磁盘（`~/.cache/...`）：本沙箱 `/tmp` 只有 992M tmpfs，
 > 并行编译多个库时会耗尽空间。
+
+## 6. Meson 组件、系统组件与手写 Makefile
+
+Meson 组件用 `recipe.meson`，`options` 既可以是一张表，也可以是
+`function(ctx)`（需要把安装目录拼进 prefix 时）：
+
+```lua
+local recipe = require("gcpkg.recipe")
+return recipe.meson {
+  name = "kmod", version = "34.2",
+  source = { url = "...", sha256 = "...", strip = 1 },
+  dependencies = { "zlib" },
+  meson = {
+    options = function(ctx)
+      return {
+        tools = "false",
+        ["build-tests"] = "false",
+        -- 默认会写 /etc/depmod.d，非 root 沙箱装不了
+        distconfdir = ctx.prefix .. "/etc/depmod.d",
+        moduledir   = ctx.prefix .. "/lib/modules",
+      }
+    end,
+    args = { "-Dc_args=-Wno-error=deprecated" },
+  },
+  exports = { includes = {"@PREFIX@/include"}, libs = {"kmod"} },
+}
+```
+
+`build/meson.lua` 自动加 `--prefix` / `--libdir=lib` / `--sysconfdir=<prefix>/etc` /
+`--localstatedir=<prefix>/var`，所以 systemd、dbus、util-linux 这类系统组件不会
+写 `/etc`、`/var`。`systemd` 还要把 `rootprefix` / `rootlibdir` / `sysvinit-path`
+指向 prefix，并关掉 `hwdb`（否则 install 脚本会尝试运行 `systemd-hwdb update`）。
+
+其它常见形态：
+
+- **纯数据 port**：`fontutil` / `xcb-proto` 只装 `.pc` / 头文件 / XML，
+  `compdb_entries = 0` 是合法的；下游 `dependency('fontutil')` 靠
+  `PKG_CONFIG_PATH`（含 `share/pkgconfig`）解析。
+- **tarball 缺生成文件**：`pre_build(ctx)` 里 `ctx.exec({...}, {cwd=ctx.src, log=ctx.log})`
+  跑 `autoreconf -fi`，必要时先用 `require('gcpkg.fs').write(ctx.src..'/NEWS','')`
+  补 `NEWS`（libcap-ng / popt）。需要 `autopoint`。
+- **手写 Makefile**：`recipe.make` 的 `jobs = 1` 规避没有依赖边的并行竞态；
+  `vars` 里拼 `-I`、`LIBS` 时注意上游是否自行硬编码 `CC=gcc`（gcpkg 会用
+  `CC=<wrapper>` 覆盖，保证 compdb 可采）。
+- **系统依赖**：宿主 `-dev` 包通过 `pkgconfig` backend 使用，不需要为 `libudev`、
+  `xtrans`、`libmount` 之类再写一个 port；`ports/README.md` 第「第四轮」节列出
+  沙箱里实际安装的包。上游源码始终不改。
+
+### 第四轮工具链（Debian/Ubuntu）
+
+```
+sudo apt-get install -y meson ninja-build bison flex xsltproc gettext gperf \
+    autopoint python3-jinja2 python3-ply libyaml-cpp-dev liblua5.4-dev pkg-config
+# 以及 X11 / systemd 所需的 -dev 包：libudev-dev libmtdev-dev libxkbfile-dev
+# libxfont-dev libfontenc-dev libunwind-dev libbsd-dev libxshmfence-dev
+# libx11-xcb-dev libxcb-util-dev libdbus-1-dev libdrm-dev libpciaccess-dev
+# libpixman-1-dev xtrans-dev libgbm-dev libepoxy-dev libselinux1-dev libaudit-dev
+# libpam0g-dev libacl1-dev libcrypt-dev libgcrypt20-dev libidn2-dev libelf-dev
+# libdw-dev libglib2.0-dev libmount-dev libblkid-dev libkmod-dev libseccomp-dev
+# libcap-dev libpcre2-dev liblz4-dev libzstd-dev liblzma-dev zlib1g-dev
+# libssl-dev libffi-dev libexpat1-dev libarchive-dev libcurl4-openssl-dev
+```
+`/usr` 下的安装不随工作区快照持久化，新会话先跑
+`/home/user/setup-gcpkg-toolchain.sh`。`fontutil` 没有系统 `-dev` 包，
+已作为纯数据 port 纳入（X.Org 的正确文件名是 `font-util-1.4.2.tar.xz`）。
+
+第四轮 35 个 port 的 `build.lua` / `features.yaml` 由
+`tools/gen-linux-ports.py` 依据 `tools/linux-catalog.tsv`（35 条真实 URL +
+SHA256 + 上游 tarball 的构建系统标记）生成，`GCPKG_PORTS` 可覆盖输出目录：
+
+```bash
+python3 tools/gen-linux-ports.py          # 重新生成 35 套 port，不影响 fontutil
+./build/bin/gcpkg check --ports ./ports  # 51 ports OK
+./tests/linux.sh                         # 校验 36 个新 port 的真实编译结果
+```
+
+保留生成器是为了让「按上游 tarball 的真实选项名逐个核对」这件事可复现；
+运行时引擎完全不依赖它，只读取 `ports/*/build.lua` 里内嵌的 URL/SHA256。

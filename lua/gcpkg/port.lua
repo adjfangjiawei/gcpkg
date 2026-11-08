@@ -119,22 +119,40 @@ function M.dependency_env(ordered)
         ld[#ld + 1] = "-L" .. l
         pkgdirs[#pkgdirs + 1] = util.join(l, "pkgconfig")
     end
+    local acl, py = {}, {}
     for _, p in ipairs(util.uniq(prefixes)) do
+        -- X11 / Wayland "data" ports (xorgproto, xcb-proto,
+        -- wayland-protocols) install their .pc files under share/pkgconfig,
+        -- not lib/pkgconfig. Without this, meson's dependency() and
+        -- ./configure's PKG_CHECK_MODULES cannot see the lower layers.
         pkgdirs[#pkgdirs + 1] = util.join(p, "lib", "pkgconfig")
         pkgdirs[#pkgdirs + 1] = util.join(p, "lib64", "pkgconfig")
+        pkgdirs[#pkgdirs + 1] = util.join(p, "share", "pkgconfig")
+        acl[#acl + 1] = util.join(p, "share", "aclocal")
+        py[#py + 1] = util.join(p, "lib", "python3", "site-packages")
     end
     local env = {}
     if #cpp > 0 then
         env.CPPFLAGS = table.concat(cpp, " ")
+        -- Some hand-written Makefiles / configure probes honour CPATH but not
+        -- CPPFLAGS; keep both in sync so headers are found either way.
+        env.CPATH = table.concat(util.uniq(includes), ":")
     end
     if #ld > 0 then
         env.LDFLAGS = table.concat(ld, " ")
+        env.LIBRARY_PATH = table.concat(util.uniq(libdirs), ":")
     end
     if #pkgdirs > 0 then
         env.PKG_CONFIG_PATH = table.concat(util.uniq(pkgdirs), ":")
     end
+    if #acl > 0 then
+        env.ACLOCAL_PATH = table.concat(util.uniq(acl), ":")
+    end
+    if #py > 0 then
+        env.PYTHONPATH = table.concat(util.uniq(py), ":")
+    end
     if #prefixes > 0 then
-        env.CMAKE_PREFIX_PATH = table.concat(util.uniq(prefixes), ":")
+        env.CMAKE_PREFIX_PATH = table.concat(util.uniq(prefixes), ";")
     end
     return env
 end
