@@ -18,8 +18,10 @@ if [[ ! -x "$BIN" ]]; then
 fi
 
 echo "--- registry / graph ---"
-"$BIN" check --ports "$PORTS"
-"$BIN" ports --ports "$PORTS" | grep -q '51 ports' || { echo "expected 51 ports" >&2; exit 1; }
+CHECK=$("$BIN" check --ports "$PORTS")
+echo "$CHECK"
+# Forward-compatible: the registry only grows as more ports are added.
+echo "$CHECK" | python3 -c 'import re,sys; n=int(re.search(r"(\d+) ports OK", sys.stdin.read()).group(1)); assert n >= 51, n; print("registry:", n, "ports")'
 ORDER=$("$BIN" graph xserver --ports "$PORTS")
 echo "$ORDER" | tail -6
 ORDER="$ORDER" python3 - <<'PY'

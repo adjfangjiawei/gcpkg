@@ -99,11 +99,15 @@ function M.dependency_env(ordered)
         return {}
     end
     local includes, libdirs, defines, prefixes = {}, {}, {}, {}
-    local pkgdirs = {}
+    local pkgdirs, bins = {}, {}
     for _, m in ipairs(ordered) do
         includes = util.concat(includes, m.includes or {})
         libdirs = util.concat(libdirs, m.libdirs or {})
         defines = util.concat(defines, m.defines or {})
+        -- Tool ports (cmake, code generators, SDK bin dirs) export a PATH
+        -- entry. Prepending it makes "gcpkg manages cmake" actually work:
+        -- a dependent port's CMake/Meson invocation sees our cmake first.
+        bins = util.concat(bins, m.binaries or {})
         if m.prefix then
             prefixes[#prefixes + 1] = m.prefix
         end
@@ -153,6 +157,10 @@ function M.dependency_env(ordered)
     end
     if #prefixes > 0 then
         env.CMAKE_PREFIX_PATH = table.concat(util.uniq(prefixes), ";")
+    end
+    if #bins > 0 then
+        env.PATH = table.concat(util.uniq(bins), ":") .. ":" ..
+                   (os.getenv("PATH") or "/usr/bin:/bin")
     end
     return env
 end

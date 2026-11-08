@@ -348,7 +348,69 @@ EXPAT  → <store>/pkg/expat-2.7.1/lib/libexpat.a
 `tests/linux.sh` 额外校验 36 个 manifest、6718 条 JSONL 的绝对路径、
 12 个关键产物及 clangd 对 5 个库 compdb 的加载。
 
-## 10. 构建 gcpkg 本体
+## 10. 媒体 / AI / 网络 / 厂商 SDK（2026-11-08 第五轮）
+
+第五轮新增 **23 个 port**，注册表 51 → **74**（`gcpkg check` = 74 ports OK）。
+按你的要求，这一轮以**静态验证**为主（真实编译由你在本机完成）：
+`check` / `graph` / `ports` / `externals` / `features`、URL+SHA256 校验、
+依赖可解析、分层顺序，全部不下载、不编译（`tests/media.sh`）。
+
+### 两个新引擎能力
+
+- `lua/gcpkg/build/external.lua`（新 adapter）：登录墙 / 授权 / 多 GB `.run`
+  / 已装在机器上的 SDK 无法匿名下载，所以这类 port 的 `source` 是一个
+  **函数** —— `net.prepare` 只在 `gcpkg install` 时调用它，检查
+  `$GCPKG_<NAME>_HOME`（含备用变量与默认路径）指向的目录并写 marker；
+  `build` 不编译，只导出 include / libdir / libs / binaries（二进制 SDK
+  没有翻译单元，compdb 为 0，和 `fontutil` / `xcb-proto` 一样合理）。
+  因此 `gcpkg check` / `graph` / `ports` 在**没有装任何 SDK 的机器上**也能跑。
+  `gcpkg externals` 静态打印 4 个 SDK 各自的变量名、是否已设置、官方下载页。
+- `lua/gcpkg/port.lua`：依赖环境把 `exports.binaries` 前置到 `PATH`。
+  「管理 CMake」因此不只是声明：`ports/cmake` 是工具 port，
+  `folly` / `proxygen` / `vulkan` / `redpanda` 等依赖它后，
+  它们的 CMake/Meson 调用优先使用 gcpkg 自己构建的 cmake。
+
+### 覆盖面
+
+| 组 | port |
+| --- | --- |
+| 构建 / 语言 / 基础 | `cmake` `lua` `alsa-lib` `libpsl` `libfuse` `ucx` |
+| 流媒体 | `live555` `librtsp` |
+| Vulkan | `vulkan-headers` `vulkan`（Loader） |
+| Facebook C++ 栈 | `folly` `fizz` `wangle` `mvfst` `proxygen` |
+| 流式数据 | `redpanda` |
+| NVIDIA 开源栈 | `dcgm` `nv-image-codec` `cv-cuda` |
+| 厂商 SDK（external） | `nvidia`（CUDA）`cann`（华为 CANN）`nv-codec-sdk`（Video Codec SDK）`dahuaplayer`（大华 PlaySDK） |
+
+`cmake` / `lua` 用自定义 `build(ctx)`（bootstrap / `make linux`），
+`alsa-lib` / `libpsl` / `ucx` 用 autotools（`pre_build` 按需 `autoreconf`），
+`libfuse` 用 Meson，其余 CMake。所有可匿名下载的 tarball 都带**真实 URL +
+SHA256**（`tools/media-catalog.tsv`），不猜测校验和。
+
+### 依赖图（静态）
+
+`gcpkg graph proxygen` = 11 步：
+`cmake → openssl → zlib → zstd → lz4 → bzip2 → folly → fizz → wangle → mvfst → proxygen`；
+`gcpkg graph nv-image-codec` = `nvidia → cv-cuda → nv-image-codec`。
+`folly` 复用第四轮之前的 L0 加密/压缩链，宿主侧的 boost / glog / gflags /
+fmt / double-conversion / libevent 仍走 `pkgconfig` backend。
+
+### 本轮动态验证（轻量，其余交给你本地）
+
+| 项 | 结果 |
+| --- | --- |
+| `lua` 5.4.7 | 真编译 34 条 compdb，`liblua.a` + `bin/lua -v` = Lua 5.4.7 |
+| `alsa-lib` 1.2.9 | 真编译 113 条 compdb |
+| `nvidia` adapter | 用临时假 SDK 目录 `install` 成功，manifest 正确导出 `include/` / `lib64/` / `cudart` 等，compdb 0 条 |
+| 旧回归 | `tests/{smoke,chain,features,linux}.sh` 全部 exit=0 |
+
+其余 21 个新 port 是**诚实的静态声明**：proxygen 链、Redpanda、DCGM、
+CV-CUDA/nvImageCodec 需要大量系统组件或 CUDA；CANN / Video Codec SDK /
+Dahua PlaySDK 需要登录或授权。上游源码一行未改，所有适配都在 `build.lua`
+的选项、钩子和 SDK 元数据里。`docs/EXTERNAL_SDKS.md` 给出 4 个 SDK 的
+环境变量、默认路径、探针文件与导出内容。
+
+## 11. 构建 gcpkg 本体
 
 ```bash
 cmake -S . -B build            # 需要 Lua 5.4 开发库、yaml-cpp、pkg-config

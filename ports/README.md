@@ -1,7 +1,7 @@
 # Port 注册表
 
 每个库恰好两个文件：`build.lua`（构建描述）+ `features.yaml`（特性描述）。
-当前共 **51 个 port**（其中第四轮新增 36 个 Linux 底层库）。`gcpkg ports` 按依赖层级列出，`gcpkg graph <port>` 打印
+当前共 **74 个 port**（第四轮 +36 个 Linux 底层库，第五轮 +23 个媒体/AI/SDK port）。`gcpkg ports` 按依赖层级列出，`gcpkg graph <port>` 打印
 自底向上的构建顺序，`gcpkg check` 校验文件齐全、Lua 可加载、依赖可解析；
 三者都接受 `--feature=...`，会把特性 `requires:` 引入的条件依赖算进图里。
 
@@ -150,3 +150,41 @@ L0 31 / L1 11 / L2 5 / L3 2 / L4 1。`gcpkg graph xserver` 给出 16 步
 Debian 包，所以补了一个纯数据 port。`tests/linux.sh` 校验全部 36 个
 manifest、6718 条 JSONL 的绝对路径、12 个关键产物，以及 clangd 对
 libnuma / wayland / libX11 / xserver / systemd 五个 compdb 的加载。
+
+## 第五轮：媒体 / AI / 网络 / 厂商 SDK（23 个 port）
+
+**默认静态验证**（`tests/media.sh`）：注册表、依赖图、URL+SHA256、SDK 环境变量、
+依赖解析，均不下载不编译。`lua` 与 `alsa-lib` 另外做了真编译（34 / 113 条
+compdb），`nvidia` 用临时假 SDK 目录验证了 adapter 全链路；其余由你在本机验证。
+
+| port | 版本 | 接入方式 | 依赖（gcpkg） | 本轮验证 |
+| --- | --- | --- | --- | --- |
+| `cmake` | 3.31.6 | 自定义 `build(ctx)`（`./bootstrap`） | — | 静态（工具 port，导出 `bin/` 到 PATH） |
+| `lua` | 5.4.7 | 自定义 `build(ctx)`（`make linux`） | — | ✅ 真编译 34 条，`bin/lua -v` |
+| `alsa-lib` | 1.2.9 | autotools | — | ✅ 真编译 113 条 |
+| `libpsl` | 0.21.0 | autotools + `pre_build(autoreconf)` | — | 静态 |
+| `libfuse` | 3.18.3 | Meson | — | 静态 |
+| `live555` | 2021.11.14 | 自定义 `build(ctx)`（`genMakefiles`） | — | 静态（上游无 install target，脚本收集 4 个 `.a`） |
+| `librtsp` | 1.0.0 | 自定义 `build(ctx)`（子目录 `librtsp/`） | — | 静态 |
+| `ucx` | 1.23.2 | autotools + `pre_build(autogen.sh)` | — | 静态 |
+| `folly` | 2026.10.26.00 | CMake | `cmake,openssl,zlib,zstd,lz4,bzip2` | 静态 |
+| `fizz` | 2026.10.26.00 | CMake | `folly,openssl,cmake` | 静态 |
+| `wangle` | 2026.10.26.00 | CMake | `folly,fizz,cmake` | 静态 |
+| `mvfst` | 2026.10.26.00 | CMake | `folly,fizz,cmake` | 静态 |
+| `proxygen` | 2026.10.26.00 | CMake | `folly,fizz,wangle,mvfst,cmake` | 静态（`graph` 11 步） |
+| `redpanda` | 26.2.2 | CMake | `cmake` | 静态 |
+| `vulkan-headers` | 1.4.363.0 | CMake | — | 静态 |
+| `vulkan` | 1.4.363.0 | CMake（Loader） | `vulkan-headers,cmake` | 静态 |
+| `dcgm` | 4.7.0 | CMake | `nvidia` | 静态 |
+| `cv-cuda` | 0.19.0 | CMake | `nvidia` | 静态 |
+| `nv-image-codec` | 0.10.0 | CMake | `nvidia,cv-cuda` | 静态 |
+| `nvidia` | 12.8 | **external SDK**（`GCPKG_NVIDIA_HOME`） | — | ✅ adapter 冒烟（0 compdb） |
+| `cann` | 9.0.0 | **external SDK**（`GCPKG_CANN_HOME`） | — | 静态 |
+| `nv-codec-sdk` | 12.2 | **external SDK**（`GCPKG_NV_CODEC_SDK_HOME`） | `nvidia` | 静态 |
+| `dahuaplayer` | 3.044.0000000.1 | **external SDK**（`GCPKG_DAHUAPLAYER_HOME`） | — | 静态 |
+
+`tools/gen-media-ports.py` + `tools/media-catalog.tsv` 可重新生成这 23 套
+文件（19 个 tarball 的 URL/SHA256 均为实际下载计算值；`lua` 用 lua.org
+官方包而非只有 `src/` 的 GitHub 镜像）。外部 SDK 的版本号只是 store key 的
+占位，实际版本由你本地 `$GCPKG_<NAME>_HOME` 决定，详见
+[docs/EXTERNAL_SDKS.md](../docs/EXTERNAL_SDKS.md)。

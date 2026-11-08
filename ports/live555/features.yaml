@@ -1,0 +1,19 @@
+schema: 1
+port: live555
+
+# Upstream has no install target: ./genMakefiles linux, make, then copy the per-component .a and headers into the gcpkg prefix.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

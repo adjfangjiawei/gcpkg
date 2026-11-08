@@ -12,6 +12,7 @@ Usage:
   gcpkg compdb [PROJECT_DIR]       rebuild merged compile_commands.json only
   gcpkg features PORT              list a library's YAML features
   gcpkg backends                   list external package-manager adapters
+  gcpkg externals                  list vendor SDK ports + the env var each needs
   gcpkg ports                      list ports grouped by dependency layer
   gcpkg graph PORT                 print the bottom-up build order for a port
   gcpkg check                      validate all ports (files + dependencies)
@@ -207,6 +208,25 @@ function M.main(args)
             log.info(string.format("  %-12s %-8s %s", b.name,
                                    b.available and "ready" or "n/a", b.detail))
         end
+        return 0
+    elseif cmd == "externals" then
+        -- Purely static: no download, no SDK required. Prints the exact
+        -- environment variable a user must point at a locally installed SDK.
+        local graph = require("gcpkg.graph")
+        local ports = graph.ports(roots)
+        local names = util.keys(ports)
+        table.sort(names)
+        local n = 0
+        for _, name in ipairs(names) do
+            local sdk = (ports[name].spec or {}).sdk
+            if sdk then
+                n = n + 1
+                local set = os.getenv(sdk.env or "") and "set" or "unset"
+                log.info(string.format("  %-16s %-28s %-6s %s", name,
+                    sdk.env or "?", set, sdk.url or sdk.description or ""))
+            end
+        end
+        log.step(n .. " external SDK ports (point the env var at the SDK before install)")
         return 0
     elseif cmd == "ports" then
         local graph = require("gcpkg.graph")

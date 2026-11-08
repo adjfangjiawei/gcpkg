@@ -2,7 +2,7 @@
 
 一个**元包管理器**：用 Lua 描述「怎么构建一个库」，用 YAML 描述「这个库有哪些特性」，把任意构建系统、乃至其它包管理器（vcpkg / conan / pkg-config / apt / …）接进来，**不改它们本身**，并且让项目自身也能被它管理、生成可跨依赖跳转的 clangd 编译数据库。
 
-> 当前分支 `feat/lua-yaml-compdb-openssl`：Lua 引擎 + YAML 特性 + 项目模式 + 统一编译数据库 + **51 个真实 port**（L0 → L4）。按依赖层次自底向上扩展：`openssl` 起步，L0 十个基础库，再到 `libssh2` / `nghttp2` / `curl` 全链与 `libarchive`（一次挂 8 个 L0 依赖）。第四轮继续覆盖 Linux 底层库栈：NUMA / 权限与沙箱 / netfilter / X11 / **Xserver** / **Wayland** / libinput / D-Bus / kmod / util-linux / **systemd** / ipvs / iptables —— 36 个新 port 全部真实编译（6718 条编译命令），`xserver` 依赖图 16 步、`systemd` 单包 3272 条。特性开关也能引入真实的传递依赖（`openssl:zlib` → 先构建 `zlib`）。
+> 当前分支 `feat/lua-yaml-compdb-openssl`：Lua 引擎 + YAML 特性 + 项目模式 + 统一编译数据库 + **74 个真实 port**（L0 → L4）。按依赖层次自底向上扩展：`openssl` 起步，L0 十个基础库，再到 `libssh2` / `nghttp2` / `curl` 全链与 `libarchive`（一次挂 8 个 L0 依赖）。第四轮继续覆盖 Linux 底层库栈：NUMA / 权限与沙箱 / netfilter / X11 / **Xserver** / **Wayland** / libinput / D-Bus / kmod / util-linux / **systemd** / ipvs / iptables —— 36 个新 port 全部真实编译（6718 条编译命令），`xserver` 依赖图 16 步、`systemd` 单包 3272 条。特性开关也能引入真实的传递依赖（`openssl:zlib` → 先构建 `zlib`）。第五轮再覆盖 CMake / Lua / ALSA / libpsl / libfuse / live555 / librtsp / UCX / Vulkan / folly / proxygen / Redpanda 以及 NVIDIA（CUDA、DCGM、Video Codec SDK、nvImageCodec、CV-CUDA）、华为 CANN、大华播放库 —— 共 23 个新 port；其中 4 个需登录或专有的 SDK 做成 `gcpkg.build.external` 声明式 port，`gcpkg externals` 静态列出所需环境变量，你在本地设好即可真构建。
 
 ## 三个核心要求如何落地
 
@@ -46,6 +46,13 @@ python3 -c "import json;d=json.load(open('examples/hello/compile_commands.json')
 ./build/bin/gcpkg install xserver --store ~/.cache/gcpkg-linux-store --ports ./ports -j 4
 ./build/bin/gcpkg install systemd --store ~/.cache/gcpkg-linux-store --ports ./ports -j 4
 ./tests/linux.sh                                     # 校验 36 个 port / compdb / clangd
+
+# 第五轮：媒体 / AI / 网络 / 厂商 SDK（默认只做静态验证）
+./build/bin/gcpkg externals --ports ./ports        # 列出 4 个外部 SDK 及环境变量
+./build/bin/gcpkg graph proxygen --ports ./ports   # 11 步自底向上
+./tests/media.sh                                  # 静态：注册表 / 图 / SHA / 依赖，不下载不编译
+GCPKG_MEDIA_DYNAMIC=1 ./tests/media.sh           # 可选：lua 真编译 + SDK adapter 冒烟
+GCPKG_NVIDIA_HOME=/usr/local/cuda ./build/bin/gcpkg install nvidia --store ~/.cache/gcpkg-media-store --ports ./ports
 ```
 
 > store 请放在真实磁盘（如 `~/.cache/...`）：本沙箱 `/tmp` 是 992M 的 tmpfs，
@@ -60,7 +67,9 @@ gcpkg compdb examples/hello                          # 只重建合并的 compil
 gcpkg features openssl                               # 列出 YAML 特性
 gcpkg ports                                          # 按依赖层级列出所有库（L0 = 最底层）
 gcpkg graph curl                                     # 打印某库自底向上的构建顺序
+gcpkg externals                                      # 列出专有 SDK port 所需环境变量
 gcpkg graph xserver                                  # 16 步的 X11/Xserver 依赖链
+gcpkg graph proxygen                                 # folly -> fizz -> wangle/mvfst -> proxygen
 gcpkg graph openssl --feature=openssl:zlib           # 条件依赖也进入依赖图
 gcpkg install systemd --store ~/.cache/gcpkg-linux-store --ports ./ports
 gcpkg check --feature=openssl:zlib                   # 校验（含特性引入的依赖）
@@ -110,10 +119,10 @@ Source/Core/       C++ 运行时（Lua 沙箱、进程、YAML 桥、CLI 引导�
 Source/Intercept/  gcpkg-intercept：透明 CC/CXX 编译器包装器
 lua/gcpkg/         Lua 引擎（特性、port、project、编译数据库、adapter、CLI）
 lua/gcpkg/build/   各构建系统的 Lua 适配模块
-ports/             51 个库，每个 build.lua + features.yaml（L0 → L4）
+ports/             74 个库，每个 build.lua + features.yaml（L0 → L4）
 examples/hello/    OpenSSL 项目：gcpkg.lua + gcpkg.yaml + src/main.c
 examples/web/      curl 全链顶端项目
-tests/             smoke / chain / features / linux 四个端到端回归
+tests/             smoke / chain / features / linux / media 五个端到端回归
 docs/              架构与扩展文档
 Source/MainProcess/  旧 TOML 原型，保留但不参与构建
 ```

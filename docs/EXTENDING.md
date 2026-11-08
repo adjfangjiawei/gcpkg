@@ -179,7 +179,9 @@ M.register("conan", {
 | `GCPKG_INTERCEPT_BIN` | 覆盖 `gcpkg-intercept` 路径 |
 | `GCPKG_SYSTEM_PREFIX` | `system` adapter 的前缀 |
 | `GCPKG_VERBOSE` / `GCPKG_DEBUG` | 打印每条命令 / 调试日志 |
-| `GCPKG_STORE`（测试脚本） | 覆盖 `tests/{smoke,chain,features,linux}.sh` 的 store 路径 |
+| `GCPKG_STORE`（测试脚本） | 覆盖 `tests/{smoke,chain,features,linux,media}.sh` 的 store 路径 |
+| `GCPKG_MEDIA_DYNAMIC` | `tests/media.sh` 设为 1 时执行动态冒烟（lua + SDK adapter） |
+| `GCPKG_<NAME>_HOME` | 外部 SDK 的安装根目录，见 `gcpkg externals` / `docs/EXTERNAL_SDKS.md` |
 | `GCPKG_BIN`（测试脚本） | 覆盖测试使用的 gcpkg 可执行文件 |
 
 > store 建议放在真实磁盘（`~/.cache/...`）：本沙箱 `/tmp` 只有 992M tmpfs，
@@ -262,3 +264,55 @@ python3 tools/gen-linux-ports.py          # 重新生成 35 套 port，不影响
 
 保留生成器是为了让「按上游 tarball 的真实选项名逐个核对」这件事可复现；
 运行时引擎完全不依赖它，只读取 `ports/*/build.lua` 里内嵌的 URL/SHA256。
+
+## 7. 厂商 SDK port 与工具 port
+
+登录墙 / 授权 / 多 GB `.run` / 已经装在机器上的 SDK（CUDA、华为 CANN、
+NVIDIA Video Codec SDK、大华 PlaySDK…）不适合 `source = {url=..., sha256=...}`。
+用 `gcpkg.build.external` 声明，它仍是一个普通 port：有版本、依赖、
+features.yaml、manifest，能进依赖图、能被上层库引用。
+
+```lua
+local external = require("gcpkg.build.external")
+return external.declare {
+  name = "nvidia", version = "12.8",
+  description = "NVIDIA CUDA Toolkit / driver platform",
+  license = "Proprietary", homepage = "https://developer.nvidia.com/cuda-toolkit",
+  dependencies = {},
+  sdk = {
+    env = "GCPKG_NVIDIA_HOME",              -- required, printed by `gcpkg externals`
+    alt_env = { "CUDA_HOME", "CUDA_PATH" },  -- fallbacks
+    default = "/usr/local/cuda",
+    url = "https://developer.nvidia.com/cuda-downloads",  -- where to get it
+    probe = { "include/cuda_runtime.h" },    -- layout sanity check (warn only)
+    includes = { "include" },
+    libdirs = { "lib64", "lib", "lib64/stubs" },
+    binaries = { "bin" },
+    libs = { "cudart", "cuda", "nvidia-ml" },
+  },
+}
+```
+
+要点：
+
+- `source` 是函数，`net.prepare` 只在 `install` 时调用它；`check` / `graph` /
+  `ports` / `externals` 是**纯静态**的，不需要装 SDK。`gcpkg externals`
+  会列出每个 SDK 的变量名、是否已设置、官方下载页。
+- 二进制 SDK 不编译，compdb 为 0 条；`build` 返回的 include / libdir / libs
+  是绝对路径，会进入 manifest 并传导给所有依赖它的 port。
+- 切换 SDK 版本：改 `$GCPKG_<NAME>_HOME` 后加 `--no-cache`（环境变量优先于
+  上次写入的 `.gcpkg-sdk-root` marker）。
+- 若 SDK 里确实有可编译的东西，传 `build_hook = function(ctx, root) ... end`，
+  `ctx.env` 里编译器包装器与所有依赖环境变量都已就绪。
+- 见 `docs/EXTERNAL_SDKS.md` 获取 4 个内置 SDK 的完整清单。
+
+**工具 port**：`exports.binaries` 会被前置到依赖方的 `PATH`。
+`ports/cmake` 就是这样被管理的 —— `folly` / `proxygen` / `vulkan` / `redpanda`
+声明 `dependencies = {"cmake", ...}` 后，它们的构建优先使用 gcpkg 的 cmake，
+而不是宿主的。
+
+**静态验证**：`tests/media.sh` 检查注册表、两张自底向上图、23 个 port 的
+两文件、真实 URL+SHA256、SDK 环境变量、无沙箱绝对路径、依赖可解析，
+默认不下载不编译；`GCPKG_MEDIA_DYNAMIC=1` 才会真编译 `lua` 并用临时假 SDK
+目录冒烟测试 adapter。生成器是 `tools/gen-media-ports.py` +
+`tools/media-catalog.tsv`（`GCPKG_PORTS` 可覆盖输出目录）。

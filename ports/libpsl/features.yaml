@@ -1,0 +1,19 @@
+schema: 1
+port: libpsl
+
+# GitHub tag archives ship configure.ac only; pre_build regenerates ./configure when needed. Needs libidn2/libunistring headers from the host.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

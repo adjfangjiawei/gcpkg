@@ -1,0 +1,19 @@
+schema: 1
+port: vulkan
+
+# Khronos Vulkan-Loader; depends on vulkan-headers and the managed cmake tool port.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]
