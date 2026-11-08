@@ -1,7 +1,7 @@
 # Port 注册表
 
 每个库恰好两个文件：`build.lua`（构建描述）+ `features.yaml`（特性描述）。
-当前共 **74 个 port**（第四轮 +36 个 Linux 底层库，第五轮 +23 个媒体/AI/SDK port）。`gcpkg ports` 按依赖层级列出，`gcpkg graph <port>` 打印
+当前共 **111 个 port**（第四轮 +36 个 Linux 底层库，第五轮 +23 个媒体/AI/SDK port，第六轮 +37 个基础库）。`gcpkg ports` 按依赖层级列出，`gcpkg graph <port>` 打印
 自底向上的构建顺序，`gcpkg check` 校验文件齐全、Lua 可加载、依赖可解析；
 三者都接受 `--feature=...`，会把特性 `requires:` 引入的条件依赖算进图里。
 
@@ -188,3 +188,56 @@ compdb），`nvidia` 用临时假 SDK 目录验证了 adapter 全链路；其余
 官方包而非只有 `src/` 的 GitHub 镜像）。外部 SDK 的版本号只是 store key 的
 占位，实际版本由你本地 `$GCPKG_<NAME>_HOME` 决定，详见
 [docs/EXTERNAL_SDKS.md](../docs/EXTERNAL_SDKS.md)。
+
+## 第六轮：更多 Linux 基础库（37 个 port）
+
+`gcpkg check` = **111 ports OK**。37 个 tarball 的 URL/SHA256 均为实测值
+（`tools/linux-base-catalog.tsv`），由 `tools/gen-linux-base-ports.py` 生成。
+默认静态验证（`tests/linux-base.sh`）；14 个代表性库在这里从干净源码真编译，
+合计 **884 条编译命令**，其余交给你在本机验证。
+
+| port | 版本 | 构建系统 | 依赖（gcpkg） | 本轮验证 |
+| --- | --- | --- | --- | --- |
+| `gmp` | 6.3.0 | autotools | — | 静态 |
+| `mpfr` | 4.2.2 | autotools | gmp | 静态 |
+| `mpc` | 1.3.1 | autotools | gmp, mpfr | 静态 |
+| `nettle` | 3.10 | autotools | gmp | 静态 |
+| `libtasn1` | 4.20.0 | autotools | — | 静态 |
+| `libunistring` | 1.3 | autotools | — | 静态 |
+| `libidn2` | 2.3.8 | autotools | libunistring | 静态 |
+| `libgpg-error` | 1.55 | autotools | — | ✅ 真编译 43 条 |
+| `libgcrypt` | 1.11.1 | autotools | libgpg-error | 静态 |
+| `libsodium` | 1.0.20 | autotools | — | ✅ 真编译 119 条 |
+| `mbedtls` | 3.6.7 | cmake | — | 静态 |
+| `gnutls` | 3.8.9 | autotools | nettle, gmp, libtasn1, libidn2, libunistring, zlib | 静态 |
+| `libevent` | 2.1.13 | cmake | openssl | 静态 |
+| `libuv` | 1.53.0 | cmake | — | 静态 |
+| `jansson` | 2.15.1 | cmake | — | ✅ 真编译 70 条 |
+| `sqlite3` | 3.46.1 | autotools | — | 静态 |
+| `ncurses` | 6.5 | autotools | — | ✅ 真编译 364 条 |
+| `readline` | 8.2.13 | autotools | ncurses | ✅ 真编译 34 条 |
+| `oniguruma` | 6.9.10 | cmake | — | 静态 |
+| `utf8proc` | 2.12.0 | cmake | — | ✅ 真编译 4 条 |
+| `xxhash` | 0.8.4 | custom-make | — | ✅ 真编译 10 条 |
+| `libdeflate` | 1.26 | cmake | — | ✅ 真编译 52 条 |
+| `libpng` | 1.6.59 | cmake | zlib | ✅ 真编译 70 条 |
+| `libjpeg-turbo` | 3.2.1 | cmake | — | 静态 |
+| `libtiff` | 4.7.0 | cmake | zlib, xz, zstd, libjpeg-turbo | 静态 |
+| `freetype` | 2.13.3 | cmake | zlib, bzip2, libpng, brotli | 静态 |
+| `fontconfig` | 2.16.0 | autotools | freetype, expat | 静态 |
+| `harfbuzz` | 15.1.0 | meson | freetype, glib | 静态 |
+| `glib` | 2.84.4 | meson | libffi, zlib, pcre2 | 静态 |
+| `libxslt` | 1.1.43 | autotools | libxml2 | ✅ 真编译 30 条 |
+| `libusb` | 1.0.30 | autotools | — | ✅ 真编译 10 条 |
+| `elfutils` | 0.192 | autotools | zlib, zstd, xz | 静态 |
+| `libbpf` | 1.8.0 | custom-libbpf | elfutils, zlib | 静态 |
+| `libattr` | 2.5.2 | autotools | — | ✅ 真编译 14 条 |
+| `libacl` | 2.3.2 | autotools | libattr | ✅ 真编译 61 条 |
+| `libnfnetlink` | 1.0.2 | autotools | — | ✅ 真编译 3 条 |
+| `libnetfilter_conntrack` | 1.0.9 | autotools | libnfnetlink, libmnl | 静态 |
+
+依赖图示例：`graph gnutls` 7 步（gmp → nettle → libtasn1 → libunistring →
+libidn2 → zlib → gnutls）、`graph libbpf` 5 步（zlib / zstd / xz → elfutils
+→ libbpf）、`graph fontconfig` 7 步。真编译子集用 `GCPKG_BASE_DYNAMIC=1
+./tests/linux-base.sh` 复现；上游源码始终不改，适配全在 `build.lua`
+的选项 / `pre_build` / 自定义 `build(ctx)` 里。

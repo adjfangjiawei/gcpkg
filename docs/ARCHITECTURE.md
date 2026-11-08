@@ -410,7 +410,65 @@ Dahua PlaySDK 需要登录或授权。上游源码一行未改，所有适配都
 的选项、钩子和 SDK 元数据里。`docs/EXTERNAL_SDKS.md` 给出 4 个 SDK 的
 环境变量、默认路径、探针文件与导出内容。
 
-## 11. 构建 gcpkg 本体
+## 11. 更多 Linux 基础库（2026-11-08 第六轮）
+
+第六轮新增 **37 个 port**，注册表 74 → **111**（`gcpkg check` = 111 ports OK）。
+延续「自底向上 + 宽依赖面」：新库大量复用前几轮的 L0 成果（zlib / xz /
+zstd / bzip2 / brotli / libffi / pcre2 / expat / libxml2 / openssl / libmnl），
+而不是重新声明一遍。
+
+### 覆盖面
+
+| 组 | port |
+| --- | --- |
+| GNU 数值 / 加密 | `gmp` `mpfr` `mpc` `nettle` `libtasn1` `libunistring` `libidn2` `libgpg-error` `libgcrypt` `libsodium` `mbedtls` `gnutls` |
+| 事件 / 数据 / 终端 | `libevent` `libuv` `jansson` `sqlite3` `ncurses` `readline` `oniguruma` `utf8proc` `xxhash` `libdeflate` |
+| 图像 / 字体 | `libpng` `libjpeg-turbo` `libtiff` `freetype` `fontconfig` `harfbuzz` `glib` |
+| 内核 / 系统接口 | `libusb` `elfutils` `libbpf` `libattr` `libacl` `libnfnetlink` `libnetfilter_conntrack` |
+
+Autotools / CMake / Meson / 手写 Makefile 四种形态都有，全部通过
+`lua/gcpkg/recipe.lua` 的对应分支或自定义 `build(ctx)` 接入，上游零修改。
+
+### 真实 URL / SHA256 与依赖图
+
+37 个 tarball 全部实际下载并计算 SHA256（`tools/linux-base-catalog.tsv`）；
+`isl` 的 SourceForge / GCC 镜像都失效，已剔除而不是写假校验和。
+`tools/gen-linux-base-ports.py` 可重新生成 37 套 `build.lua` + `features.yaml`。
+
+- `gcpkg graph gnutls` = 7 步：`gmp → nettle → libtasn1 → libunistring →
+  libidn2 → zlib → gnutls`（nettle / libidn2 各自还带下层依赖）。
+- `gcpkg graph libbpf` = 5 步：`zlib → zstd → xz → elfutils → libbpf`。
+- `gcpkg graph fontconfig` = 7 步（zlib → libpng → freetype → fontconfig，
+  另含 bzip2 / brotli / expat）。
+
+### 真编译（14 个代表性库，884 条编译命令）
+
+用 `~/.cache/gcpkg-linux-store` 复用前几轮依赖，从**干净源码**重建：
+`xxhash` 10、`libdeflate` 52、`jansson` 70、`utf8proc` 4、`libpng` 70、
+`libgpg-error` 43、`libsodium` 119、`libattr` 14、`libacl` 61、
+`libnfnetlink` 3、`ncurses` 364、`readline` 34、`libxslt` 30、`libusb` 10。
+`GCPKG_BASE_DYNAMIC=1 ./tests/linux-base.sh` 可复现（14 PASS / 0 FAIL）。
+
+期间修正了三类真实的上游差异，全部落在生成的 `build.lua` 里：
+
+- `libdeflate` 1.26 的 tag tarball 只有 `CMakeLists.txt`（无顶层 Makefile）
+  → 从手写 Makefile 配方改为 CMake 配方。
+- `libusb` 1.0.30 的 tag tarball 只有 `configure.ac` → 改为 autotools，
+  `pre_build` 条件执行 `autoreconf -fi`。
+- `libxslt` 默认构建 shared 库，会把非 PIC 的 `liblzma.a` 链进 `.so` 而失败
+  → 所有 autotools 配方统一加 `--disable-shared --enable-static`
+  （与 `features.yaml` 里 `static` 为默认值一致）。
+
+### 静态验证与边界
+
+`tests/linux-base.sh` 默认纯静态：111 ports OK、三张自底向上图的顺序断言、
+37 份两文件、真实 URL + 64 位 SHA256、无沙箱绝对路径、依赖全部可解析、
+`gcpkg features gnutls` 可加载。不下载、不编译。
+其余 23 个新 port（GnuTLS / GLib / HarfBuzz / elfutils / libbpf 的完整链等）
+按约定由用户在本机验证 —— 它们需要更多系统组件或更长构建时间。
+六个回归脚本全部 exit=0。
+
+## 12. 构建 gcpkg 本体
 
 ```bash
 cmake -S . -B build            # 需要 Lua 5.4 开发库、yaml-cpp、pkg-config

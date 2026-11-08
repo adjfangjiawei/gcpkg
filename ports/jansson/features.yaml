@@ -1,0 +1,20 @@
+schema: 1
+port: jansson
+
+# JSON C library; complements the existing json-c port.
+# Static validation is the default; see tests/linux-base.sh.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

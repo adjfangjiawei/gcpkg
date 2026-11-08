@@ -316,3 +316,36 @@ return external.declare {
 默认不下载不编译；`GCPKG_MEDIA_DYNAMIC=1` 才会真编译 `lua` 并用临时假 SDK
 目录冒烟测试 adapter。生成器是 `tools/gen-media-ports.py` +
 `tools/media-catalog.tsv`（`GCPKG_PORTS` 可覆盖输出目录）。
+
+## 8. 批量新增基础库的流程
+
+第六轮 37 个基础库用的是同一套可复现流程，适合继续扩：
+
+```bash
+# 1) 在 tools/<round>-catalog.tsv 记下真实 URL、实测 SHA256、构建系统 kind、依赖
+# 2) 生成器把每库展开成 build.lua + features.yaml
+python3 tools/gen-linux-base-ports.py
+./build/bin/gcpkg check --ports ./ports
+./build/bin/gcpkg graph gnutls --ports ./ports      # 看自底向上顺序
+./tests/linux-base.sh                              # 静态：不下载不编译
+GCPKG_BASE_DYNAMIC=1 ./tests/linux-base.sh         # 可选：真编译子集
+```
+
+生成器只是开发工具；运行时引擎完全不依赖它，只读 `ports/*/build.lua` 里
+内嵌的 URL/SHA256。`GCPKG_PORTS` 可覆盖输出目录。
+
+从这一轮总结出的几个坑（都不需要改引擎）：
+
+- **GitHub tag tarball 常缺生成文件**：只有 `configure.ac` 时用
+  `pre_build(ctx)` 条件跑 `autoreconf -fi`；只有 `CMakeLists.txt` 的库
+  （libdeflate）不要硬套手写 Makefile 配方。
+- **静态库链进 shared 会失败**：上游 configure 默认 `--enable-shared` 时，
+  会把 gcpkg 的非 PIC `.a`（如 `liblzma.a`）链进 `.so`。autotools 配方统一
+  加 `--disable-shared --enable-static`，与 `features.yaml` 的 `static` 默认一致。
+- **增量编译让 compdb 变 0**：`net.prepare` 会复用带 marker 的源码目录，
+  重跑只做增量，编译器包装器不产生新条目。要得到完整编译数据库，
+  清掉 store 的 `src/<key>` + `build/<key>` 再装一次。
+- **脚本别被 `pipefail` 坑**：缓存命中日志里没有 "compile commands"，
+  `grep | tail` 会让 `set -euo pipefail` 提前退出，记得 `|| N="cached"`。
+- **镜像失效就剔除**：`isl` 的 SourceForge / GCC 镜像全部 403/404，
+  与其写占位 SHA256 不如不收（校验和必须是真实下载计算值）。
