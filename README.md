@@ -32,6 +32,9 @@ python3 -c "import json;d=json.load(open('examples/hello/compile_commands.json')
 gcpkg install openssl --feature=openssl:shared      # 单独构建/安装库
 gcpkg compdb examples/hello                          # 只重建合并的 compile_commands.json
 gcpkg features openssl                               # 列出 YAML 特性
+gcpkg ports                                          # 按依赖层级列出所有库（L0 = 最底层）
+gcpkg graph curl                                     # 打印某库自底向上的构建顺序
+gcpkg check                                          # 校验所有 port 的文件与依赖
 gcpkg backends                                       # 探测本机外部包管理器
 gcpkg port new zlib                                  # 生成 port 模板
 ```

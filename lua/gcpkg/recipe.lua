@@ -110,7 +110,15 @@ function M.define(spec)
         elseif kind == "make" then
             local make = require("gcpkg.build.make")
             local cfg = spec.make or {}
-            local vars = util.deepcopy(cfg.vars or {})
+            local vars = util.deepcopy(type(cfg.vars) == "function" and cfg.vars(ctx) or cfg.vars or {})
+            -- Hand-written Makefiles often hard-code CC=gcc, which would bypass
+            -- our interceptor. Command-line make variables win over the file.
+            if not vars.CC then
+                vars.CC = ctx.compiler.wrapper_cc
+            end
+            if not vars.CXX then
+                vars.CXX = ctx.compiler.wrapper_cxx
+            end
             local targets = util.deepcopy(cfg.targets or {})
             for _, a in ipairs(featureArgs) do
                 local k, v = tostring(a):match("^([%w_]+)=(.*)$")

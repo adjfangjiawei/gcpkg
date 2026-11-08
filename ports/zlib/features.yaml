@@ -1,0 +1,16 @@
+schema: 1
+port: zlib
+
+# Feature switches are DATA: they inject build flags without
+# editing build.lua, and are resolved from defaults + project
+# gcpkg.yaml + --feature CLI overrides.
+features:
+  no-examples:
+    default: true
+    description: Do not build the zlib example programs
+    args: ["-DZLIB_BUILD_EXAMPLES=OFF"]
+  examples:
+    default: false
+    description: Build the zlib examples
+    args: ["-DZLIB_BUILD_EXAMPLES=ON"]
+    conflicts: ["no-examples"]

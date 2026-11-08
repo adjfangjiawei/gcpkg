@@ -1,0 +1,21 @@
+schema: 1
+port: pcre2
+
+# Feature switches are DATA: they inject build flags without
+# editing build.lua, and are resolved from defaults + project
+# gcpkg.yaml + --feature CLI overrides.
+features:
+  no-tests:
+    default: true
+    description: Do not build the upstream test suite
+    args: ["-DPCRE2_BUILD_TESTS=OFF"]
+  static:
+    default: true
+    description: Build static libraries
+    args: ["-DBUILD_STATIC_LIBS=ON", "-DBUILD_SHARED_LIBS=OFF"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: ["-DBUILD_STATIC_LIBS=OFF", "-DBUILD_SHARED_LIBS=ON"]
+    conflicts: ["static"]

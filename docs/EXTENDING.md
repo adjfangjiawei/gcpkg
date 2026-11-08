@@ -40,6 +40,8 @@ return {
 }
 ```
 
+更常见的情况可以直接用声明式配方（`require("gcpkg.recipe")`），`ports/zlib`、`ports/zstd`、`ports/xz` 等都是这样写的：配方自动处理 prefix、特性参数、依赖环境传导和编译数据库导入，`build.lua` 只需 ~20 行；只有上游构建系统确实特殊时才写 `build(ctx)`（如 `ports/openssl`、`ports/bzip2`）。
+
 `ports/zlib/features.yaml`（**唯一特性配置**）
 
 ```yaml
