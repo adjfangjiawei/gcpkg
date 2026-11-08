@@ -154,6 +154,23 @@ port_dir / compdb_entries`：
 （项目内）或 `~/...`（家目录下），不会把绝对路径硬编码进去。仓库自带的
 `examples/*` 每次构建都会重写自己的 lock，仓库根 `.gitignore` 单独忽略了它们。
 
+## 代理配置也分项目特有 / 公有
+
+第八轮把依赖清单分成项目级与用户级；第十轮的代理沿用同一个
+`gcpkg.yaml` 和同一套作用域：
+
+```bash
+gcpkg proxy http://proxy.corp:3128 -C apps/demo    # 写 apps/demo/gcpkg.yaml
+gcpkg proxy http://proxy.corp:3128 -g              # 写 $GCPKG_HOME/gcpkg.yaml
+gcpkg proxy -C apps/demo                           # 查看：项目配置压过用户级
+gcpkg proxy --unset -C apps/demo                   # 只清项目级
+```
+
+两者各写一个独立的托管区块，和 `gcpkg add` 的
+`# --- gcpkg managed dependencies ---` 区块互不干扰。临时的会话覆盖用
+`GCPKG_PROXY`，单次命令用 `--proxy` / `--no-proxy`。优先级、凭据脱敏与
+`no_proxy` 规则见 [docs/PROXY.md](PROXY.md)。
+
 ## 实测结果（本轮）
 
 静态：`./tests/projects.sh` exit=0，覆盖 145 ports OK、`graph udisks2`
@@ -189,3 +206,5 @@ jansson 2.15.1 / 2.13.1 / 2.12（URL 与 SHA256 都实测过，但按前面的�
 | `lua/gcpkg/cli.lua` | 新命令与 `-C/--local/-g/--name` 选项、统一 roots 计算 |
 | `ports/zlib/features.yaml`、`ports/jansson/features.yaml` | 真实多版本声明示例 |
 | `tests/projects.sh` | 静态 + 动态回归 |
+| `lua/gcpkg/proxy.lua` | 代理解析、两层配置、脱敏与 `proxy.env()`（第十轮） |
+| `docs/PROXY.md` | 代理优先级、环境变量、端到端验证 |

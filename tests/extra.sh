@@ -17,8 +17,8 @@ NAMES=$(tail -n +2 "$CATALOG" | cut -f1)
 N=$(echo "$NAMES" | wc -w)
 [ "$N" -eq 43 ] || { echo "catalog must have 43 ports, got $N"; exit 1; }
 
-echo "== registry: 188 ports, files, real URLs and SHA256 =="
-"$BIN" check --ports "$ROOT/ports" 2>&1 | grep "188 ports OK" > /dev/null
+echo "== registry: >= 188 ports, files, real URLs and SHA256 =="
+"$BIN" check --ports "$ROOT/ports" 2>&1 | python3 -c 'import re,sys; n=int(re.search(r"(\d+) ports OK",sys.stdin.read()).group(1)); sys.exit(0 if n >= 188 else 1)'
 for name in $NAMES; do
     d="$ROOT/ports/$name"
     [ -f "$d/build.lua" ] || { echo "missing $d/build.lua"; exit 1; }

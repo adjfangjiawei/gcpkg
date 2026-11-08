@@ -182,6 +182,9 @@ M.register("conan", {
 | `GCPKG_STORE`（测试脚本） | 覆盖 `tests/{smoke,chain,features,linux,media}.sh` 的 store 路径 |
 | `GCPKG_MEDIA_DYNAMIC` | `tests/media.sh` 设为 1 时执行动态冒烟（lua + SDK adapter） |
 | `GCPKG_<NAME>_HOME` | 外部 SDK 的安装根目录，见 `gcpkg externals` / `docs/EXTERNAL_SDKS.md` |
+| `GCPKG_PROXY` / `GCPKG_NO_PROXY` | 会话级代理与绕过列表（优先于落盘配置），见 `docs/PROXY.md` |
+| `GCPKG_PROXY_DYNAMIC` | `tests/proxy.sh` 设为 1 时启动本地 CONNECT 代理跑端到端 |
+| `GCPKG_R10_DYNAMIC` | `tests/r10.sh` 设为 1 时全量真编译 38 个库 |
 | `GCPKG_BIN`（测试脚本） | 覆盖测试使用的 gcpkg 可执行文件 |
 
 > store 建议放在真实磁盘（`~/.cache/...`）：本沙箱 `/tmp` 只有 992M tmpfs，
@@ -452,3 +455,31 @@ gcpkg list -C apps/demo               # zlib 显示 [project]
 - **SHA256 必须实测**：tag / 镜像 404 就换正式 release 或剔除，不塞占位值。
 
 完整的 43 行表、每库 compdb 条数与修复细节见 `docs/EXTRA_LIBRARIES.md`。
+
+## 12. 代理与第十轮扩库
+
+代理不需要为每个 adapter 重写：`lua/gcpkg/proxy.lua` 一处解析、
+`proxy.env()` 一处下发。新加下载渠道时，只要把 `env = proxy.env()` 传给
+`gcpkg.exec(cmd, {...})` 即可；凭据别拼进 argv（日志与 `--verbose` 会打印
+命令行），配置回显用 `proxy.redact()`。完整优先级与验证见
+`docs/PROXY.md`。
+
+第十轮沿用「TSV + 生成器」：`tools/r10-catalog.tsv`（38 行真实
+URL/SHA256/kind/deps）+ `tools/gen-r10-ports.py`，`tests/r10.sh` 重跑
+生成器断言幂等。几条新经验：
+
+- **官方 release 优先**：`libbsd` 的 GitHub tag 用 `git describe` 生成
+  `AC_INIT` 版本号，tag 归档里没有 `.git`，`autoreconf` 必然失败；
+  `abseil` 的 tag 是 `20240722.0`（`20240722` 404）。
+- **老 automake 包**：`cunit` 自带的 `Makefile` 硬编码了原作者机器路径，
+  必须 `autoreconf -fi` + `./configure` 重新生成，而不是直接 `make`。
+- **子目录工程**：`blake3` 的 C CMake 工程在 `c/`，用
+  `cmake = { source = "c", ... }`；手写小写 `makefile` 的 `libtomcrypt`
+  用 `recipe.make` 的 `vars = function(ctx) ... end` 传 `PREFIX`，
+  `CC` 由 recipe 自动换成拦截器包装器。
+- **真名字**：`catch2` v3 装的是 `libCatch2.a` + `libCatch2Main.a`；
+  `portaudio` 静态库要关 `PA_LIBNAME_ADD_SUFFIX`。
+- **校验导出物**：`tests/r10.sh` 动态部分不止看 exit code，还逐个检查
+  manifest 的 `libs` 是否真有 `lib<name>.a` / `.so`，能抓出这类命名错误。
+
+38 行表与全部适配说明在 `docs/ROUND10_LIBRARIES.md`。

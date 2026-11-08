@@ -630,7 +630,46 @@ Makefile 用自定义 `build(ctx)` 指定 cwd、prefix 与 `CC=<wrapper>`。
 详见 `docs/EXTRA_LIBRARIES.md`。三个 tag 全失效的候选（msgpack-c、
 tomlc99、utf8cpp）按惯例剔除，不写占位 SHA256。
 
-## 15. 构建 gcpkg 本体
+## 15. 代理与第十轮库（2026-11-08 第十轮）
+
+用户要求「继续支持更多的库，包管理器要支持设置代理」。注册表 188 → **226**，
+新增 38 个库；`GCPKG_R10_DYNAMIC=1 ./tests/r10.sh` 从干净 store 全部真编译
+（`38 PASS / 0 FAIL, 2498 compile commands`），并逐个检查 manifest 与导出的
+`.a` / `.so`。详见 `docs/ROUND10_LIBRARIES.md`。
+
+### 代理是一层引擎能力
+
+新增 `lua/gcpkg/proxy.lua`：一次性解析 `--no-proxy` > `--proxy` >
+`GCPKG_PROXY` > 项目 `gcpkg.yaml` > `$GCPKG_HOME/gcpkg.yaml` > 标准
+`HTTPS_PROXY` / `HTTP_PROXY` / `ALL_PROXY`，`no_proxy` 单独按
+`--noproxy` > `GCPKG_NO_PROXY` > 项目 > 用户级 > `NO_PROXY` 解析。
+`proxy.env()` 把结果变成 8 个环境变量，合并进：
+
+- `net.lua` 的 `curl` 下载与 `git clone --depth 1`（含 `source.git` port）；
+- `port.lua` 的所有 port 构建钩子环境；
+- `project.lua` 的项目构建拦截环境。
+
+凭据只走环境与配置文件，不进 argv；`exec.lua` 写日志时统一把
+`://user:pw@` 脱敏。`gcpkg proxy [URL|--unset]` 用托管区块写 YAML，
+`-g` 写用户级、`-C/--local` 写项目级，与第八轮的两层依赖清单一致。
+`--no-proxy` 清空 6 个 `*_proxy` 并设 `no_proxy=*`，保证确定性的直连。
+详见 `docs/PROXY.md`。
+
+同时修掉 `net.prepare` 的源码身份缺陷：`.gcpkg-source-ready` marker 现在
+记录 `url|sha256`（git 另加 `ref`），同名同版本换源会自动刷新解包目录——
+这正是 `libbsd` 从 GitHub tag 换到官方 release tarball 时暴露出来的。
+
+### 依赖面
+
+`graph re2` = 2 步（`abseil → re2`，`find_package(absl)` 命中安装的 CMake
+config）、`graph glog` = 2 步（`gflags → glog`）、`graph libbsd` = 2 步
+（`libmd → libbsd`）。七个条件特性除了 `requires:` 拉依赖，还能追加构建开关
+（`libsrtp:openssl` → `-DENABLE_OPENSSL=ON`、`portaudio:alsa` →
+`-DPA_USE_ALSA=ON`），默认图保持精简。生成器仍是
+`tools/r10-catalog.tsv`（38 行实测 URL/SHA256/kind/deps）+
+`tools/gen-r10-ports.py`，`tests/r10.sh` 断言重跑后逐字节一致。
+
+## 16. 构建 gcpkg 本体
 
 
 

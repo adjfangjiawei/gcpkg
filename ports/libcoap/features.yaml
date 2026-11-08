@@ -1,0 +1,25 @@
+schema: 1
+port: libcoap
+
+# CoAP RFC 7252; static libcoap-3, DTLS off by default.
+# Static validation is the default; see tests/r10.sh.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]
+  tls:
+    default: false
+    description: Pull in openssl for this optional capability
+    requires: [openssl]
+    args: ["-DENABLE_DTLS=openssl"]

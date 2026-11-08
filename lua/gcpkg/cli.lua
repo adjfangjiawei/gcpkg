@@ -2,6 +2,7 @@ local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local features = require("gcpkg.features")
 local workspace = require("gcpkg.workspace")
+local proxy = require("gcpkg.proxy")
 local M = {}
 
 local USAGE = [[
@@ -16,6 +17,7 @@ Project workflow (pnpm-style):
   gcpkg remove NAME...              remove libraries from this project
   gcpkg list [DIR]                  show project deps, scopes, versions and lock
   gcpkg versions PORT               list versions declared for a port
+  gcpkg proxy [URL|--unset]         show / set / clear the proxy configuration
 
 Build / inspection:
   gcpkg build [PROJECT_DIR]         build a project + merged compile_commands.json
@@ -33,8 +35,11 @@ Build / inspection:
 Options:
   -C DIR, --dir=DIR                operate on a project in another directory
   --name=NAME                      (new) project name
-  --local                          (add) create a project-private port
-  -g, --global                     (add/remove) user-wide dependency list
+  -g, --global                     (add/remove/proxy) user-wide config
+  --local                          (add/proxy) project-specific config
+  --proxy=URL                      one-shot proxy (http/https/socks5, user:pass@host)
+  --no-proxy                       force a direct connection for this run
+  --noproxy=LIST                   comma-separated hosts that bypass the proxy
   --store=DIR                      package store (default $GCPKG_HOME or ~/.gcpkg)
   --ports=DIR[:DIR...]             public port registry roots
   --share=DIR                      engine root (contains lua/ and ports/)
@@ -75,6 +80,16 @@ local function parse(args)
             o.verbose = true
         elseif a == "--no-cache" then
             o.no_cache = true
+        elseif a:match("^--proxy=") then
+            o.proxy = a:match("^--proxy=(.*)$")
+        elseif a == "--proxy" then
+            o.proxy = nextval()
+        elseif a == "--no-proxy" then
+            o.no_proxy = true
+        elseif a:match("^--noproxy=") then
+            o.no_proxy_list = a:match("^--noproxy=(.*)$")
+        elseif a == "--noproxy" then
+            o.no_proxy_list = nextval()
         elseif a == "--local" then
             o.local_port = true
         elseif a == "--global" or a == "-g" then
@@ -124,6 +139,7 @@ local function doctor(cfg, o)
     log.info("engine (GCPKG_SHARE): " .. gcpkg.sys.share())
     log.info("lua root            : " .. gcpkg.sys.lua_root())
     log.info("store               : " .. cfg.store.root)
+    log.info("proxy               : " .. proxy.summary())
     log.info("ports roots         : " .. table.concat(cfg.ports, " : "))
     local wrapper = gcpkg.sys.wrapper_bin()
     log.info("compiler interceptor: " .. wrapper ..
@@ -159,6 +175,13 @@ function M.main(args)
     if o.verbose then
         gcpkg.sys.set_verbose(true)
     end
+    -- Resolve once per process: downloads, git clones and build hooks all
+    -- read proxy.env() from this configuration.
+    proxy.configure({
+        proxy = o.proxy, no_proxy = o.no_proxy,
+        no_proxy_list = o.no_proxy_list,
+        project_dir = workspace.find_root(o.dir or fs.cwd()),
+    })
     if o.help or #o.positional == 0 then
         print(USAGE)
         return 0
@@ -186,7 +209,25 @@ function M.main(args)
     }
 
     local cmd = o.positional[1]
-    if cmd == "doctor" then
+    if cmd == "proxy" then
+        local value = o.positional[2]
+        if o.local_port and not projDir then
+            error("--local needs a gcpkg project (run `gcpkg new DIR` first)")
+        end
+        if value == "--unset" then
+            local path = proxy.unset({ project_dir = projDir, global = o.global })
+            log.step("cleared proxy from " .. path)
+        elseif value and not value:match("^%-") then
+            local path = proxy.set({ project_dir = projDir, global = o.global,
+                                     url = value, no_proxy_list = o.no_proxy_list })
+            log.step("set proxy " .. proxy.redact(value) .. " in " .. path)
+        else
+            proxy.describe({ project_dir = projDir, proxy = o.proxy,
+                             no_proxy = o.no_proxy,
+                             no_proxy_list = o.no_proxy_list })
+        end
+        return 0
+    elseif cmd == "doctor" then
         return doctor(cfg, o)
     elseif cmd == "new" or cmd == "init" then
         local dir = o.positional[2] or (cmd == "init" and fs.cwd() or nil)

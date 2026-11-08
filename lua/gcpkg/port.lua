@@ -13,6 +13,7 @@ local store = require("gcpkg.store")
 local compdb = require("gcpkg.compdb")
 local net = require("gcpkg.net")
 local backends = require("gcpkg.backends")
+local proxy = require("gcpkg.proxy")
 local M = { roots = nil }
 
 function M.default_roots()
@@ -328,7 +329,7 @@ function M.install(spec_name, cfg)
     fs.write(jsonl, "")
     local ccReal = compilerValue("cc", "cc")
     local cxxReal = compilerValue("cxx", "c++")
-    local env = util.merge(M.dependency_env(ordered), f.env, {
+    local env = util.merge(M.dependency_env(ordered), f.env, proxy.env(), {
         CC = ccLink,
         CXX = cxxLink,
         GCPKG_CC_REAL = ccReal,

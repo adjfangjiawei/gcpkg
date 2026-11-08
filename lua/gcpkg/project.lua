@@ -13,6 +13,7 @@ local store = require("gcpkg.store")
 local compdb = require("gcpkg.compdb")
 local port = require("gcpkg.port")
 local workspace = require("gcpkg.workspace")
+local proxy = require("gcpkg.proxy")
 local M = {}
 
 local function load(project_dir)
@@ -118,14 +119,14 @@ function M.build(projectDir, cfg, opts)
     local ccLink, cxxLink = util.join(binDir, "cc"), util.join(binDir, "c++")
     fs.symlink(wrapper, ccLink)
     fs.symlink(wrapper, cxxLink)
-    local interceptEnv = {
+    local interceptEnv = util.merge(proxy.env(), {
         CC = ccLink,
         CXX = cxxLink,
         GCPKG_CC_REAL = gcpkg.sys.compiler("cc"),
         GCPKG_CXX_REAL = gcpkg.sys.compiler("cxx"),
         GCPKG_INTERCEPT_LOG = jsonl,
         GCPKG_INTERCEPT_TAG = "project:" .. (spec.name or "project"),
-    }
+    })
 
     local log = require("gcpkg.log")
     local ctx = {

@@ -1,6 +1,11 @@
 local fs = require("gcpkg.fs")
 local M = {}
 
+-- Never write proxy/URL credentials into a build log.
+function M.redact(s)
+    return (tostring(s):gsub("([%w][%w+%.%-]*://)[^/@%s]+@", "%1***@"))
+end
+
 local function normalize(cmd)
     if type(cmd) == "string" then
         return { cmd }
@@ -21,7 +26,7 @@ function M.run(cmd, opts)
         error("exec: empty command")
     end
     if opts.log then
-        fs.append(opts.log, "+ " .. table.concat(cmd, " ") .. "\n")
+        fs.append(opts.log, "+ " .. M.redact(table.concat(cmd, " ")) .. "\n")
     end
     local code = gcpkg.sys.exec({
         cmd = cmd,

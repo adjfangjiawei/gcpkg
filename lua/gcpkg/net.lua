@@ -3,6 +3,7 @@
 -- source type can be added by a port as a plain Lua function.
 local fs = require("gcpkg.fs")
 local util = require("gcpkg.util")
+local proxy = require("gcpkg.proxy")
 local M = {}
 
 function M.sha256(path)
@@ -24,8 +25,10 @@ function M.download(url, dest, expected, opts)
         fs.rm(dest)
     end
     gcpkg.log.step("downloading " .. url)
+    -- Proxy credentials stay in the child environment, never in argv: build
+    -- logs and --verbose output cannot leak them. curl/git read *_proxy env.
     gcpkg.exec({ "curl", "-fL", "--retry", "3", "--connect-timeout", "20", "-o", dest, url },
-               { log = opts.log })
+               { log = opts.log, env = proxy.env() })
     if expected then
         local got = M.sha256(dest)
         if got ~= expected then
@@ -57,7 +60,7 @@ function M.git_clone(url, ref, dest, opts)
     end
     cmd[#cmd + 1] = url
     cmd[#cmd + 1] = dest
-    gcpkg.exec(cmd, { log = opts.log })
+    gcpkg.exec(cmd, { log = opts.log, env = proxy.env() })
 end
 
 -- prepare(source, srcDir, opts) -> srcDir
@@ -77,9 +80,24 @@ function M.prepare(source, srcDir, opts)
         error("port.source must be a table or a function")
     end
 
+    -- The marker records the exact source identity: a port may legitimately
+    -- change its URL or checksum while keeping name/version (e.g. after a
+    -- dead upstream tag). Without this check the old unpacked tree would be
+    -- reused and the build would silently use the wrong sources.
     local marker = util.join(srcDir, ".gcpkg-source-ready")
+    local identity = source.url or source.git or source.dir or "custom"
+    if source.sha256 then
+        identity = identity .. "|" .. source.sha256
+    end
+    if source.git and source.ref then
+        identity = identity .. "|" .. source.ref
+    end
     if fs.isfile(marker) then
-        return srcDir
+        if fs.read(marker) == identity then
+            return srcDir
+        end
+        gcpkg.log.warn("source identity changed, refreshing " .. srcDir)
+        fs.rm(srcDir)
     end
     fs.mkdirs(srcDir)
 
@@ -103,7 +121,7 @@ function M.prepare(source, srcDir, opts)
     else
         error("port.source needs url, git or dir")
     end
-    fs.write(marker, source.url or source.git or source.dir or "custom")
+    fs.write(marker, identity)
     return srcDir
 end
 

@@ -15,6 +15,7 @@ local M = {}
 M.META_KEYS = {
     schema = true, port = true, versions = true, dependencies = true,
     project = true, ports = true, inherit_global = true,
+    proxy = true, no_proxy = true,
 }
 
 -- "openssl:shared", "-openssl:shared" (disable), "shared" (global)

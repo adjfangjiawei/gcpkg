@@ -1,0 +1,25 @@
+schema: 1
+port: libdwarf
+
+# DWARF reader; `compression` feature pulls zlib + zstd.
+# Static validation is the default; see tests/r10.sh.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]
+  compression:
+    default: false
+    description: Pull in zlib, zstd for this optional capability
+    requires: [zlib, zstd]
+    args: []
