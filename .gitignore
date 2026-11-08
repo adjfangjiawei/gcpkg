@@ -1,3 +1,14 @@
+# legacy
 Build
 Library
 temp
+
+# gcpkg build outputs
+build/
+compile_commands.json
+.clangd
+.gcpkg/
+
+# editors / caches
+.cache/
+*.log

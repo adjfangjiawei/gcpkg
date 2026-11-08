@@ -1,39 +1,28 @@
-cmake_minimum_required(VERSION 3.30)
-set(CMAKE_CXX_COMPILER clang++-22)
-set(CMAKE_C_COMPILER clang-22)
+cmake_minimum_required(VERSION 3.28)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-set(VCPKG_MANIFEST_MODE OFF)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-
-# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
-# set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address -Wl,--no-undefined")
+# gcpkg: a thin C++ runtime + a Lua-driven package/project engine.
+# The old TOML prototype under Source/MainProcess, Source/Basic is kept in the
+# tree for reference but is intentionally NOT part of the build (see docs/ARCHITECTURE.md).
 project(gcpkg LANGUAGES C CXX)
 
-# 设置C++标准
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-set(PROJECT_ROOT_DIR ${CMAKE_SOURCE_DIR}/Source)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua5.4)
+pkg_check_modules(YAMLCPP REQUIRED IMPORTED_TARGET yaml-cpp)
 
-find_package(LLVM REQUIRED CONFIG)
-list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-include(HandleLLVMOptions)
-add_definitions(${LLVM_DEFINITIONS})
-llvm_map_components_to_libnames(llvm_libs support core irreader)
+add_subdirectory(Source/Core)
+add_subdirectory(Source/Intercept)
 
-add_subdirectory(extern/tomlplusplus)
-set(ENABLE_WERROR OFF CACHE BOOL "Forcefully disable -Werror for the libarchive subproject" FORCE)
-add_subdirectory(extern/libarchive)
+# The Lua engine and the port registry are data, not compiled code: adding a
+# build-system adapter or a library port never requires recompiling gcpkg.
+install(DIRECTORY lua/ DESTINATION share/gcpkg/lua)
+install(DIRECTORY ports/ DESTINATION share/gcpkg/ports)
+install(DIRECTORY examples/ DESTINATION share/gcpkg/examples)
 
-target_compile_options(archive_static PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wno-error=implicit-fallthrough>
-    $<$<C_COMPILER_ID:GNU,Clang>:-Wno-error=implicit-fallthrough>
-)
-
-find_package(CURL REQUIRED)
-
-add_subdirectory(Source)
+message(STATUS "gcpkg source root : ${CMAKE_SOURCE_DIR}")
+message(STATUS "gcpkg Lua 5.4     : ${LUA_VERSION}")
+message(STATUS "gcpkg yaml-cpp    : ${YAMLCPP_VERSION}")

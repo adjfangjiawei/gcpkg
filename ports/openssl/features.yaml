@@ -1,0 +1,42 @@
+schema: 1
+port: openssl
+
+# ONE feature description per library.
+# A feature can inject Configure args, environment variables, defines, extra
+# port dependencies and "provides" tags. build.lua reads them through
+# ctx.feature_args(); no Lua edit (and no gcpkg edit) is needed to change a
+# build option.
+features:
+  shared:
+    default: false
+    description: Build shared libraries (libssl.so / libcrypto.so) instead of static ones
+    args: ["shared"]
+    conflicts: ["no-shared"]
+    provides: ["openssl:shared"]
+
+  no-shared:
+    default: true
+    description: Static libraries only (default; easier to relink into projects)
+    args: ["no-shared"]
+    conflicts: ["shared"]
+
+  no-tests:
+    default: true
+    description: Do not build the OpenSSL test suite
+    args: ["no-tests"]
+
+  no-docs:
+    default: true
+    description: Do not build or install documentation
+    args: ["no-docs"]
+
+  no-asm:
+    default: false
+    description: Disable assembler optimisations for maximum portability
+    args: ["no-asm"]
+
+  zlib:
+    default: false
+    description: Enable zlib compression (pulls in the zlib port when available)
+    args: ["zlib"]
+    requires: ["zlib"]

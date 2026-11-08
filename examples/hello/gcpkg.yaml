@@ -1,0 +1,7 @@
+project: hello-gcpkg
+
+# Project-level feature selection. These refer to features declared in each
+# library's features.yaml; they can be overridden with --feature=... on the CLI.
+features:
+  openssl:
+    enable: [no-shared, no-tests, no-docs]
