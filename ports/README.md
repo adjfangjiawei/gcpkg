@@ -299,3 +299,56 @@ libidn2 → zlib → gnutls）、`graph libbpf` 5 步（zlib / zstd / xz → elf
 会让该项目真编译 1.2.13，而其它项目仍用默认的 1.3.1。其余 port 保持单版本。
 项目私有 port、公有 registry、用户级 registry 三者的优先级与 `gcpkg.lock`
 见 `docs/PROJECTS.md`。
+
+## 第九轮：43 个新基础库（188 ports total）
+
+| port | 版本 | kind | 依赖 | 真编译 compdb |
+| --- | --- | --- | --- | --- |
+| `yyjson` | 0.10.0 | cmake | — | 4 |
+| `cjson` | 1.7.18 | cmake | — | 6 |
+| `rapidjson` | 1.1.0 | cmake | — | 2 |
+| `libcbor` | 0.11.0 | cmake | — | 60 |
+| `inih` | r58 | meson | — | 6 |
+| `libbase64` | 0.5.2 | cmake | — | 29 |
+| `simdjson` | 3.10.0 | cmake | — | 6 |
+| `snappy` | 1.2.2 | cmake | — | 12 |
+| `zlib-ng` | 2.2.4 | cmake | — | 99 |
+| `c-blosc` | 1.21.6 | cmake | — | 124 |
+| `lzfse` | 1.0 | cmake | — | 18 |
+| `miniz` | 3.0.2 | cmake | — | 22 |
+| `nghttp3` | 1.11.0 | cmake | — | 128 |
+| `ngtcp2` | 1.16.0 | cmake | — | 190 |
+| `libssh` | 0.11.1 | cmake | openssl,zlib | 134 |
+| `hiredis` | 1.2.0 | cmake | — | 16 |
+| `libmodbus` | 3.1.11 | autotools | — | 12 |
+| `libdnet` | 1.12 | autotools | — | 28 |
+| `libnet` | 1.3 | autotools | — | 51 |
+| `libwebsockets` | 4.3.3 | cmake | zlib | 144 |
+| `librdkafka` | 2.8.0 | autotools | zlib | 121 |
+| `libogg` | 1.3.5 | cmake | — | 8 |
+| `libvorbis` | 1.3.7 | cmake | libogg | 48 |
+| `opus` | 1.5.2 | cmake | — | 309 |
+| `flac` | 1.4.3 | cmake | libogg | 108 |
+| `libwebp` | 1.5.0 | cmake | — | 346 |
+| `libsamplerate` | 0.2.2 | cmake | — | 10 |
+| `libsecp256k1` | 0.6.0 | cmake | — | 10 |
+| `wolfssl` | 5.7.6 | autotools | — | 35 |
+| `fmt` | 11.2.0 | cmake | — | 6 |
+| `spdlog` | 1.15.3 | cmake | fmt | 14 |
+| `lmdb` | 0.9.31 | custom-make | — | 13 |
+| `capstone` | 5.0.3 | cmake | — | 162 |
+| `googletest` | 1.15.2 | cmake | — | 12 |
+| `libedit` | 3.1 | autotools | ncurses | 32 |
+| `pcre` | 8.45 | cmake | — | 48 |
+| `libconfig` | 1.7.3 | autotools | — | 17 |
+| `giflib` | 5.2.2 | custom-make | — | 24 |
+| `libsndfile` | 1.2.2 | cmake | libogg,libvorbis,opus,flac | 189 |
+| `libvpx` | 1.15.0 | custom-make | — | 161 |
+| `libtheora` | 1.1.1 | autotools | libogg | 34 |
+| `libzip` | 1.11.3 | cmake | zlib | 250 |
+| `libmaxminddb` | 1.12.2 | cmake | — | 8 |
+
+来源 `tools/extra-catalog.tsv`，生成器 `tools/gen-extra-ports.py`；全部 43 个
+在干净 store 真编译通过（合计 3056 条），`GCPKG_EXTRA_DYNAMIC=1
+./tests/extra.sh` 可复现。条件依赖：`graph libzip --feature=libzip:openssl`
+等四条会额外拉起 openssl。详见 `docs/EXTRA_LIBRARIES.md`。

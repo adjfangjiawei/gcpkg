@@ -599,7 +599,39 @@ tarball。现在 `port.install()` 在 `features.yaml` 的 `versions:` 里查版�
 `gcpkg install`（无参）先装好依赖，`build` 命中缓存并合并编译数据库。
 详见 `docs/PROJECTS.md`。
 
-## 14. 构建 gcpkg 本体
+## 14. 更多基础库（2026-11-08 第九轮）
+
+一句话需求「继续支持更多的库」：注册表 145 → **188**，新增 43 个此前没覆盖
+的库，按 JSON/CBOR/配置、压缩、QUIC/网络协议、音视频、加密/C++ 工具五组铺开。
+与前两轮不同，**43 个全部在干净 store 里真编译通过**：
+`GCPKG_EXTRA_DYNAMIC=1 ./tests/extra.sh` = `43 PASS / 0 FAIL, 3056 compile
+commands`。默认仍只做静态验证，`tests/extra.sh` 不下载不编译。
+
+### 依赖面
+
+`graph libsndfile` 5 步（`libogg → libvorbis → opus → flac → libsndfile`），
+`graph spdlog` 2 步（`fmt → spdlog`），`graph libssh` 用已有 `openssl + zlib`，
+`graph libzip` 用已有 `zlib`，`graph libedit` 用已有 `ncurses`。四个
+`features.yaml` 的 `requires:` 条件依赖（`libzip:openssl`、
+`libwebsockets:tls`、`librdkafka:ssl`、`ngtcp2:tls`）启用后各多一步 openssl，
+默认图保持精简。
+
+### 适配（全部落在生成的两文件里）
+
+`tools/extra-catalog.tsv`（43 行真实 URL/SHA256/kind/deps）+
+`tools/gen-extra-ports.py`（cmake / meson / autotools / 自定义 `build(ctx)`、
+条件 feature）。`tests/extra.sh` 会重跑生成器并断言逐字节一致。
+
+几个值得记的形态：`zlib-ng` 需要同时关掉三个测试开关；`inih` 的
+Meson 没有 `tests` 选项；`nghttp3` / `libtheora` 的 GitHub tag 归档缺
+submodule / 缺 SDL m4 宏，改官方 release tarball；`libvpx` 用
+`--target=generic-gnu` 纯 C 目标绕开缺失的 nasm；`giflib` / `lmdb` 手写
+Makefile 用自定义 `build(ctx)` 指定 cwd、prefix 与 `CC=<wrapper>`。
+详见 `docs/EXTRA_LIBRARIES.md`。三个 tag 全失效的候选（msgpack-c、
+tomlc99、utf8cpp）按惯例剔除，不写占位 SHA256。
+
+## 15. 构建 gcpkg 本体
+
 
 
 ```bash

@@ -30,7 +30,13 @@ assert() { if ! eval "$1"; then echo "FAILED: $1"; tail -25 "$LOG"; exit 1; fi; 
 
 echo "== registry still intact =="
 capture check
-lasthas "145 ports OK"
+python3 - "$OUT" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+n = int(re.search(r"(\d+) ports OK", text).group(1))
+assert n >= 145, n   # older rounds' registry is a subset now
+print("registry:", n, "ports OK")
+PY
 capture graph udisks2
 lasthas "liburing"
 lasthas "libnvme"

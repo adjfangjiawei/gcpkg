@@ -428,3 +428,27 @@ gcpkg list -C apps/demo               # zlib 显示 [project]
 `./tests/projects.sh`（默认纯静态）；
 `GCPKG_PROJECT_DYNAMIC=1 ./tests/projects.sh` 真编译两个不同 zlib 版本
 和 jansson 2.14。完整说明见 `docs/PROJECTS.md`。
+
+
+## 11. 批量扩库的第九轮经验
+
+`tools/extra-catalog.tsv` + `tools/gen-extra-ports.py` 是新增 43 个库的唯一源，
+`tests/extra.sh` 会重跑生成器校验幂等。几条通用规则：
+
+- **先下载再决定 kind**：GitHub tag 归档常常缺 submodule（`nghttp3` 的
+  `lib/sfparse`、libtheora 的 SDL m4），优先用官方 release tarball；
+  顶层 `CMakeLists.txt` / `meson.build` / `configure(.ac)` / `Makefile`
+  逐个解压核对，别靠猜。
+- **选项名要去上游源码里查**：`option(ZLIB_ENABLE_TESTS ...)`、
+  `meson_options.txt`、`./configure --help`，写错选项会直接报
+  `Unknown options` 或编译出一堆不需要的测试程序。
+- **关掉文档/示例/测试**：`makeinfo`、宿主静态 `libcurl.a`、现代 libpng
+  已删除的 `png_sizeof` 都是这类失败源。
+- **手写 Makefile**：自定义 `build(ctx)` 里显式传 `CC=<wrapper>`，否则
+  Makefile 里的字面量 `gcc` 绕过拦截器，compdb 为 0；`lmdb` 这类
+  Makefile 在子目录的用 `cwd = util.join(ctx.src, ...)`。
+- **没有汇编器时**：`libvpx --target=generic-gnu` 是纯 C 目标，功能完整、
+  没有 SIMD；本机有 nasm 可去掉该参数重新构建。
+- **SHA256 必须实测**：tag / 镜像 404 就换正式 release 或剔除，不塞占位值。
+
+完整的 43 行表、每库 compdb 条数与修复细节见 `docs/EXTRA_LIBRARIES.md`。

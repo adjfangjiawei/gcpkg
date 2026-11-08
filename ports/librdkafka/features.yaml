@@ -1,0 +1,24 @@
+schema: 1
+port: librdkafka
+
+# Kafka C client on zlib; `ssl` feature adds openssl.
+# Static validation is the default; see tests/extra.sh.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]
+  ssl:
+    default: false
+    description: Pull in openssl for this optional capability
+    requires: [openssl]
