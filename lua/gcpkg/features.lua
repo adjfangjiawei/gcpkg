@@ -8,6 +8,15 @@
 local util = require("gcpkg.util")
 local M = {}
 
+-- Top-level metadata in features.yaml must never be mistaken for a feature.
+-- `versions:` (per-release sources) and the project/workspace keys are maps,
+-- so without this filter `describe()` would print them as off-by-default
+-- features and an explicit request could try to "enable" them.
+M.META_KEYS = {
+    schema = true, port = true, versions = true, dependencies = true,
+    project = true, ports = true, inherit_global = true,
+}
+
 -- "openssl:shared", "-openssl:shared" (disable), "shared" (global)
 function M.parse_spec(spec)
     spec = tostring(spec)
@@ -101,7 +110,9 @@ function M.resolve(spec, port_name, requests)
 
     local enabled = {}
     for name, def in pairs(defs) do
-        if type(def) == "table" and def.default == true then
+        if M.META_KEYS[name] then
+            defs[name] = nil  -- map-shaped metadata (versions:, dependencies:)
+        elseif type(def) == "table" and def.default == true then
             enabled[name] = true
         elseif type(def) ~= "table" then
             defs[name] = nil  -- ignore scalar metadata (schema, port, ...)
@@ -182,9 +193,11 @@ function M.describe(spec, port_name)
     local lines = {}
     local defs = (spec or {}).features or spec or {}
     for _, name in ipairs(util.keys(defs)) do
-        local def = defs[name] or {}
-        lines[#lines + 1] = string.format("  %-18s %-8s %s", name,
-            def.default and "[on]" or "[off]", def.description or "")
+        if not M.META_KEYS[name] then
+            local def = defs[name] or {}
+            lines[#lines + 1] = string.format("  %-18s %-8s %s", name,
+                def.default and "[on]" or "[off]", def.description or "")
+        end
     end
     return "Features for " .. tostring(port_name) .. ":\n" .. table.concat(lines, "\n")
 end

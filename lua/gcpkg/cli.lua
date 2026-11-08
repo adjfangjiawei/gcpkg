@@ -1,40 +1,57 @@
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local features = require("gcpkg.features")
+local workspace = require("gcpkg.workspace")
 local M = {}
 
 local USAGE = [[
 gcpkg ]] .. (gcpkg.version or "") .. [[ -- Lua-described meta package manager
 
-Usage:
-  gcpkg build [PROJECT_DIR]        build a project (gcpkg.lua + gcpkg.yaml)
-  gcpkg install PORT[@VERSION]     build & install a library into the store
-  gcpkg compdb [PROJECT_DIR]       rebuild merged compile_commands.json only
-  gcpkg features PORT              list a library's YAML features
-  gcpkg backends                   list external package-manager adapters
-  gcpkg externals                  list vendor SDK ports + the env var each needs
-  gcpkg ports                      list ports grouped by dependency layer
-  gcpkg graph PORT                 print the bottom-up build order for a port
-  gcpkg check                      validate all ports (files + dependencies)
-  gcpkg doctor                     show toolchain / paths / wrapper status
-  gcpkg port new NAME              scaffold build.lua + features.yaml
+Project workflow (pnpm-style):
+  gcpkg new DIR [--name=NAME]       scaffold a project (gcpkg.lua + gcpkg.yaml + gcpkg-ports/)
+  gcpkg init [DIR]                  same, in the current directory
+  gcpkg add DEP[@VERSION]...        add libraries to THIS project's gcpkg.yaml
+  gcpkg add --local NAME            add a project-private port (gcpkg-ports/NAME/)
+  gcpkg add -g DEP[@VERSION]...     add to the user-wide (public) dependency list
+  gcpkg remove NAME...              remove libraries from this project
+  gcpkg list [DIR]                  show project deps, scopes, versions and lock
+  gcpkg versions PORT               list versions declared for a port
+
+Build / inspection:
+  gcpkg build [PROJECT_DIR]         build a project + merged compile_commands.json
+  gcpkg install [PORT@VERSION]     with no argument: install ALL project deps
+  gcpkg compdb [PROJECT_DIR]        rebuild merged compile_commands.json only
+  gcpkg features PORT               list a library's YAML features
+  gcpkg backends                    list external package-manager adapters
+  gcpkg externals                   list vendor SDK ports + the env var each needs
+  gcpkg ports                       list ports grouped by dependency layer
+  gcpkg graph PORT                  print the bottom-up build order for a port
+  gcpkg check                       validate all ports (files + dependencies)
+  gcpkg doctor                      show toolchain / paths / wrapper status
+  gcpkg port new NAME               scaffold build.lua + features.yaml
 
 Options:
-  --store=DIR                     package store (default $GCPKG_HOME or ~/.gcpkg)
-  --ports=DIR[:DIR...]            port registry roots
-  --share=DIR                     engine root (contains lua/ and ports/)
-  --feature=PORT:NAME, -f ...     enable a feature (prefix '-' disables it)
-  -j N, --jobs=N                  parallel jobs
-  --no-cache                      force rebuild even if the store is fresh
-  --verbose                       print every executed command
-  -h, --help                      this help
+  -C DIR, --dir=DIR                operate on a project in another directory
+  --name=NAME                      (new) project name
+  --local                          (add) create a project-private port
+  -g, --global                     (add/remove) user-wide dependency list
+  --store=DIR                      package store (default $GCPKG_HOME or ~/.gcpkg)
+  --ports=DIR[:DIR...]             public port registry roots
+  --share=DIR                      engine root (contains lua/ and ports/)
+  --feature=PORT:NAME, -f ...      enable a feature (prefix '-' disables it)
+  -j N, --jobs=N                   parallel jobs
+  --no-cache                       force rebuild even if the store is fresh
+  --verbose                        print every executed command
+  -h, --help                       this help
 
 Examples:
-  gcpkg build examples/hello --store ~/.cache/gcpkg-store
+  gcpkg new apps/demo && gcpkg add zlib@1.2.13 -C apps/demo
+  gcpkg new apps/other && gcpkg add zlib@1.3.1 -C apps/other
+  gcpkg versions zlib
+  gcpkg build apps/demo --store ~/.cache/gcpkg-store
   gcpkg install openssl --feature=openssl:shared
-  gcpkg graph openssl --feature=openssl:zlib   # feature-conditional deps
+  gcpkg graph udisks2                       # feature-conditional deps
   gcpkg compdb . --ports ./ports:~/my-ports
-  gcpkg backends
 ]]
 
 local function parse(args)
@@ -58,6 +75,10 @@ local function parse(args)
             o.verbose = true
         elseif a == "--no-cache" then
             o.no_cache = true
+        elseif a == "--local" then
+            o.local_port = true
+        elseif a == "--global" or a == "-g" then
+            o.global = true
         elseif a:match("^--store=") then
             o.store = a:match("^--store=(.*)$")
         elseif a == "--store" then
@@ -70,6 +91,14 @@ local function parse(args)
             o.share = a:match("^--share=(.*)$")
         elseif a == "--share" then
             o.share = nextval()
+        elseif a:match("^--name=") then
+            o.name = a:match("^--name=(.*)$")
+        elseif a == "--name" then
+            o.name = nextval()
+        elseif a:match("^--dir=") then
+            o.dir = a:match("^--dir=(.*)$")
+        elseif a == "--dir" or a == "-C" then
+            o.dir = nextval()
         elseif a:match("^--feature=") then
             features.add_request(o.requests, a:match("^--feature=(.*)$"))
         elseif a == "--feature" or a == "-f" then
@@ -87,52 +116,6 @@ local function parse(args)
     end
     return o
 end
-
-local BUILD_TEMPLATE = [[-- %s: ONE build description for ONE library.
--- Everything here is ordinary Lua: require() other build modules, import()
--- another port, or define your own helpers.
-local make = require("gcpkg.build.make")
-
-return {
-  name = "%s",
-  version = "0.0.0",
-  source = {
-    url = "https://example.com/%s-0.0.0.tar.gz",
-    sha256 = nil,
-    strip = 1,
-  },
-  dependencies = {},
-
-  build = function(ctx)
-    -- ctx.src / ctx.build_dir / ctx.prefix / ctx.exec / ctx.features /
-    -- ctx.feature_args() / ctx.record() / ctx.compiler / ctx.jobs
-    -- Any build system works; this template assumes ./configure && make.
-    ctx.exec({ "./configure", "--prefix=" .. ctx.prefix })
-    make.install({ cwd = ctx.src, exec = ctx.exec, log = ctx.log, jobs = ctx.jobs })
-
-    return {
-      includes = { ctx.prefix .. "/include" },
-      libdirs  = { ctx.prefix .. "/lib" },
-      libs     = { "%s" },
-    }
-  end,
-}
-]]
-
-local FEATURES_TEMPLATE = [[schema: 1
-port: %s
-# ONE feature description per library. Enabled features inject args/env/
-# defines/requires into the build without editing build.lua.
-features:
-  shared:
-    default: false
-    description: build shared libraries
-    args: ["--enable-shared"]
-  tests:
-    default: false
-    description: build the test suite
-    args: ["--with-tests"]
-]]
 
 local function doctor(cfg, o)
     local log = require("gcpkg.log")
@@ -152,6 +135,25 @@ local function doctor(cfg, o)
     return 0
 end
 
+local function project_dir(o)
+    if o.dir then
+        return util.abs(o.dir)
+    end
+    local extra = o.positional[2]
+    if extra and not extra:match("^%-") then
+        return util.abs(extra)
+    end
+    return workspace.find_root(fs.cwd()) or fs.cwd()
+end
+
+local function tail(list, from)
+    local out = {}
+    for i = from, #list do
+        out[#out + 1] = list[i]
+    end
+    return out
+end
+
 function M.main(args)
     local o = parse(args or gcpkg.args)
     if o.verbose then
@@ -165,7 +167,14 @@ function M.main(args)
     local port = require("gcpkg.port")
     local storeMod = require("gcpkg.store")
     local log = require("gcpkg.log")
-    local roots = o.ports and util.split(o.ports, ":") or port.default_roots()
+    local publicRoots = o.ports and util.split(o.ports, ":") or port.default_roots()
+    -- Inside a project, its private ports are searched first; the user-wide
+    -- registry comes before engine/public registries. Outside a project this
+    -- is just the old default roots plus ~/.gcpkg/ports.
+    local projDir = workspace.find_root(o.dir or fs.cwd())
+    local py = projDir and workspace.read_yaml(util.join(projDir, "gcpkg.yaml")) or {}
+    local roots = util.map(workspace.roots(projDir, publicRoots, py),
+                          function(r) return util.abs(r) end)
     port.set_roots(roots)
     local home = os.getenv("HOME") or fs.cwd()
     local storeRoot = o.store or os.getenv("GCPKG_HOME") or util.join(home, ".gcpkg")
@@ -179,6 +188,50 @@ function M.main(args)
     local cmd = o.positional[1]
     if cmd == "doctor" then
         return doctor(cfg, o)
+    elseif cmd == "new" or cmd == "init" then
+        local dir = o.positional[2] or (cmd == "init" and fs.cwd() or nil)
+        if not dir then
+            error("new needs a directory (gcpkg new DIR)")
+        end
+        local created = workspace.new_project(dir, o.name)
+        log.step("created project " .. created)
+        log.info("  gcpkg.lua / gcpkg.yaml / src/main.c / gcpkg-ports/")
+        log.info("  next: gcpkg add zlib@1.2.13 -C " .. dir)
+        return 0
+    elseif cmd == "add" then
+        local specs = tail(o.positional, 2)
+        if #specs == 0 then
+            error("add needs at least one dependency (e.g. gcpkg add zlib@1.2.13)")
+        end
+        workspace.add(projDir, specs, {
+            roots = roots, storeRoot = st.root, global = o.global,
+            local_port = o.local_port,
+        })
+        return 0
+    elseif cmd == "remove" then
+        local specs = tail(o.positional, 2)
+        if #specs == 0 then
+            error("remove needs at least one library name")
+        end
+        workspace.remove(projDir, specs, {
+            roots = roots, storeRoot = st.root, global = o.global,
+        })
+        return 0
+    elseif cmd == "list" then
+        local dir = project_dir(o)
+        local root = workspace.find_root(dir)
+        if not root then
+            error("not inside a gcpkg project: " .. dir)
+        end
+        workspace.list(root, { storeRoot = st.root, roots = roots })
+        return 0
+    elseif cmd == "versions" then
+        local name = o.positional[2]
+        if not name then
+            error("versions needs a port name")
+        end
+        workspace.describe_versions(name, roots)
+        return 0
     elseif cmd == "build" then
         require("gcpkg.project").build(o.positional[2] or fs.cwd(), cfg, {})
         return 0
@@ -187,7 +240,13 @@ function M.main(args)
         return 0
     elseif cmd == "install" then
         if not o.positional[2] then
-            error("install needs a port name")
+            -- pnpm-style: install every dependency of the current project.
+            local root = workspace.find_root(o.dir or fs.cwd())
+            if not root then
+                error("install with no argument needs a gcpkg.yaml (run `gcpkg new DIR`)")
+            end
+            workspace.install_project(root, cfg)
+            return 0
         end
         local m = port.install(o.positional[2], cfg)
         log.info("manifest: " .. storeMod.manifest_path(st, m.key))
@@ -281,14 +340,13 @@ function M.main(args)
         if not name then
             error("port new needs a name")
         end
-        local dir = util.join(roots[1], name)
+        -- Always scaffold into the FIRST PUBLIC root, not a project-private
+        -- directory -- public ports are shared by every project.
+        local dir = util.join(util.abs(publicRoots[1]), name)
         if fs.exists(util.join(dir, "build.lua")) then
             error("port already exists: " .. dir)
         end
-        fs.mkdirs(dir)
-        fs.write(util.join(dir, "build.lua"),
-                 string.format(BUILD_TEMPLATE, name, name, name, name))
-        fs.write(util.join(dir, "features.yaml"), string.format(FEATURES_TEMPLATE, name))
+        workspace.scaffold_port(dir, name)
         log.step("created port " .. dir)
         return 0
     end

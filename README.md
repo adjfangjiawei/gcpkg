@@ -2,7 +2,12 @@
 
 一个**元包管理器**：用 Lua 描述「怎么构建一个库」，用 YAML 描述「这个库有哪些特性」，把任意构建系统、乃至其它包管理器（vcpkg / conan / pkg-config / apt / …）接进来，**不改它们本身**，并且让项目自身也能被它管理、生成可跨依赖跳转的 clangd 编译数据库。
 
-> 当前分支 `feat/lua-yaml-compdb-openssl`：Lua 引擎 + YAML 特性 + 项目模式 + 统一编译数据库 + **145 个真实 port**（L0 → L4）。按依赖层次自底向上扩展：`openssl` 起步，L0 十个基础库，再到 `libssh2` / `nghttp2` / `curl` 全链与 `libarchive`（一次挂 8 个 L0 依赖）。第四轮继续覆盖 Linux 底层库栈：NUMA / 权限与沙箱 / netfilter / X11 / **Xserver** / **Wayland** / libinput / D-Bus / kmod / util-linux / **systemd** / ipvs / iptables —— 36 个新 port 全部真实编译（6718 条编译命令），`xserver` 依赖图 16 步、`systemd` 单包 3272 条。特性开关也能引入真实的传递依赖（`openssl:zlib` → 先构建 `zlib`）。第五轮再覆盖 CMake / Lua / ALSA / libpsl / libfuse / live555 / librtsp / UCX / Vulkan / folly / proxygen / Redpanda 以及 NVIDIA（CUDA、DCGM、Video Codec SDK、nvImageCodec、CV-CUDA）、华为 CANN、大华播放库 —— 共 23 个新 port；其中 4 个需登录或专有的 SDK 做成 `gcpkg.build.external` 声明式 port，`gcpkg externals` 静态列出所需环境变量，你在本地设好即可真构建。第六轮继续补 Linux 基础库：GNU 数值/加密栈（GMP → GnuTLS）、终端/数据（ncurses → readline、SQLite、Jansson）、图像字体（libpng → freetype → fontconfig / HarfBuzz）与内核接口（libattr → libacl、elfutils → libbpf），共 37 个新 port，其中 14 个在这里真编译出 884 条编译命令。第七轮专攻**内核接口与磁盘/存储信息查询**（NVMe/SMART/分区/文件系统/RAID/DMI/PCI、ftrace、keyring、GPIO、IIO 等），新增 34 个 port；`liburing` 早就在栈里，这一轮重新从干净源码复核（14 条 compdb）并让它成为 `libnvme → udisks2` 磁盘信息链的一环，另有 21 个新 port 真编译（合计 1061 条）。
+> 当前分支 `feat/lua-yaml-compdb-openssl`：Lua 引擎 + YAML 特性 + 项目模式 + 统一编译数据库 + **145 个真实 port**（L0 → L4）。按依赖层次自底向上扩展：`openssl` 起步，L0 十个基础库，再到 `libssh2` / `nghttp2` / `curl` 全链与 `libarchive`（一次挂 8 个 L0 依赖）。第四轮继续覆盖 Linux 底层库栈：NUMA / 权限与沙箱 / netfilter / X11 / **Xserver** / **Wayland** / libinput / D-Bus / kmod / util-linux / **systemd** / ipvs / iptables —— 36 个新 port 全部真实编译（6718 条编译命令），`xserver` 依赖图 16 步、`systemd` 单包 3272 条。特性开关也能引入真实的传递依赖（`openssl:zlib` → 先构建 `zlib`）。第五轮再覆盖 CMake / Lua / ALSA / libpsl / libfuse / live555 / librtsp / UCX / Vulkan / folly / proxygen / Redpanda 以及 NVIDIA（CUDA、DCGM、Video Codec SDK、nvImageCodec、CV-CUDA）、华为 CANN、大华播放库 —— 共 23 个新 port；其中 4 个需登录或专有的 SDK 做成 `gcpkg.build.external` 声明式 port，`gcpkg externals` 静态列出所需环境变量，你在本地设好即可真构建。第六轮继续补 Linux 基础库：GNU 数值/加密栈（GMP → GnuTLS）、终端/数据（ncurses → readline、SQLite、Jansson）、图像字体（libpng → freetype → fontconfig / HarfBuzz）与内核接口（libattr → libacl、elfutils → libbpf），共 37 个新 port，其中 14 个在这里真编译出 884 条编译命令。第七轮专攻**内核接口与磁盘/存储信息查询**（NVMe/SMART/分区/文件系统/RAID/DMI/PCI、ftrace、keyring、GPIO、IIO 等），新增 34 个 port；`liburing` 早就在栈里，这一轮重新从干净源码复核（14 条 compdb）并让它成为 `libnvme → udisks2` 磁盘信息链的一环，另有 21 个新 port 真编译（合计 1061 条）。第八轮补上 pnpm 式项目工作流：
+`gcpkg new` / `add` / `remove` / `list` / `versions` / `install`（无参），
+区分**项目私有 port / 用户级 / 公有 registry** 三种作用域与**项目特有 / 公有**
+两种依赖清单，并让不同项目锁定同库的不同版本（`zlib@1.2.13` 与
+`zlib@1.3.1` 同时真编译，`gcpkg.lock` 各记各的），详见
+[docs/PROJECTS.md](docs/PROJECTS.md)。
 
 ## 三个核心要求如何落地
 
@@ -68,6 +73,16 @@ GCPKG_KERNEL_DYNAMIC=1 ./tests/linux-kernel.sh     # 真编译 22 个（含 libu
 ./build/bin/gcpkg build examples/diskinfo --store ~/.cache/gcpkg-linux-store --ports ./ports
 #   -> 合并 240 条编译命令，clangd 可从项目跳进 libnvme/libatasmart/pciutils/liburing
 # 详见 docs/DISK_INFO.md
+
+# 第八轮：pnpm 式项目工作流（详见 docs/PROJECTS.md）
+./build/bin/gcpkg new apps/demo --name=demo            # 一键脚手架
+./build/bin/gcpkg add zlib@1.2.13 -C apps/demo        # 项目特有依赖 + 指定版本
+./build/bin/gcpkg add --local mylib -C apps/demo      # 项目私有 port
+./build/bin/gcpkg versions zlib                       # 4 个真实 URL/SHA 的版本
+./build/bin/gcpkg list -C apps/demo                   # 作用域 / 版本 / lock
+./build/bin/gcpkg build apps/demo --store ~/.cache/gcpkg-store --ports ./ports
+./tests/projects.sh                                    # 静态回归
+GCPKG_PROJECT_DYNAMIC=1 ./tests/projects.sh           # 两个项目各编译不同 zlib
 ```
 
 > store 请放在真实磁盘（如 `~/.cache/...`）：本沙箱 `/tmp` 是 992M 的 tmpfs，
@@ -88,6 +103,14 @@ gcpkg graph proxygen                                 # folly -> fizz -> wangle/m
 gcpkg graph gnutls                                   # GNU 数值/加密链，7 步
 gcpkg install libpng --store ~/.cache/gcpkg-linux-store --ports ./ports
 gcpkg graph udisks2                                  # 磁盘信息链，15 步
+gcpkg new apps/demo                                  # pnpm 式项目脚手架
+gcpkg add zlib@1.2.13 -C apps/demo                   # 给项目加依赖并锁定版本
+gcpkg add --local mylib -C apps/demo                 # 项目私有 port（两文件）
+gcpkg add -g bzip2                                   # 用户级公有依赖清单
+gcpkg remove zlib -C apps/demo
+gcpkg list -C apps/demo                              # 作用域、版本、lock
+gcpkg versions zlib                                  # 4 个真实版本
+gcpkg install -C apps/demo                           # 无参 = 安装项目全部依赖
 gcpkg install nvme-cli --store ~/.cache/gcpkg-linux-store --ports ./ports
 gcpkg graph openssl --feature=openssl:zlib           # 条件依赖也进入依赖图
 gcpkg install systemd --store ~/.cache/gcpkg-linux-store --ports ./ports
@@ -136,16 +159,18 @@ clangd 打开项目根目录即可工作；跳转到 `openssl/sha.h`、`crypto/s
 ```
 Source/Core/       C++ 运行时（Lua 沙箱、进程、YAML 桥、CLI 引导）
 Source/Intercept/  gcpkg-intercept：透明 CC/CXX 编译器包装器
-lua/gcpkg/         Lua 引擎（特性、port、project、编译数据库、adapter、CLI）
+lua/gcpkg/         Lua 引擎（特性、port、project、workspace、编译数据库、adapter、CLI）
 lua/gcpkg/build/   各构建系统的 Lua 适配模块
 ports/             145 个库，每个 build.lua + features.yaml（L0 → L4）
 examples/hello/    OpenSSL 项目：gcpkg.lua + gcpkg.yaml + src/main.c
 examples/web/      curl 全链顶端项目
-tests/             smoke / chain / features / linux / media / linux-base / linux-kernel 七个回归
+tests/             smoke / chain / features / linux / media / linux-base / linux-kernel / projects 八个回归
 docs/              架构与扩展文档
 Source/MainProcess/  旧 TOML 原型，保留但不参与构建
 ```
 
-详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 与 [docs/EXTENDING.md](docs/EXTENDING.md)。
+详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、[docs/EXTENDING.md](docs/EXTENDING.md)、
+[docs/PROJECTS.md](docs/PROJECTS.md)（pnpm 式项目工作流）、
+[docs/DISK_INFO.md](docs/DISK_INFO.md) 与 [docs/EXTERNAL_SDKS.md](docs/EXTERNAL_SDKS.md)。
 
 许可证：BSD-3-Clause（见 LICENSE）。

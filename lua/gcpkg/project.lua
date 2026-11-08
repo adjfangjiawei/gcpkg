@@ -12,6 +12,7 @@ local features = require("gcpkg.features")
 local store = require("gcpkg.store")
 local compdb = require("gcpkg.compdb")
 local port = require("gcpkg.port")
+local workspace = require("gcpkg.workspace")
 local M = {}
 
 local function load(project_dir)
@@ -68,9 +69,16 @@ function M.build(projectDir, cfg, opts)
     projectDir = fs.realpath(projectDir or fs.cwd())
     local spec, y = load(projectDir)
     local requests = mergeRequests(cfg.requests, features.from_yaml(y))
-    local projectCfg = util.merge(cfg, { requests = requests })
+    -- Project-private ports (gcpkg-ports/) + the user registry + the public
+    -- registry. First match wins, so a project can override one library
+    -- without forking the shared 145-port registry.
+    local roots = workspace.roots(projectDir, cfg.ports or port.get_roots(), y)
+    local projectCfg = util.merge(cfg, { requests = requests, ports = roots })
 
-    local depSpecs = util.concat(spec.dependencies or {}, y.dependencies or {})
+    -- Deps may live in gcpkg.lua, in the project's managed gcpkg.yaml block,
+    -- or (opt-in) in the user's global gcpkg.yaml. First declaration wins.
+    local depSpecs = workspace.effective_dependencies(projectDir, y,
+        cfg.store and cfg.store.root, spec)
     local manifests = {}
     for _, dep in ipairs(depSpecs) do
         manifests[#manifests + 1] = port.install_or_backend(dep, projectCfg)
@@ -206,6 +214,8 @@ function M.build(projectDir, cfg, opts)
 
     log.step("compile database: " .. outPath .. " (" .. compdb.summary(entries) .. ")")
     log.info("  clangd can now navigate project + dependency sources")
+    -- Per-project resolution record: which versions/scopes were actually used.
+    workspace.write_lock(projectDir, y, projectCfg, ordered, spec)
     return { compile_commands = outPath, entries = #entries, dependencies = ordered }
 end
 

@@ -376,3 +376,55 @@ GCPKG_BASE_DYNAMIC=1 ./tests/linux-base.sh         # 可选：真编译子集
 生成器 `tools/gen-linux-kernel-ports.py` + `tools/linux-kernel-catalog.tsv`；
 静态验证 `tests/linux-kernel.sh`，动态子集 `GCPKG_KERNEL_DYNAMIC=1`。
 磁盘信息相关的 port 清单与用法见 `docs/DISK_INFO.md`。
+
+
+## 10. 项目工作流与多版本 port（第八轮）
+
+### 给一个 port 声明多个真实版本
+
+只改 `features.yaml`，`build.lua` 一行不动：
+
+```yaml
+versions:
+  "1.2.13":
+    source:
+      url: "https://github.com/madler/zlib/releases/download/v1.2.13/zlib-1.2.13.tar.gz"
+      sha256: "b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30"
+```
+
+版本号**必须加引号**（YAML 会把 `1.3` 解析成数字）。`source` 会与
+`build.lua` 的默认 source 合并，所以 `strip` 等字段可以只写一次；还可以给
+某个版本写 `dependencies:` 覆盖。`gcpkg versions zlib` 列出全部版本、
+默认版本和各自的 URL；`gcpkg add zlib@1.2.13 -C apps/demo` 之后
+`gcpkg build apps/demo` 会真的下载并编译 1.2.13，生成 `zlib-1.2.13`
+manifest。未声明的版本会报错而不是悄悄用默认源码，所以校验和必须是实测值。
+
+`features:` 与 `versions:` 是并列的两类数据：`features.resolve()` 会跳过
+`schema/port/versions/dependencies/project/ports/inherit_global` 这些元数据键，
+因此 `gcpkg features` 不会把 `versions` 列成一个开关。
+
+### 项目私有 port 覆盖公有 registry
+
+```bash
+gcpkg new apps/demo
+gcpkg add --local zlib -C apps/demo   # 复制公有 zlib 的两文件到 gcpkg-ports/zlib/
+# 现在编辑 apps/demo/gcpkg-ports/zlib/build.lua 或 features.yaml 即可
+gcpkg list -C apps/demo               # zlib 显示 [project]
+```
+
+查找顺序是 `gcpkg-ports/` → `$GCPKG_HOME/ports/` → `--ports`/引擎 `ports/`。
+要覆盖用户级或公有 registry 的同名库，把它放在更靠前的 root 即可；
+`gcpkg.yaml` 的 `ports:` 可以列出多个目录。项目外仍用公有版本。
+
+### 依赖清单的作用域
+
+项目特有依赖写在 `gcpkg.yaml` 托管区块（`add`/`remove` 管理）；公有依赖用
+`gcpkg add -g` 写到 `$GCPKG_HOME/gcpkg.yaml`，项目通过
+`inherit_global: true` 显式继承。默认不继承，避免「一台机器上的所有项目
+被塞同一组库」。`gcpkg.lock` 记录实际解析结果，建议提交到版本库。
+
+### 验证
+
+`./tests/projects.sh`（默认纯静态）；
+`GCPKG_PROJECT_DYNAMIC=1 ./tests/projects.sh` 真编译两个不同 zlib 版本
+和 jansson 2.14。完整说明见 `docs/PROJECTS.md`。

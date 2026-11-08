@@ -209,6 +209,39 @@ function M.install(spec_name, cfg)
               table.concat(cfg.ports or M.get_roots(), "\n  "))
     end
     local spec = M.load(dir)
+    local fspec = M.features_file(dir) or {}
+
+    -- Version selection is REAL: `name@version` must switch the upstream
+    -- source, not merely rename the cache key. Additional releases are
+    -- declared in features.yaml (`versions:`), so a port is still exactly
+    -- two files. An undeclared version is an error instead of a silent lie.
+    if wanted then
+        local entry = (fspec.versions or {})[wanted]
+        if entry then
+            spec.version = wanted
+            local base = type(spec.source) == "table" and util.deepcopy(spec.source) or {}
+            if type(entry.source) == "table" then
+                spec.source = util.merge(base, entry.source)
+            elseif entry.url or entry.sha256 then
+                spec.source = util.merge(base, { url = entry.url, sha256 = entry.sha256 })
+            end
+            if entry.dependencies then
+                spec.dependencies = entry.dependencies
+            end
+        elseif wanted ~= tostring(spec.version) then
+            local avail = util.keys(fspec.versions or {})
+            table.sort(avail)
+            if spec.version then
+                avail[#avail + 1] = tostring(spec.version) .. " (default)"
+            end
+            error("port '" .. name .. "' has no version '" .. wanted ..
+                  "'. Available in " .. util.join(dir, "features.yaml") .. ": " ..
+                  (#avail > 0 and table.concat(avail, ", ") or "none declared"))
+        else
+            spec.version = wanted
+        end
+    end
+
     local portName = spec.name or name
     local version = wanted or spec.version or "0"
     local key = store.key(portName, version)
@@ -218,7 +251,6 @@ function M.install(spec_name, cfg)
     end
     cfg.in_progress[key] = true
 
-    local fspec = M.features_file(dir) or {}
     local f = features.resolve(fspec.features or fspec, portName, cfg.requests)
 
     -- 1. dependencies (declared in build.lua + pulled in by enabled features)

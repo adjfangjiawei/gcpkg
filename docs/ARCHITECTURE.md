@@ -543,7 +543,64 @@ util-linux/libattr/libacl）与内核库串在一起，而不是重复声明。
 其余 12 个新 port（udisks2 / libstoragemgmt / 文件系统工具 / libselinux 等）
 按约定由用户在本机真编译。七个回归脚本全部 exit=0。
 
-## 13. 构建 gcpkg 本体
+## 13. 项目工作流：作用域与版本（2026-11-08 第八轮）
+
+用户要求「像 pnpm 一样用命令创建项目、添加库」，并明确区分项目特有与公有、
+不同项目依赖不同库、以及按项目指定不同版本。新增 `lua/gcpkg/workspace.lua`，
+其余引擎模块只做通用能力扩展。
+
+### 命令
+
+`gcpkg new DIR` / `init`、`add DEP[@VERSION]...`、`remove NAME...`、
+`list`、`versions PORT`、`install`（无参 = 安装项目全部依赖）。
+`-C/--dir=DIR` 类似 `pnpm -C`；`--local` 创建项目私有 port；
+`-g/--global` 写用户级公有依赖清单；`--name` 指定项目名。
+
+### 三层 port 作用域
+
+`project`（`<project>/gcpkg-ports/`，只对本项目的同名 port 生效）→
+`user`（`$GCPKG_HOME/ports/`）→ `public`（`--ports` / `GCPKG_PORTS` /
+引擎 `ports/`）。`graph.ports()` 与 `port.find()` 都是「第一个命中即生效」，
+所以一个项目可以覆盖 `zlib` 而不 fork 145 个 port 的公共 registry。
+`gcpkg list` 用 `[project]/[user]/[public]` 标出每个依赖命中的位置。
+
+### 两种依赖清单
+
+项目特有清单在 `<project>/gcpkg.yaml` 的托管区块（`# --- gcpkg managed
+dependencies ---`），`add`/`remove` 只改这个区块，其它注释、features、
+ports 全部保留。公有清单在 `$GCPKG_HOME/gcpkg.yaml`，项目必须显式
+`inherit_global: true` 才继承；默认不继承，因此不同项目天然可以有完全不同
+的依赖集合。同名依赖项目声明优先。
+
+### 版本是真的换源码
+
+之前 `install zlib@1.2.13` 只换了缓存 key、源码仍是 build.lua 的默认
+tarball。现在 `port.install()` 在 `features.yaml` 的 `versions:` 里查版本，
+用声明的 `source`（真实 URL + SHA256）覆盖 `spec.source`，并替换
+`spec.version` / 可选 `spec.dependencies`；store 产生独立的
+`zlib-1.2.13` manifest / prefix / 源码树，fingerprint 天然不同。
+**未声明的版本直接报错**并列出可用版本。`features.resolve()` 增加元数据键
+过滤，`versions:` 不会被误当成 feature。一库仍严格是
+`build.lua` + `features.yaml` 两个文件。
+
+### 锁文件
+
+`<project>/gcpkg.lock`（JSON）记录依赖规格、inherit_global、roots 以及实际
+解析出的 `key / version / scope / port_dir / compdb_entries`。`add`/`remove`
+清空 resolved 并标 `pending`，`install`/`build` 写满；`list` 展示。
+每个项目一份，互不干扰。
+
+### 实测
+
+`tests/projects.sh` 静态 exit=0；`GCPKG_PROJECT_DYNAMIC=1` 动态 exit=0：
+`v1` 用 `zlib@1.2.13`（真编译 70 条、项目 compdb 71 条），`v2` 用
+`zlib@1.3.1`（62 条）+ `jansson@2.14`（64 条）（项目 compdb 127 条），
+两个 compdb 不串版本，两个 lock 的 resolved key 不同。
+`gcpkg install`（无参）先装好依赖，`build` 命中缓存并合并编译数据库。
+详见 `docs/PROJECTS.md`。
+
+## 14. 构建 gcpkg 本体
+
 
 ```bash
 cmake -S . -B build            # 需要 Lua 5.4 开发库、yaml-cpp、pkg-config

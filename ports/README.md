@@ -290,3 +290,12 @@ libidn2 → zlib → gnutls）、`graph libbpf` 5 步（zlib / zstd / xz → elf
 依赖图：`graph udisks2` 15 步（含 `liburing → libnvme`）、`graph nvme-cli`
 3 步、`graph libtracefs` 2 步。上游源码始终不改，适配全在 `build.lua`
 的选项 / `pre_build` / 自定义 `build(ctx)` 与 `features.yaml` 的 env 里。
+
+## 多版本 port
+
+`ports/zlib/features.yaml` 与 `ports/jansson/features.yaml` 里有 `versions:`
+块（每个版本真实 URL + SHA256），因此 `gcpkg versions zlib` 能看到
+1.3.1 / 1.2.13 / 1.2.12 / 1.2.11，`gcpkg add zlib@1.2.13 -C <project>`
+会让该项目真编译 1.2.13，而其它项目仍用默认的 1.3.1。其余 port 保持单版本。
+项目私有 port、公有 registry、用户级 registry 三者的优先级与 `gcpkg.lock`
+见 `docs/PROJECTS.md`。
