@@ -163,7 +163,7 @@ META = {
                                                   "BUILD_SHARED_LIBS": "OFF"},
                        n="Widest new chain: libogg + libvorbis + opus + flac -> libsndfile."),
     "libvpx": dict(e=ex(["vpx"]), custom="vpx",
-                   n="VP8/VP9 codec: custom ./configure with the pure-C generic-gnu target."),
+                   n="VP8/VP9 codec: SIMD configure using the nasm tool port on PATH."),
     "libtheora": dict(e=ex(["theora", "theoradec", "theoraenc"]),
                       args=["--disable-examples", "--disable-oggtest",
                             "--disable-vorbistest", "--disable-sdltest"],
@@ -214,8 +214,9 @@ CUSTOM = {
     "vpx": '''    build = function(ctx)
         local j = tostring(ctx.jobs or 4)
         ctx.exec({ "./configure", "--prefix=" .. ctx.prefix,
-                   -- generic-gnu is a pure-C target: no yasm/nasm required.
-                   "--target=generic-gnu",
+                   -- The nasm TOOL PORT is on PATH via exports.binaries;
+                   -- x86_64-linux-gcc + --as=nasm enables the SIMD paths.
+                   "--target=x86_64-linux-gcc", "--as=nasm",
                    "--disable-examples", "--disable-tools", "--disable-docs",
                    "--disable-unit-tests", "--enable-static", "--disable-shared" },
                  { cwd = ctx.src, log = ctx.log })

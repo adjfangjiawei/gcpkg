@@ -98,7 +98,9 @@ function M.define(spec)
                 prefix = ctx.prefix,
                 exec = ctx.exec,
                 log = ctx.log,
-                jobs = ctx.jobs,
+                -- A port may cap parallelism (heavy template TUs can OOM a
+                -- small builder); otherwise the CLI -j value is used.
+                jobs = cfg.jobs or ctx.jobs,
                 env = ctx.env,
                 defines = defines,
                 args = args,
@@ -179,6 +181,30 @@ function M.define(spec)
                     targets = { cfg.install_target },
                 }
             end
+        elseif kind == "python" then
+            -- setup.py / pip based Python packages. PYTHONPATH for dependents
+            -- comes from <prefix>/lib/python3/site-packages (dependency_env).
+            local python = require("gcpkg.build.python")
+            local cfg = spec.python or {}
+            local args = util.concat(util.deepcopy(cfg.args or {}), featureArgs)
+            result = python.all {
+                src = cfg.source and util.join(ctx.src, cfg.source) or ctx.src,
+                prefix = ctx.prefix, exec = ctx.exec, log = ctx.log,
+                env = ctx.env, mode = cfg.mode, python = cfg.python, args = args,
+                no_isolation = cfg.no_isolation,
+            }
+
+        elseif kind == "cargo" then
+            -- Rust crates: cargo comes from the `rust` tool port on PATH.
+            local cargo = require("gcpkg.build.cargo")
+            local cfg = spec.cargo or {}
+            local args = util.concat(util.deepcopy(cfg.args or {}), featureArgs)
+            result = cargo.all {
+                src = cfg.source and util.join(ctx.src, cfg.source) or ctx.src,
+                prefix = ctx.prefix, exec = ctx.exec, log = ctx.log,
+                env = ctx.env, args = args,
+            }
+
         else
             error("unknown recipe kind '" .. tostring(kind) .. "'")
         end
@@ -221,6 +247,16 @@ end
 
 function M.make(spec)
     spec.kind = "make"
+    return M.define(spec)
+end
+
+function M.python(spec)
+    spec.kind = "python"
+    return M.define(spec)
+end
+
+function M.cargo(spec)
+    spec.kind = "cargo"
     return M.define(spec)
 end
 

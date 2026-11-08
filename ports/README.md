@@ -344,7 +344,7 @@ libidn2 → zlib → gnutls）、`graph libbpf` 5 步（zlib / zstd / xz → elf
 | `libconfig` | 1.7.3 | autotools | — | 17 |
 | `giflib` | 5.2.2 | custom-make | — | 24 |
 | `libsndfile` | 1.2.2 | cmake | libogg,libvorbis,opus,flac | 189 |
-| `libvpx` | 1.15.0 | custom-make | — | 161 |
+| `libvpx` | 1.15.0 | custom-make | nasm（第十一轮起） | 211 |
 | `libtheora` | 1.1.1 | autotools | libogg | 34 |
 | `libzip` | 1.11.3 | cmake | zlib | 250 |
 | `libmaxminddb` | 1.12.2 | cmake | — | 8 |
@@ -353,3 +353,8 @@ libidn2 → zlib → gnutls）、`graph libbpf` 5 步（zlib / zstd / xz → elf
 在干净 store 真编译通过（合计 3056 条），`GCPKG_EXTRA_DYNAMIC=1
 ./tests/extra.sh` 可复现。条件依赖：`graph libzip --feature=libzip:openssl`
 等四条会额外拉起 openssl。详见 `docs/EXTRA_LIBRARIES.md`。
+
+第十一轮又新增 23 个 port（17 个常见库 + `nasm` / `python` / `rust` /
+`tokenizers-cpp` / `toml` / `ryu`），总计 **249** 个；其中 `libvpx`
+由纯 C 目标改为经 `nasm` 工具 port 编 SIMD。完整清单见
+`docs/ROUND11_LIBRARIES.md` 与 `docs/TOOLCHAINS.md`。

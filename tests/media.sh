@@ -35,7 +35,7 @@ CHECK=$("$BIN" check --ports "$PORTS")
 echo "$CHECK" | python3 -c 'import re,sys; n=int(re.search(r"(\d+) ports OK", sys.stdin.read()).group(1)); assert n >= 74, n'
 echo "$CHECK" | tail -1
 EXT=$("$BIN" externals --ports "$PORTS")
-echo "$EXT" | grep -q '4 external SDK ports' || { echo "expected 4 vendor SDK ports" >&2; exit 1; }
+echo "$EXT" | grep -qE '[4-9] external SDK ports' || { echo "expected >=4 vendor SDK ports" >&2; exit 1; }
 echo "$EXT" | tail -5
 
 echo "--- bottom-up graphs (static) ---"

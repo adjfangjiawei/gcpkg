@@ -2,7 +2,7 @@
 
 一个**元包管理器**：用 Lua 描述「怎么构建一个库」，用 YAML 描述「这个库有哪些特性」，把任意构建系统、乃至其它包管理器（vcpkg / conan / pkg-config / apt / …）接进来，**不改它们本身**，并且让项目自身也能被它管理、生成可跨依赖跳转的 clangd 编译数据库。
 
-> 当前分支 `feat/lua-yaml-compdb-openssl`：Lua 引擎 + YAML 特性 + 项目模式 + 统一编译数据库 + **226 个真实 port**（L0 → L4）。按依赖层次自底向上扩展：`openssl` 起步，L0 十个基础库，再到 `libssh2` / `nghttp2` / `curl` 全链与 `libarchive`（一次挂 8 个 L0 依赖）。第四轮继续覆盖 Linux 底层库栈：NUMA / 权限与沙箱 / netfilter / X11 / **Xserver** / **Wayland** / libinput / D-Bus / kmod / util-linux / **systemd** / ipvs / iptables —— 36 个新 port 全部真实编译（6718 条编译命令），`xserver` 依赖图 16 步、`systemd` 单包 3272 条。特性开关也能引入真实的传递依赖（`openssl:zlib` → 先构建 `zlib`）。第五轮再覆盖 CMake / Lua / ALSA / libpsl / libfuse / live555 / librtsp / UCX / Vulkan / folly / proxygen / Redpanda 以及 NVIDIA（CUDA、DCGM、Video Codec SDK、nvImageCodec、CV-CUDA）、华为 CANN、大华播放库 —— 共 23 个新 port；其中 4 个需登录或专有的 SDK 做成 `gcpkg.build.external` 声明式 port，`gcpkg externals` 静态列出所需环境变量，你在本地设好即可真构建。第六轮继续补 Linux 基础库：GNU 数值/加密栈（GMP → GnuTLS）、终端/数据（ncurses → readline、SQLite、Jansson）、图像字体（libpng → freetype → fontconfig / HarfBuzz）与内核接口（libattr → libacl、elfutils → libbpf），共 37 个新 port，其中 14 个在这里真编译出 884 条编译命令。第七轮专攻**内核接口与磁盘/存储信息查询**（NVMe/SMART/分区/文件系统/RAID/DMI/PCI、ftrace、keyring、GPIO、IIO 等），新增 34 个 port；`liburing` 早就在栈里，这一轮重新从干净源码复核（14 条 compdb）并让它成为 `libnvme → udisks2` 磁盘信息链的一环，另有 21 个新 port 真编译（合计 1061 条）。第八轮补上 pnpm 式项目工作流：
+> 当前分支 `feat/lua-yaml-compdb-openssl`：Lua 引擎 + YAML 特性 + 项目模式 + 统一编译数据库 + **249 个真实 port**（L0 → L4，含工具链 port）。按依赖层次自底向上扩展：`openssl` 起步，L0 十个基础库，再到 `libssh2` / `nghttp2` / `curl` 全链与 `libarchive`（一次挂 8 个 L0 依赖）。第四轮继续覆盖 Linux 底层库栈：NUMA / 权限与沙箱 / netfilter / X11 / **Xserver** / **Wayland** / libinput / D-Bus / kmod / util-linux / **systemd** / ipvs / iptables —— 36 个新 port 全部真实编译（6718 条编译命令），`xserver` 依赖图 16 步、`systemd` 单包 3272 条。特性开关也能引入真实的传递依赖（`openssl:zlib` → 先构建 `zlib`）。第五轮再覆盖 CMake / Lua / ALSA / libpsl / libfuse / live555 / librtsp / UCX / Vulkan / folly / proxygen / Redpanda 以及 NVIDIA（CUDA、DCGM、Video Codec SDK、nvImageCodec、CV-CUDA）、华为 CANN、大华播放库 —— 共 23 个新 port；其中 4 个需登录或专有的 SDK 做成 `gcpkg.build.external` 声明式 port，`gcpkg externals` 静态列出所需环境变量，你在本地设好即可真构建。第六轮继续补 Linux 基础库：GNU 数值/加密栈（GMP → GnuTLS）、终端/数据（ncurses → readline、SQLite、Jansson）、图像字体（libpng → freetype → fontconfig / HarfBuzz）与内核接口（libattr → libacl、elfutils → libbpf），共 37 个新 port，其中 14 个在这里真编译出 884 条编译命令。第七轮专攻**内核接口与磁盘/存储信息查询**（NVMe/SMART/分区/文件系统/RAID/DMI/PCI、ftrace、keyring、GPIO、IIO 等），新增 34 个 port；`liburing` 早就在栈里，这一轮重新从干净源码复核（14 条 compdb）并让它成为 `libnvme → udisks2` 磁盘信息链的一环，另有 21 个新 port 真编译（合计 1061 条）。第八轮补上 pnpm 式项目工作流：
 `gcpkg new` / `add` / `remove` / `list` / `versions` / `install`（无参），
 区分**项目私有 port / 用户级 / 公有 registry** 三种作用域与**项目特有 / 公有**
 两种依赖清单，并让不同项目锁定同库的不同版本（`zlib@1.2.13` 与
@@ -18,6 +18,14 @@
 全局下发：`gcpkg proxy [URL|--unset]` 支持项目特有 / 用户级公有两层配置，
 `--proxy` / `--no-proxy` 单次覆盖，凭据不进命令行和日志，curl、git clone
 与所有构建钩子都继承同一份配置，详见 [docs/PROXY.md](docs/PROXY.md)。
+第十一轮把**工具链本身**也做成 port：`nasm` / `python` 是源码工具 port，
+`rust` 是 `gcpkg.build.external` 声明式工具 port；新增 `recipe.python` /
+`recipe.cargo` 两个 Lua adapter，以及用户所说的「tokenize-cpp」即
+`mlc-ai/tokenizers-cpp`（Rust → C → C++ 绑定，3 个 pinned tarball、
+端到端静态链接执行通过），另有 17 个常见 C/C++ 库。`libvpx` 现在真的
+经 `nasm` 编 SIMD（不再用纯 C 回退），注册表 226 → **249**。详见
+[docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) 与
+[docs/ROUND11_LIBRARIES.md](docs/ROUND11_LIBRARIES.md)。
 
 ## 三个核心要求如何落地
 
@@ -95,7 +103,7 @@ GCPKG_KERNEL_DYNAMIC=1 ./tests/linux-kernel.sh     # 真编译 22 个（含 libu
 GCPKG_PROJECT_DYNAMIC=1 ./tests/projects.sh           # 两个项目各编译不同 zlib
 
 # 第九轮：43 个新库（详见 docs/EXTRA_LIBRARIES.md）
-./build/bin/gcpkg check --ports ./ports               # 226 ports OK
+./build/bin/gcpkg check --ports ./ports               # 249 ports OK
 ./build/bin/gcpkg graph libsndfile --ports ./ports    # 5 步：ogg/vorbis/opus/flac -> sndfile
 ./build/bin/gcpkg graph libzip --feature=libzip:openssl --ports ./ports
 ./tests/extra.sh                                      # 静态：43 两文件 / SHA / 图 / 生成器幂等
@@ -112,6 +120,13 @@ GCPKG_R10_DYNAMIC=1 ./tests/r10.sh                    # 38/38 真编译，2498 �
 ./build/bin/gcpkg proxy --no-proxy                   # 强制直连（连标准环境变量也绕过）
 ./tests/proxy.sh                                     # 静态：优先级 / 两作用域 / 脱敏
 GCPKG_PROXY_DYNAMIC=1 ./tests/proxy.sh               # 端到端：本地 CONNECT 代理
+
+# 第十一轮：工具链 port + Python/Cargo adapter + tokenizers-cpp
+./build/bin/gcpkg graph libvpx --ports ./ports        # nasm -> libvpx（SIMD）
+./build/bin/gcpkg graph tokenizers-cpp --ports ./ports # rust -> tokenizers-cpp
+./build/bin/gcpkg externals --ports ./ports          # rust: GCPKG_RUST_HOME
+./tests/r11.sh                                       # 静态：23 两文件 / 生成器幂等 / 依赖链
+GCPKG_R11_DYNAMIC=1 ./tests/r11.sh                   # 24/24 真编译，1353 条 compdb
 ```
 
 > store 请放在真实磁盘（如 `~/.cache/...`）：本沙箱 `/tmp` 是 992M 的 tmpfs，
@@ -185,7 +200,11 @@ features:
 - `<project>/compile_commands.json`：合并后的编译命令，包含项目自身、依赖库及其所有传递依赖（递归）的翻译单元。`examples/hello` 实测 1127 条（1126 OpenSSL + 1 项目），`examples/web` 站在 curl 链顶端，从零实测 2115 条、覆盖 134 个源码目录（复用旧缓存的 store 为 1689 条 / 124 目录）；
 - `<project>/.clangd`：追加依赖的 `-I` 路径。
 
-clangd 打开项目根目录即可工作；跳转到 `openssl/sha.h`、`crypto/sha/sha256.c` 等依赖源码时会使用该库自己的编译命令（`-I`、`-D` 全部保留），这是 vcpkg 这类只导出 include/lib 的管理器做不到的地方。Linux 栈的 36 个 port 同样各自产出编译数据库（合计 6718 条）；`tests/linux.sh` 会逐条校验绝对路径，并用 clangd 实际加载 libnuma / wayland / libX11 / xserver / systemd 五个库的 compdb；第六轮 14 个真编译 port 又贡献 884 条，第七轮 22 个再贡献 1061 条（各库 manifest 中 `compdb_entries` 均可查，store 累计 10034 条）；第九轮 43 个新库又贡献 3056 条；第十轮 38 个新库再贡献 2498 条。
+clangd 打开项目根目录即可工作；跳转到 `openssl/sha.h`、`crypto/sha/sha256.c` 等依赖源码时会使用该库自己的编译命令（`-I`、`-D` 全部保留），这是 vcpkg 这类只导出 include/lib 的管理器做不到的地方。Linux 栈的 36 个 port 同样各自产出编译数据库（合计 6718 条）；`tests/linux.sh` 会逐条校验绝对路径，并用 clangd 实际加载 libnuma / wayland / libX11 / xserver / systemd 五个库的 compdb；第六轮 14 个真编译 port 又贡献 884 条，第七轮 22 个再贡献 1061 条（各库 manifest 中 `compdb_entries` 均可查，store 累计 10034 条）；第九轮 43 个新库又贡献 3056 条；第十轮 38 个新库再贡献 2498 条；第十一轮的工具链 / 多语言 port 同样并入统一 compdb
+（`python` 263 条、`libvpx` SIMD 构建 211 条、`tokenizers-cpp` 153 条、
+`nasm` 85 条），Rust crate 本身按惯例交给 rust-analyzer 而非 clangd。
+`GCPKG_R11_DYNAMIC=1 ./tests/r11.sh` 从全新 store 复现为
+**24 PASS / 0 FAIL、1353 条编译命令**。
 
 ## 目录
 
@@ -194,17 +213,20 @@ Source/Core/       C++ 运行时（Lua 沙箱、进程、YAML 桥、CLI 引导�
 Source/Intercept/  gcpkg-intercept：透明 CC/CXX 编译器包装器
 lua/gcpkg/         Lua 引擎（特性、port、project、workspace、proxy、编译数据库、adapter、CLI）
 lua/gcpkg/build/   各构建系统的 Lua 适配模块
-ports/             226 个库，每个 build.lua + features.yaml（L0 → L4）
+ports/             249 个库，每个 build.lua + features.yaml（L0 → L4，含工具链 port）
 examples/hello/    OpenSSL 项目：gcpkg.lua + gcpkg.yaml + src/main.c
 examples/web/      curl 全链顶端项目
-tests/             smoke / chain / features / linux / media / linux-base / linux-kernel / projects / extra 九个回归
+tests/             12 个回归（含 r10 / proxy / r11）
 docs/              架构与扩展文档
 Source/MainProcess/  旧 TOML 原型，保留但不参与构建
 ```
 
 详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、[docs/EXTENDING.md](docs/EXTENDING.md)、
 [docs/PROJECTS.md](docs/PROJECTS.md)（pnpm 式项目工作流）、
-[docs/DISK_INFO.md](docs/DISK_INFO.md)、[docs/EXTRA_LIBRARIES.md](docs/EXTRA_LIBRARIES.md)
+[docs/DISK_INFO.md](docs/DISK_INFO.md)、[docs/EXTRA_LIBRARIES.md](docs/EXTRA_LIBRARIES.md)、
+[docs/ROUND10_LIBRARIES.md](docs/ROUND10_LIBRARIES.md)、
+[docs/TOOLCHAINS.md](docs/TOOLCHAINS.md)（工具链与多语言 adapter）、
+[docs/ROUND11_LIBRARIES.md](docs/ROUND11_LIBRARIES.md)
 与 [docs/EXTERNAL_SDKS.md](docs/EXTERNAL_SDKS.md)。
 
 许可证：BSD-3-Clause（见 LICENSE）。

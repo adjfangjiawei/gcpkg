@@ -1,7 +1,7 @@
 schema: 1
 port: libvpx
 
-# VP8/VP9 codec: custom ./configure with the pure-C generic-gnu target.
+# VP8/VP9 codec: SIMD configure using the nasm tool port on PATH.
 # Static validation is the default; see tests/extra.sh.
 features:
   no-tests:

@@ -208,3 +208,5 @@ jansson 2.15.1 / 2.13.1 / 2.12（URL 与 SHA256 都实测过，但按前面的�
 | `tests/projects.sh` | 静态 + 动态回归 |
 | `lua/gcpkg/proxy.lua` | 代理解析、两层配置、脱敏与 `proxy.env()`（第十轮） |
 | `docs/PROXY.md` | 代理优先级、环境变量、端到端验证 |
+| `lua/gcpkg/build/python.lua`、`cargo.lua` | 工具链 port 的两种 adapter（第十一轮） |
+| `docs/TOOLCHAINS.md` | `PATH` / `PYTHONPATH` 如何由 `dependency_env()` 传给下游 port |

@@ -450,8 +450,9 @@ gcpkg list -C apps/demo               # zlib 显示 [project]
 - **手写 Makefile**：自定义 `build(ctx)` 里显式传 `CC=<wrapper>`，否则
   Makefile 里的字面量 `gcc` 绕过拦截器，compdb 为 0；`lmdb` 这类
   Makefile 在子目录的用 `cwd = util.join(ctx.src, ...)`。
-- **没有汇编器时**：`libvpx --target=generic-gnu` 是纯 C 目标，功能完整、
-  没有 SIMD；本机有 nasm 可去掉该参数重新构建。
+- **没有汇编器时**：第九轮 `libvpx --target=generic-gnu` 是纯 C 目标；
+  第十一轮起 `nasm` 本身是源码工具 port，`libvpx` 直接 `dependencies={"nasm"}`
+  + `--as=nasm` 编 SIMD，见 `docs/TOOLCHAINS.md`。
 - **SHA256 必须实测**：tag / 镜像 404 就换正式 release 或剔除，不塞占位值。
 
 完整的 43 行表、每库 compdb 条数与修复细节见 `docs/EXTRA_LIBRARIES.md`。
@@ -483,3 +484,24 @@ URL/SHA256/kind/deps）+ `tools/gen-r10-ports.py`，`tests/r10.sh` 重跑
   manifest 的 `libs` 是否真有 `lib<name>.a` / `.so`，能抓出这类命名错误。
 
 38 行表与全部适配说明在 `docs/ROUND10_LIBRARIES.md`。
+
+## 13. 工具链 port 与 Python / Cargo adapter（第十一轮）
+
+工具链也可以是普通 port：`nasm` / `python` 各自一个 `build.lua` +
+`features.yaml`，把 `bin/` 写进 `exports.binaries`，`dependency_env()` 就
+会把它 prepend 到下游的 `PATH`；`rust` 用已有的 `gcpkg.build.external`
+声明 `GCPKG_RUST_HOME`。新增包管理器时照旧写一个 Lua adapter +
+`recipe.lua` 的一个 kind 分支即可：
+
+```lua
+elseif kind == "python" then
+    local python = require("gcpkg.build.python")
+    result = python.all { src = ctx.src, prefix = ctx.prefix, exec = ctx.exec, ... }
+```
+
+三个要点：安装路径要稳定（`python` adapter 用 `pip --target` 装到
+`<prefix>/lib/python3/site-packages`，正好是 `dependency_env()` 收集
+`PYTHONPATH` 的路径）；adapter 里所有子进程都走 `ctx.exec`，代理与拦截
+才能继承；工具链缺失时宁可做成 external port 静态声明，也不要假编译。
+完整设计、pinned tarball 与踩坑见 `docs/TOOLCHAINS.md`，23 个新 port 的
+清单在 `docs/ROUND11_LIBRARIES.md`。

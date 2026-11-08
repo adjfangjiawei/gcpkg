@@ -1,0 +1,19 @@
+schema: 1
+port: highway
+
+# Google Highway portable SIMD library (core; contrib sort disabled: its vqsort templates need multi-GB RAM per TU).
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

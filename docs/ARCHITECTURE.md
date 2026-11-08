@@ -669,6 +669,28 @@ config）、`graph glog` = 2 步（`gflags → glog`）、`graph libbsd` = 2 步
 `tools/r10-catalog.tsv`（38 行实测 URL/SHA256/kind/deps）+
 `tools/gen-r10-ports.py`，`tests/r10.sh` 断言重跑后逐字节一致。
 
+### 第十一轮：工具链也是 port，包管理器也是 adapter
+
+注册表 226 → **249**。三种形态：`nasm` 2.16.03 与 `python` 3.12.8
+是从真实 tarball 编译的**源码工具 port**（`exports.binaries` 进 `PATH`）；
+`rust` 用 `gcpkg.build.external.declare` 声明 `GCPKG_RUST_HOME`，
+`gcpkg externals` 离线列出；`tokenizers-cpp` 固定到上游 main commit
+`c586c52`（v0.1.1 tag 与它自带的 `tokenizers 0.21.4` 不兼容），在
+`source()` 里用 3 个 pinned tarball 补齐 GitHub 归档的空 submodule。
+
+`lua/gcpkg/recipe.lua` 增加 `python` / `cargo` 两个 kind，分别调用
+`lua/gcpkg/build/python.lua`（setup.py / PEP 517 pip --target）与
+`lua/gcpkg/build/cargo.lua`（`cargo build --release` 后把 `.a`/`.rlib`
+装进 prefix）。两者都只通过 `ctx.exec` 调子进程，所以代理 env、
+CC/CXX 拦截与统一日志自动生效。Rust 本身不进 compdb（交给
+rust-analyzer），但 C++ 侧仍经 `compdb_files` 并入统一编译数据库。
+
+第九轮的 `libvpx` 纯 C 回退被移除：`tools/extra-catalog.tsv` 与
+`tools/gen-extra-ports.py` 同步改成 `nasm` 依赖 + `--as=nasm`，
+`tests/r11.sh` 断言 `generic-gnu` 已消失、构建日志含 `[AS]`。
+新增 `tests/r11.sh`（静态 + `GCPKG_R11_DYNAMIC=1` 全量真编译）与
+`docs/TOOLCHAINS.md` / `docs/ROUND11_LIBRARIES.md`。
+
 ## 16. 构建 gcpkg 本体
 
 

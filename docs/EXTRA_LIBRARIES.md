@@ -113,7 +113,7 @@ gcpkg graph ngtcp2 --feature=ngtcp2:tls
 | `inih` 的 Meson 报 `Unknown options: "tests"` | 上游 `meson_options.txt` 里没有 `tests`，改用 `default_library=static` + `with_INIReader` |
 | `nghttp3` 的 GitHub tag tarball 缺 `lib/sfparse` submodule，CMake 找不到源文件 | 换成官方 release `nghttp3-1.11.0.tar.xz`（实测 SHA256），tag 归档不带 submodule |
 | `libtheora` 的 tag tarball 只有 `configure.ac`，`autoreconf` 缺 `AM_PATH_SDL` / `AS_AC_EXPAND` 宏 | 换成 Xiph 官方 release `.tar.xz`（自带 `configure`），再加 `--disable-examples`（`png2theora` 用了现代 libpng 已删除的 `png_sizeof`） |
-| `libvpx` 的 `./configure` 要求 yasm/nasm，沙箱里没有 | 自定义 `build(ctx)` 用 `--target=generic-gnu` 纯 C 目标（可在有 nasm 的机器上换成 SIMD 目标） |
+| `libvpx` 的 `./configure` 要求 yasm/nasm，当时沙箱里没有 | 第九轮用 `--target=generic-gnu` 纯 C 目标；**第十一轮新增 `nasm` 源码工具 port 后已改为 `dependencies={"nasm"}` + `--as=nasm` 的 SIMD 目标**（见 `docs/TOOLCHAINS.md`） |
 | `librdkafka` 的 examples 链接宿主静态 `libcurl.a`，缺 GSSAPI 符号 | `--disable-curl --disable-gssapi --disable-sasl` |
 | `libconfig` 文档目标要 `makeinfo`（未安装） | `--disable-doc --disable-examples --disable-tests` |
 | `giflib` / `lmdb` 是手写 Makefile，`lmdb` 的 Makefile 还在 `libraries/liblmdb/` 子目录 | 自定义 `build(ctx)` 指定 cwd、传 `PREFIX`/`prefix`，并显式 `CC=<wrapper>` 让编译命令进入 compdb（giflib 24 条、lmdb 13 条） |
@@ -126,7 +126,7 @@ gcpkg graph ngtcp2 --feature=ngtcp2:tls
 ## 验证
 
 ```bash
-./build/bin/gcpkg check --ports ./ports              # 188 ports OK
+./build/bin/gcpkg check --ports ./ports              # 当时 188 ports OK，当前 249
 ./tests/extra.sh                                    # 静态：两文件 / SHA / 图 / 条件依赖 / 生成器幂等
 GCPKG_EXTRA_DYNAMIC=1 ./tests/extra.sh              # 干净 store 全量真编译 43 个
 ```
@@ -147,10 +147,12 @@ GCPKG_EXTRA_DYNAMIC=1 ./tests/extra.sh              # 干净 store 全量真编�
 `43 PASS / 0 FAIL`，累计 3056 条编译命令；这些编译数据库同样可被项目模式
 合并，供 clangd 从项目代码跳进新库源码。
 
-> 说明：`libvpx` 为绕开缺失的汇编器用了纯 C 目标，功能完整但不含 SIMD
-> 优化；若你本机有 nasm，可把 `build.lua` 里的 `--target=generic-gnu`
-> 去掉重新 `install`（`--no-cache`）。`libwebsockets` / `libzip` 默认关闭
-> TLS 相关选项，启用对应 feature 才会拉起 openssl。
+> 更新（第十一轮）：`libvpx` 已不再需要纯 C 回退。`nasm` 现在是 gcpkg 的
+> 源码工具 port，`libvpx` 声明 `dependencies = {"nasm"}` 并用
+> `--target=x86_64-linux-gcc --as=nasm`，构建日志里能看到 `using nasm` 与
+> `[AS] ... .asm.o`。此处 161 条 compdb 是第九轮纯 C 目标的历史数值；
+> 当前 SIMD 构建为 211 条。`libwebsockets` / `libzip` 默认关闭 TLS 相关选项，
+> 启用对应 feature 才会拉起 openssl。
 
 ## 文件
 
