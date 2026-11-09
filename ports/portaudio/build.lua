@@ -1,8 +1,5 @@
--- portaudio 19.7.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- portaudio 19.7.0 -- gcpkg port definition.
 -- Portable audio I/O; `alsa` feature pulls the alsa-lib port.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

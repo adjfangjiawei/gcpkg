@@ -1,8 +1,5 @@
--- libunwind 1.8.3 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- libunwind 1.8.3 -- gcpkg port definition.
 -- Stack unwinding; upstream CMakeLists.txt is Visual-Studio-only, so the autotools build is used (tag archive needs autoreconf).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

@@ -1,7 +1,5 @@
--- eigen 3.4.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- eigen 3.4.0 -- gcpkg port definition.
 -- Header-only linear algebra; headers land in include/eigen3.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

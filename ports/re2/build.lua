@@ -1,8 +1,5 @@
--- re2 2024-07-02 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- re2 2024-07-02 -- gcpkg port definition.
 -- RE2 regex engine on the external abseil port (find_package(absl)).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

@@ -1,16 +1,18 @@
--- Best-effort build-system detection. "Support almost any library" starts with
--- not hard-coding one build system: ports can call detect.build_system() and
--- dispatch to the matching gcpkg.build.* module, or override it explicitly.
+-- Build-system and inner-package-manager detection. Ports can call
+-- detect.build_system() or override it explicitly. Conan is the supported
+-- inner package manager; `canon` is a compatibility alias.
 --
--- Inner package managers (a project's own `canon`) are detected separately
--- from build systems.  A managed project may use BOTH: detect.build_systems()
--- returns the package manager first, then the build system, so gcpkg can run
--- `canon` and then CMake/Meson/GN/Makefile with the same injected environment.
+-- are detected separately from build systems.  A managed project may use BOTH:
+-- detect.build_systems() returns the package manager first, then the build
+-- system, so gcpkg can run Conan and then CMake/Meson/GN/Makefile with the
+-- same injected environment.
 local fs = require("gcpkg.fs")
 local util = require("gcpkg.util")
 local M = {}
 
 local PACKAGE_MANAGERS = {
+    { "conan", { "conanfile.py", "conanfile.txt", "conan.lock", "conanfile" } },
+    -- Legacy `canon` markers remain compatible with existing workspaces.
     { "canon", { "canonfile", "Canonfile", "canon.toml", "canon.json",
                  "canon.yaml", "canon.lock" } },
 }
@@ -39,7 +41,13 @@ end
 function M.package_managers(src)
     local out = {}
     for _, rule in ipairs(PACKAGE_MANAGERS) do
-        if hasAny(src, rule[2]) then out[#out + 1] = rule[1] end
+        if hasAny(src, rule[2]) then
+            -- If real Conan markers are present, do not add the legacy alias
+            -- too: both map to the same driver.
+            if rule[1] ~= "canon" or #out == 0 then
+                out[#out + 1] = rule[1]
+            end
+        end
     end
     return out
 end

@@ -2,7 +2,7 @@ schema: 1
 port: libusb
 
 # Userspace USB access: GitHub tag archives ship configure.ac, so pre_build runs autoreconf.
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

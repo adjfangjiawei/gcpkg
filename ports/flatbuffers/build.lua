@@ -1,8 +1,5 @@
--- flatbuffers 24.3.25 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- flatbuffers 24.3.25 -- gcpkg port definition.
 -- FlatBuffers serialization; flatc/tests off.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

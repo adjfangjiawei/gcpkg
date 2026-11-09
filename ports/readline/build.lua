@@ -1,8 +1,5 @@
--- readline 8.2.13 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- readline 8.2.13 -- gcpkg port definition.
 -- GNU readline on top of ncurses.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

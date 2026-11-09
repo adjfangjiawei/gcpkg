@@ -26,7 +26,7 @@ local function load(project_dir)
     gcpkg.sys.add_root(util.join(project_dir, ".gcpkg", "lua"))
     if not fs.isfile(luaPath) then
         -- A project can be described by gcpkg.yaml alone.  gcpkg then drives
-        -- the project's OWN build systems (CMake, GN, Meson, canon, Makefile)
+        -- the project's OWN build systems (CMake, GN, Meson, Conan, Makefile)
         -- without ever rewriting its sources.
         if not fs.isfile(yamlPath) then
             error("no gcpkg.lua or gcpkg.yaml in " .. project_dir)
@@ -37,12 +37,14 @@ local function load(project_dir)
             dependencies = {},
             systems = y.systems or y.system,
             commands = y.commands or {},
+            conan_cmd = y.conan_cmd or y.canon_cmd or y.cmd,
             canon_cmd = y.canon_cmd or y.cmd,
         }
         auto.build = function(ctx)
             return inner.run(ctx, {
                 systems = ctx.cfg and (ctx.cfg.systems or ctx.cfg.system) or auto.systems,
                 commands = auto.commands,
+                conan_cmd = auto.conan_cmd,
                 canon_cmd = auto.canon_cmd,
                 cmd = ctx.cfg and ctx.cfg.cmd or nil,
                 build_dir = ctx.build_dir,

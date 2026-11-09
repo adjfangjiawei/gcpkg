@@ -1,8 +1,5 @@
--- libdnet 1.12 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- libdnet 1.12 -- gcpkg port definition.
 -- Low-level networking routines; ships a generated configure.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

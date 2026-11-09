@@ -2,7 +2,7 @@ schema: 1
 port: libiio
 
 # Industrial I/O kernel interface; CMake, depends on libusb + libxml2. Avahi DNS-SD and libaio are disabled.
-# Static validation is the default; see tests/linux-kernel.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

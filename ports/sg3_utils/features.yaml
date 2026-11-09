@@ -2,7 +2,7 @@ schema: 1
 port: sg3_utils
 
 # SCSI generic commands and libsgutils2; tag archive needs autoreconf.
-# Static validation is the default; see tests/linux-kernel.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

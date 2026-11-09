@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the seventh-round ports: kernel interfaces and disk/storage info.
+"""Generate kernel-interface and storage ports from the catalog.
 
 Source of truth: tools/linux-kernel-catalog.tsv (34 real tarballs with measured
 SHA256, actual build-system kind from inspecting each archive, dependency list)
@@ -140,11 +140,8 @@ def exports_block(e):
 def build_lua(row):
     name, kind, meta = row["name"], row["kind"], META[row["name"]]
     deps = [d for d in row["deps"].split(",") if d]
-    out = ["-- %s %s -- ONE library, ONE build.lua + ONE features.yaml." % (name, row["version"]),
-           "-- Verification: static registry/graph tests here; real builds for a",
-           "-- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).",
+    out = ["-- %s %s -- gcpkg port definition." % (name, row["version"]),
            "-- %s" % meta.get("n", ""),
-           "-- Upstream is never patched: all adaptation is in this file.",
            ""]
     if not kind.startswith("custom-"):
         out.append('local recipe = require("gcpkg.recipe")')
@@ -196,7 +193,7 @@ def features_yaml(row):
     return "\n".join([
         "schema: 1", "port: %s" % row["name"], "",
         "# %s" % META[row["name"]].get("n", ""),
-        "# Static validation is the default; see tests/linux-kernel.sh.",
+        "# Feature switches for this port.",
         "features:",
         "  no-tests:", "    default: true", "    description: Skip the upstream test suite", "    args: []",
     ] + env_lines + [

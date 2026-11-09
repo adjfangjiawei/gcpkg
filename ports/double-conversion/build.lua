@@ -1,8 +1,5 @@
--- double-conversion 3.3.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- double-conversion 3.3.0 -- gcpkg port definition.
 -- IEEE-754 decimal conversion routines; static build.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

@@ -1,8 +1,5 @@
--- gnutls 3.8.9 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- gnutls 3.8.9 -- gcpkg port definition.
 -- Widest new dependency surface: nettle, gmp, libtasn1, libidn2, libunistring and the existing zlib port.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

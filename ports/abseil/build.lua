@@ -1,8 +1,5 @@
--- abseil 20240722.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- abseil 20240722.0 -- gcpkg port definition.
 -- Abseil C++ foundation: CMake package config installed for re2.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

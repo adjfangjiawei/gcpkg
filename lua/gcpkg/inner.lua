@@ -2,9 +2,9 @@
 --
 -- gcpkg does NOT replace a project's own build system.  It injects the outer
 -- dependencies (see inject.lua) and then invokes the inner system(s) in order:
--- a project's own `canon` package manager, CMake, GN, Meson, a Makefile, Ninja,
--- or any user-provided command.  Multiple systems may be listed, e.g.
--- `systems: [canon, cmake]` runs `canon` first and CMake second with the SAME
+-- a project's own Conan (plus the legacy `canon` alias), CMake, GN, Meson, a
+-- Makefile, Ninja, or any user-provided command. Multiple systems may be listed,
+-- e.g. `systems: [conan, cmake]` runs Conan first and CMake second with the SAME
 -- injected environment.  No file in the project source tree is rewritten.
 
 local fs = require("gcpkg.fs")
@@ -69,7 +69,9 @@ local function tokens(ctx, opts)
         ["@native@"] = files.meson, ["@meson@"] = files.meson,
         ["@gni@"] = files.gn_gni, ["@gnargs@"] = files.gn_args,
         ["@makeflags@"] = files.make_flags, ["@deps@"] = files.deps,
+        ["@conan@"] = files.conan, ["@conan-json@"] = files.conan,
         ["@canon@"] = files.canon, ["@canon-json@"] = files.canon,
+        ["@conan-env@"] = files.conan_env,
         ["@env@"] = files.env, ["@canon-env@"] = files.canon_env,
         ["@pkgconfig@"] = files.pkgconfig, ["@compdb@"] = files.compdb,
         ["@cc@"] = env.CC or (ctx.compiler or {}).wrapper_cc or "cc",
@@ -236,12 +238,21 @@ local function runNinja(ctx, opts, compdb)
     collectCompdb(ctx, opts, compdb)
 end
 
-local function runCanon(ctx, opts, compdb)
+local function runConan(ctx, opts, compdb)
     local files = ctx.inject.files
-    local custom = (opts.commands or {}).canon or opts.canon_cmd or
+    local custom = (opts.commands or {}).conan or opts.conan_cmd or
+                   (ctx.env or {}).CONAN_CMD or
+                   (opts.commands or {}).canon or opts.canon_cmd or
                    (ctx.env or {}).CANON_CMD
     if custom then
         runCustom(ctx, opts, custom, compdb)
+        return
+    end
+    if gcpkg.have("conan") then
+        -- Conan 2 syntax. Explicit commands.conan / conan_cmd are preferred;
+        -- gcpkg never parses Conan output or rewrites conanfile.py/txt.
+        exec(ctx, { "conan", "install", ".", "--output-folder=@build@" }, opts)
+        collectCompdb(ctx, opts, compdb)
         return
     end
     if gcpkg.have("canon") then
@@ -249,10 +260,10 @@ local function runCanon(ctx, opts, compdb)
         collectCompdb(ctx, opts, compdb)
         return
     end
-    error("inner 'canon' package manager has no command configured; set " ..
-          "commands.canon / canon_cmd in workspace.yaml (or --cmd), or put a " ..
-          "`canon` executable on PATH. gcpkg has already written " .. files.canon ..
-          " and the CANON_* environment variables.")
+    error("inner Conan package manager has no command configured; set " ..
+          "commands.conan / conan_cmd in workspace.yaml (or --cmd), or put a " ..
+          "`conan` executable on PATH. The legacy `canon` alias is still accepted. " ..
+          "gcpkg has already written " .. files.conan .. " and the CONAN_* variables.")
 end
 
 function M.systems_for(src, opts)
@@ -303,8 +314,8 @@ function M.run(ctx, opts)
             runMakefile(ctx, opts, compdb)
         elseif system == "ninja" then
             runNinja(ctx, opts, compdb)
-        elseif system == "canon" then
-            runCanon(ctx, opts, compdb)
+        elseif system == "conan" or system == "canon" then
+            runConan(ctx, opts, compdb)
         elseif system == "none" then
             log.info("  no inner build system declared; injection files are ready")
         else

@@ -1,7 +1,5 @@
--- libfuse 3.18.3 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- libfuse 3.18.3 -- gcpkg port definition.
 -- libfuse 3 uses Meson. No guessed -D options: meson setup runs with the upstream defaults plus gcpkg's prefix/sysconfdir confinement.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

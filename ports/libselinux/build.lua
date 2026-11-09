@@ -1,8 +1,5 @@
--- libselinux 3.8 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- libselinux 3.8 -- gcpkg port definition.
 -- SELinux userspace library; build in src/.
--- Upstream is never patched: all adaptation is in this file.
 
 
 return {

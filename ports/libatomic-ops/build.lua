@@ -1,8 +1,5 @@
--- libatomic-ops 7.8.2 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- libatomic-ops 7.8.2 -- gcpkg port definition.
 -- Atomic memory update primitives; static build.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

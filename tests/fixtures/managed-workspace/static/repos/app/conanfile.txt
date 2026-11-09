@@ -1,0 +1,2 @@
+# Conan is first-class in library ports; gcpkg never rewrites this file.
+[requires]

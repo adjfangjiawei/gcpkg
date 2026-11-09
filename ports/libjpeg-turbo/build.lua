@@ -1,8 +1,5 @@
--- libjpeg-turbo 3.2.1 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- libjpeg-turbo 3.2.1 -- gcpkg port definition.
 -- SIMD JPEG codec; CMake build.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

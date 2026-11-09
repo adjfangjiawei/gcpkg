@@ -2,7 +2,7 @@ schema: 1
 port: libunistring
 
 # Unicode primitives for libidn2 and GnuTLS.
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

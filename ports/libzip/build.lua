@@ -1,8 +1,5 @@
--- libzip 1.11.3 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- libzip 1.11.3 -- gcpkg port definition.
 -- ZIP library on the existing zlib port; `openssl` feature adds openssl.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

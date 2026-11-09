@@ -1,7 +1,5 @@
--- toml11 4.2.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- toml11 4.2.0 -- gcpkg port definition.
 -- Header-only C++ TOML library.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

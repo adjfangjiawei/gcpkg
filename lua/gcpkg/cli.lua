@@ -3,6 +3,7 @@ local fs = require("gcpkg.fs")
 local features = require("gcpkg.features")
 local workspace = require("gcpkg.workspace")
 local proxy = require("gcpkg.proxy")
+local config = require("gcpkg.config")
 local managed = require("gcpkg.managed")
 local meta = require("gcpkg.meta")
 local M = {}
@@ -20,6 +21,9 @@ Project workflow (pnpm-style):
   gcpkg list [DIR]                  show project deps, scopes, versions and lock
   gcpkg versions PORT               list versions declared for a port
   gcpkg proxy [URL|--unset]         show / set / clear the proxy configuration
+  gcpkg store show                show the effective package store
+  gcpkg store set DIR              persist a user-wide store directory
+  gcpkg store unset                remove the persisted store directory
 
 Build / inspection:
   gcpkg build [PROJECT_DIR]         build a project + merged compile_commands.json
@@ -35,11 +39,11 @@ Build / inspection:
   gcpkg doctor                      show toolchain / paths / wrapper status
   gcpkg port new NAME               scaffold build.lua + features.yaml
 
-Managed workspaces (outer gcpkg / inner CMake, GN, Meson, canon, Makefile):
+Managed workspaces (outer gcpkg / inner CMake, GN, Meson, Conan, Makefile):
   gcpkg workspace new DIR [--name=NAME]
   gcpkg workspace add --name=NAME (--url=URL|--path=PATH) [--ref=REF]
                        [--commit=SHA] [--submodules=recursive]
-                       [--system=cmake,canon] [--depends=a,b] [--packages=zlib]
+                       [--system=conan,cmake] [--depends=a,b] [--packages=zlib]
   gcpkg workspace remove NAME
   gcpkg workspace list | graph | status
   gcpkg workspace sync [--update] [--force]   clone/fetch/checkout/submodules
@@ -58,7 +62,8 @@ Options:
   --proxy=URL                      one-shot proxy (http/https/socks5, user:pass@host)
   --no-proxy                       force a direct connection for this run
   --noproxy=LIST                   comma-separated hosts that bypass the proxy
-  --store=DIR                      package store (default $GCPKG_HOME or ~/.gcpkg)
+  --store=DIR                      package store (default $GCPKG_STORE,
+                                   $GCPKG_HOME, user config, or ~/.gcpkg)
   --ports=DIR[:DIR...]             public port registry roots
   --share=DIR                      engine root (contains lua/ and ports/)
   --feature=PORT:NAME, -f ...      enable a feature (prefix '-' disables it)
@@ -71,9 +76,9 @@ Managed-workspace / injection options:
   --url=URL, --path=PATH          git remote or local checkout for `workspace add`
   --ref=REF, --commit=SHA         branch/tag and optional pinned commit
   --submodules=recursive          recursive git submodule sync (or normal/shallow)
-  --system=SYSTEMS                 inner systems, comma-separated (canon,cmake,...)
+  --system=SYSTEMS                 inner systems, comma-separated (conan,cmake,...)
   --depends=LIST, --packages=LIST  repository edges and catalog dependencies
-  --cmd=COMMAND                    override an inner command; @canon@ etc. expand
+  --cmd=COMMAND                    override an inner command; @conan@ / @canon@ etc. expand
   --only=NAME                      build/inject one repository (+ its dependencies)
   --repo=NAME                      target repo for `workspace submodule`
   --out=DIR                        injection output directory
@@ -87,14 +92,15 @@ Examples:
   gcpkg new apps/demo && gcpkg add zlib@1.2.13 -C apps/demo
   gcpkg new apps/other && gcpkg add zlib@1.3.1 -C apps/other
   gcpkg versions zlib
-  gcpkg build apps/demo --store ~/.cache/gcpkg-store
+  gcpkg store set ~/.cache/gcpkg-store
+  gcpkg build apps/demo
   gcpkg install openssl --feature=openssl:shared
   gcpkg graph udisks2                       # feature-conditional deps
   gcpkg compdb . --ports ./ports:~/my-ports
-  gcpkg workspace new ws && gcpkg workspace add -C ws --name=app --url=... --system=canon,cmake
+  gcpkg workspace new ws && gcpkg workspace add -C ws --name=app --url=... --system=conan,cmake
   gcpkg workspace sync -C ws && gcpkg workspace build -C ws
   gcpkg inject apps/demo --install --system=cmake
-  gcpkg build apps/demo --system=canon,cmake
+  gcpkg build apps/demo --system=conan,cmake
 ]]
 
 local function parse(args)
@@ -269,6 +275,8 @@ local function doctor(cfg, o)
     log.info("engine (GCPKG_SHARE): " .. gcpkg.sys.share())
     log.info("lua root            : " .. gcpkg.sys.lua_root())
     log.info("store               : " .. cfg.store.root)
+    log.info("store source        : " .. (cfg.store.source or "default"))
+    log.info("store config        : " .. config.path())
     log.info("proxy               : " .. proxy.summary())
     log.info("ports roots         : " .. table.concat(cfg.ports, " : "))
     local wrapper = gcpkg.sys.wrapper_bin()
@@ -329,7 +337,7 @@ local function workspaceCli(o, cfg)
             commit = o.commit, submodules = o.submodules,
             system = o.system or o.systems,
             depends = o.depends, packages = o.packages,
-            canon_cmd = o.cmd, commands = o.commands,
+            conan_cmd = o.cmd, canon_cmd = o.cmd, commands = o.commands,
         })
         return 0
     elseif sub == "remove" then
@@ -394,6 +402,31 @@ function M.main(args)
     local storeMod = require("gcpkg.store")
     local log = require("gcpkg.log")
     local cmd = o.positional[1]
+    if cmd == "store" then
+        local sub = o.positional[2] or "show"
+        if sub == "set" then
+            local path = o.positional[3]
+            if not path then error("gcpkg store set needs a directory") end
+            local absolute = config.set_store(path)
+            log.step("global store set to " .. absolute)
+            log.info("  config: " .. config.path())
+            return 0
+        elseif sub == "unset" then
+            config.unset_store()
+            log.step("global store setting removed")
+            log.info("  config: " .. config.path())
+            return 0
+        elseif sub == "show" then
+            local root, source = config.resolve(o.store)
+            log.step("store: " .. root)
+            log.info("  source: " .. source)
+            log.info("  config: " .. config.path())
+            log.info("  persistent: " .. (config.store() or "(none)"))
+            return 0
+        else
+            error("unknown store action '" .. sub .. "' (expected show|set|unset)")
+        end
+    end
     local publicRoots = o.ports and util.split(o.ports, ":") or port.default_roots()
     -- Inside a project, its private ports are searched first; the user-wide
     -- registry comes before engine/public registries. Outside a project this
@@ -411,9 +444,9 @@ function M.main(args)
     local roots = util.map(workspace.roots(projDir, publicRoots, py),
                           function(r) return util.abs(r) end)
     port.set_roots(roots)
-    local home = os.getenv("HOME") or fs.cwd()
-    local storeRoot = o.store or os.getenv("GCPKG_HOME") or util.join(home, ".gcpkg")
-    local st = storeMod.new(util.abs(storeRoot))
+    local storeRoot, storeSource = config.resolve(o.store)
+    local st = storeMod.new(storeRoot)
+    st.source = storeSource
     gcpkg.sys.add_root(util.join(st.root, "lua"))
     local cfg = {
         store = st, ports = roots, requests = o.requests, jobs = o.jobs,
@@ -446,7 +479,8 @@ function M.main(args)
         log.info("  CMake toolchain : " .. injection.files.toolchain)
         log.info("  CMake cache     : " .. injection.files.cache)
         log.info("  env script      : " .. injection.files.env)
-        log.info("  canon manifest  : " .. injection.files.canon)
+        log.info("  Conan manifest  : " .. injection.files.conan)
+        log.info("  canon alias     : " .. injection.files.canon)
         return 0
     elseif cmd == "proxy" then
         local value = o.positional[2]

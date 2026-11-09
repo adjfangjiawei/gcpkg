@@ -2,7 +2,7 @@ schema: 1
 port: libdnet
 
 # Low-level networking routines; ships a generated configure.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

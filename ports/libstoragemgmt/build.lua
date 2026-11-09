@@ -1,8 +1,5 @@
--- libstoragemgmt 1.11.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- libstoragemgmt 1.11.0 -- gcpkg port definition.
 -- Storage array management; autotools + autoreconf from tag archive.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

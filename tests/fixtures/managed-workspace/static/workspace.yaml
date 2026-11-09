@@ -1,0 +1,22 @@
+# Static managed-workspace fixture: no network, no build, no git operations.
+workspace: "managed-static"
+packages: []
+
+repos:
+  - name: "core"
+    path: "repos/core"
+    systems: ["cmake"]
+    depends: []
+  - name: "app"
+    path: "repos/app"
+    systems: ["conan", "cmake"]
+    conan_cmd: ["conan", "install", ".", "--output-folder=@build@"]
+    canon_cmd: ["canon", "install", "@canon@"]
+    commands:
+      conan: ["conan", "install", ".", "--output-folder=@build@"]
+      cmake: ["cmake", "-S", "@src@", "-B", "@build@"]
+    depends: ["core"]
+  - name: "leaf"
+    path: "repos/leaf"
+    systems: ["none"]
+    depends: ["app"]

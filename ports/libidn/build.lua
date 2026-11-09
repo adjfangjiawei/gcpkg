@@ -1,8 +1,5 @@
--- libidn 1.42 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- libidn 1.42 -- gcpkg port definition.
 -- IDNA2003 stringprep library; GNU autotools.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

@@ -1,0 +1,13 @@
+schema: 1
+port: glm
+
+# OpenGL Mathematics; whole glm/ header tree installed.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  header-only:
+    default: true
+    description: Install headers and compile a probe translation unit
+    args: []

@@ -1,8 +1,5 @@
--- wolfssl 5.7.6 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- wolfssl 5.7.6 -- gcpkg port definition.
 -- Embedded TLS library; big tarball, autoreconf from configure.ac.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

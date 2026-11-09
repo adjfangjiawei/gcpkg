@@ -1,8 +1,5 @@
--- fmt 11.2.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- fmt 11.2.0 -- gcpkg port definition.
 -- C++ formatting library; bottom of the fmt -> spdlog chain.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

@@ -2,7 +2,7 @@ schema: 1
 port: libdeflate
 
 # libdeflate 1.26 ships CMakeLists.txt only (no top-level Makefile).
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

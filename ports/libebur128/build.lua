@@ -1,7 +1,5 @@
--- libebur128 1.2.6 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- libebur128 1.2.6 -- gcpkg port definition.
 -- EBU R128 loudness library; static build.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

@@ -1,7 +1,5 @@
--- plog 1.1.10 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- plog 1.1.10 -- gcpkg port definition.
 -- Header-only C++ logging library.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

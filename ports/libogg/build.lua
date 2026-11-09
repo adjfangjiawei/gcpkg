@@ -1,8 +1,5 @@
--- libogg 1.3.5 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- libogg 1.3.5 -- gcpkg port definition.
 -- Ogg container; bottom of the audio chain.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

@@ -1,8 +1,5 @@
--- giflib 5.2.2 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- giflib 5.2.2 -- gcpkg port definition.
 -- Hand-written Makefile; custom build(ctx) passes PREFIX and wrapper CC.
--- Upstream is never patched: all adaptation is in this file.
 
 local fs = require("gcpkg.fs")
 

@@ -1,7 +1,5 @@
--- cpp-sort 1.17.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- cpp-sort 1.17.0 -- gcpkg port definition.
 -- Header-only C++ sorting algorithms.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

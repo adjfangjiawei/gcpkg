@@ -1,8 +1,5 @@
--- hidapi 0.15.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- hidapi 0.15.0 -- gcpkg port definition.
 -- HID device access; CMake over libusb. Static build avoids linking the non-PIC libusb-1.0.a into a .so.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

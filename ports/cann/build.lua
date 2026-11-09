@@ -1,7 +1,5 @@
--- cann 9.0.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- cann 9.0.0 -- gcpkg port definition.
 -- The .run installers are ~1-2 GB and licence-gated; point GCPKG_CANN_HOME (or ASCEND_HOME_PATH) at an installed toolkit.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local external = require("gcpkg.build.external")

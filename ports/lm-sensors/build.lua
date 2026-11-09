@@ -1,8 +1,5 @@
--- lm-sensors 3.6.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- lm-sensors 3.6.0 -- gcpkg port definition.
 -- hardware monitoring (libsensors); hand-written Makefile.
--- Upstream is never patched: all adaptation is in this file.
 
 
 return {

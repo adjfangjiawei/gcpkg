@@ -1,7 +1,5 @@
--- apr 1.7.5 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- apr 1.7.5 -- gcpkg port definition.
 -- Apache Portable Runtime; stock autotools static build.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

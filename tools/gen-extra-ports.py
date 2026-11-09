@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the ninth-round ports: 43 more Linux base libraries.
+"""Generate base-library ports from the catalog.
 
 Source of truth: tools/extra-catalog.tsv (43 real upstream tarballs with
 measured SHA256, build-system kind and dependency list) plus META below
@@ -274,11 +274,8 @@ def build_lua(row):
     custom = meta.get("custom")
     deps = [d for d in row["deps"].split(",") if d]
     out = [
-        "-- %s %s -- ONE library, ONE build.lua + ONE features.yaml." % (name, row["version"]),
-        "-- Verification: static registry/graph tests here; real builds for a",
-        "-- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).",
+        "-- %s %s -- gcpkg port definition." % (name, row["version"]),
         "-- %s" % meta.get("n", ""),
-        "-- Upstream is never patched: all adaptation is in this file.",
         "",
     ]
     if not custom:
@@ -331,7 +328,7 @@ def features_yaml(row):
         "port: %s" % name,
         "",
         "# %s" % meta.get("n", ""),
-        "# Static validation is the default; see tests/extra.sh.",
+        "# Feature switches for this port.",
         "features:",
         "  no-tests:",
         "    default: true",

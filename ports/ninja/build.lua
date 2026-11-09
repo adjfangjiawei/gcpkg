@@ -1,7 +1,5 @@
--- ninja 1.12.1 -- ONE port, ONE build.lua + ONE features.yaml.
+-- ninja 1.12.1 -- gcpkg port definition.
 -- Ninja build tool, built from source with its stock CMake project.
--- Static checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

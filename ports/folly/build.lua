@@ -1,7 +1,5 @@
--- folly 2026.10.26.00 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- folly 2026.10.26.00 -- gcpkg port definition.
 -- Wide dependency surface: reuses the existing gcpkg L0 chain (cmake, openssl, zlib, zstd, lz4, bzip2). boost/glog/gflags/fmt/double-conversion/libevent come from the host pkgconfig backend.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

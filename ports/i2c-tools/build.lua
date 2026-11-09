@@ -1,8 +1,5 @@
--- i2c-tools 4.4 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- i2c-tools 4.4 -- gcpkg port definition.
 -- I2C bus tools/library; hand-written Makefile.
--- Upstream is never patched: all adaptation is in this file.
 
 
 return {

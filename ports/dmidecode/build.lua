@@ -1,8 +1,5 @@
--- dmidecode 3.6 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- dmidecode 3.6 -- gcpkg port definition.
 -- SMBIOS/DMI hardware and disk info; hand-written Makefile.
--- Upstream is never patched: all adaptation is in this file.
 
 
 return {

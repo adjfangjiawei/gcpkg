@@ -5,14 +5,14 @@
 -- generated CMake toolchains/cache files, Meson native files, GN .gni/args,
 -- Makefile fragments, pkg-config directories, env scripts and JSON manifests
 -- all live in .gcpkg/inject/<project>/.  A project can keep using its own
--- CMake, GN, Meson, `canon` package manager, Makefile, or any combination.
+-- CMake, GN, Meson, Conan package manager, Makefile, or any combination.
 --
--- `canon` is deliberately treated as an OPAQUE inner package manager under its
--- own name.  gcpkg does not require a canon CLI, parse canon output, or rename
--- it to Conan: it supplies CANON_* / GCPKG_* variables, a gcpkg-canon.json
--- manifest and a wrapper that invokes the user's CANON_CMD / commands.canon.
--- Only when a `canon` executable exists on PATH does it conservatively try
--- `canon install`; explicit configuration is always preferred.
+-- Conan is the first-class inner package manager; `canon` is a compatibility
+-- alias for existing workspace files. gcpkg does not
+-- parse Conan output or rewrite conanfile.py/txt: it supplies CONAN_* (plus
+-- legacy CANON_*) and GCPKG_* variables, gcpkg-conan.json / gcpkg-canon.json,
+-- and wrappers that invoke CONAN_CMD / CANON_CMD / commands.conan.  Explicit
+-- configuration is always preferred over guessing a CLI.
 
 local fs = require("gcpkg.fs")
 local util = require("gcpkg.util")
@@ -196,6 +196,7 @@ local function makeFlagsFile(path, f, files)
         "GCPKG_CMAKE_CACHE_FILE := " .. makeValue(files.cache),
         "GCPKG_MESON_NATIVE_FILE := " .. makeValue(files.meson),
         "GCPKG_GN_GNI := " .. makeValue(files.gn_gni),
+        "GCPKG_CONAN_JSON := " .. makeValue(files.conan),
         "GCPKG_CANON_JSON := " .. makeValue(files.canon),
     }
     fs.write(path, table.concat(lines, "\n") .. "\n")
@@ -212,7 +213,9 @@ local function makeToolchain(path, f, files, opts)
         "set(GCPKG_INSTALLED_DIR \"" .. cmakeQuote(files.dir) .. "\")",
         "set(GCPKG_INSTALL_PREFIX \"" .. cmakeQuote(files.install_prefix) .. "\")",
         "set(GCPKG_DEPS_JSON \"" .. cmakeQuote(files.deps) .. "\")",
+        "set(GCPKG_CONAN_JSON \"" .. cmakeQuote(files.conan) .. "\")",
         "set(GCPKG_CANON_JSON \"" .. cmakeQuote(files.canon) .. "\")",
+        "set(CONAN_DEPS_JSON \"" .. cmakeQuote(files.conan) .. "\")",
         "set(GCPKG_PREFIXES " .. cmakeArgs(f.prefixes) .. ")",
         "set(GCPKG_INCLUDE_DIRS " .. cmakeArgs(f.includes) .. ")",
         "set(GCPKG_LIBRARY_DIRS " .. cmakeArgs(f.libdirs) .. ")",
@@ -243,6 +246,7 @@ local function makeToolchain(path, f, files, opts)
     out[#out + 1] = "set(ENV{LDFLAGS} \"" .. cmakeQuote(f.ldflags) .. "\")"
     out[#out + 1] = "set(ENV{GCPKG_DEPS_JSON} \"" .. cmakeQuote(files.deps) .. "\")"
     out[#out + 1] = "set(ENV{CANON_DEPS_JSON} \"" .. cmakeQuote(files.canon) .. "\")"
+    out[#out + 1] = "set(ENV{CONAN_DEPS_JSON} \"" .. cmakeQuote(files.conan) .. "\")"
     out[#out + 1] = [[if(DEFINED GCPKG_CHAINLOAD_TOOLCHAIN_FILE AND EXISTS "${GCPKG_CHAINLOAD_TOOLCHAIN_FILE}")]]
     out[#out + 1] = [[  include("${GCPKG_CHAINLOAD_TOOLCHAIN_FILE}")]]
     out[#out + 1] = [[elseif(DEFINED ENV{GCPKG_CHAINLOAD_TOOLCHAIN_FILE} AND EXISTS "$ENV{GCPKG_CHAINLOAD_TOOLCHAIN_FILE}")]]
@@ -296,6 +300,7 @@ local function makeGni(path, f, files, assignments)
     line("gcpkg_target_triplet", json.encode(files.triplet))
     line("gcpkg_install_prefix", json.encode(files.install_prefix))
     line("gcpkg_deps_json", json.encode(files.deps))
+    line("gcpkg_conan_json", json.encode(files.conan))
     line("gcpkg_canon_json", json.encode(files.canon))
     line("gcpkg_prefixes", jsonList(f.prefixes))
     line("gcpkg_include_dirs", jsonList(f.includes))
@@ -324,6 +329,7 @@ local function gnAssignments(f, files)
         line("gcpkg_target_triplet", json.encode(files.triplet)),
         line("gcpkg_install_prefix", json.encode(files.install_prefix)),
         line("gcpkg_deps_json", json.encode(files.deps)),
+        line("gcpkg_conan_json", json.encode(files.conan)),
         line("gcpkg_canon_json", json.encode(files.canon)),
         line("gcpkg_prefixes", jsonList(f.prefixes)),
         line("gcpkg_include_dirs", jsonList(f.includes)),
@@ -352,6 +358,7 @@ local function makeEnv(path, f, files, env)
         "export GCPKG_INSTALL_PREFIX=" .. shquote(files.install_prefix),
         "export GCPKG_TARGET_TRIPLET=" .. shquote(files.triplet),
         "export GCPKG_DEPS_JSON=" .. shquote(files.deps),
+        "export GCPKG_CONAN_JSON=" .. shquote(files.conan),
         "export GCPKG_CANON_JSON=" .. shquote(files.canon),
         "export GCPKG_ENV_FILE=" .. shquote(files.env),
         "export GCPKG_PKGCONFIG_DIR=" .. shquote(files.pkgconfig),
@@ -410,7 +417,7 @@ local function makeEnv(path, f, files, env)
     out[#out + 1] = "export GN_GNI_FILE=" .. shquote(files.gn_gni)
     out[#out + 1] = "export MAKE_FLAGS_FILE=" .. shquote(files.make_flags)
     out[#out + 1] = "export GCPKG_COMPILE_COMMANDS=" .. shquote(files.compdb)
-    out[#out + 1] = "# Generic `canon` integration: no CLI assumptions, no renaming."
+    out[#out + 1] = "# Conan is the supported inner package manager; `canon` is a compatibility alias."
     out[#out + 1] = "export CANON_ROOT=" .. shquote(files.root)
     out[#out + 1] = "export CANON_PROJECT_DIR=" .. shquote(files.project_dir)
     out[#out + 1] = "export CANON_INJECT_DIR=" .. shquote(files.dir)
@@ -437,6 +444,24 @@ local function makeEnv(path, f, files, env)
     out[#out + 1] = "export CANON_LDFLAGS=\"${LDFLAGS}\""
     out[#out + 1] = "export CANON_LDLIBS=\"${LDLIBS}\""
     out[#out + 1] = "export CANON_LINK_LIBRARIES=" .. shquote(table.concat(f.lib_args, " "))
+    local conanKeys = {
+        "ROOT", "PROJECT_DIR", "INJECT_DIR", "TOOLCHAIN_FILE",
+        "CMAKE_TOOLCHAIN_FILE", "CMAKE_CACHE_FILE", "MESON_NATIVE_FILE",
+        "GN_GNI", "GN_ARGS_FILE", "MAKE_FLAGS_FILE", "PKG_CONFIG_PATH",
+        "PREFIX_PATH", "CMAKE_PREFIX_PATH", "INCLUDE_PATH", "LIBRARY_PATH",
+        "BINARY_PATH", "COMPILE_COMMANDS", "INSTALL_PREFIX", "CPPFLAGS",
+        "CFLAGS", "CXXFLAGS", "LDFLAGS", "LDLIBS", "LINK_LIBRARIES",
+    }
+    for _, key in ipairs(conanKeys) do
+        out[#out + 1] = "export CONAN_" .. key .. "=\"${CANON_" .. key .. "}\""
+    end
+    out[#out + 1] = "export CONAN_DEPS_JSON=" .. shquote(files.conan)
+    out[#out + 1] = "export CONAN_ENV_FILE=" .. shquote(files.conan_env)
+    out[#out + 1] = "export CONAN_CANON_JSON=" .. shquote(files.canon)
+    out[#out + 1] = ": \"${CONAN_CMD:=conan}\""
+    out[#out + 1] = "export CONAN_CMD"
+    out[#out + 1] = ": \"${CANON_CMD:=${CONAN_CMD}}\""
+    out[#out + 1] = "export CANON_CMD"
     fs.write(path, table.concat(out, "\n") .. "\n")
 end
 
@@ -464,8 +489,10 @@ local function environment(f, files, ordered)
     set("GCPKG_INSTALL_PREFIX", files.install_prefix)
     set("GCPKG_TARGET_TRIPLET", files.triplet)
     set("GCPKG_DEPS_JSON", files.deps)
+    set("GCPKG_CONAN_JSON", files.conan)
     set("GCPKG_CANON_JSON", files.canon)
     set("GCPKG_ENV_FILE", files.env)
+    set("GCPKG_CONAN_ENV_FILE", files.conan_env)
     set("GCPKG_CANON_ENV_FILE", files.canon_env)
     set("GCPKG_PKGCONFIG_DIR", files.pkgconfig)
     set("GCPKG_COMPILE_COMMANDS", files.compdb)
@@ -489,10 +516,12 @@ local function environment(f, files, ordered)
     set("GCPKG_LINK_LIBRARIES", table.concat(f.lib_args, " "))
     for _, p in ipairs(f.projects) do
         set("GCPKG_PROJECT_PREFIX_" .. envName(p.name), p.prefix or "")
+        set("CONAN_PROJECT_PREFIX_" .. envName(p.name), p.prefix or "")
         set("CANON_PROJECT_PREFIX_" .. envName(p.name), p.prefix or "")
     end
     for _, d in ipairs(f.dependencies) do
         set("GCPKG_DEP_PREFIX_" .. envName(d.name), d.prefix or "")
+        set("CONAN_DEP_PREFIX_" .. envName(d.name), d.prefix or "")
     end
     set("CPPFLAGS", appendVar("CPPFLAGS", f.cppflags, " "))
     set("CFLAGS", appendVar("CFLAGS", f.cppflags, " "))
@@ -550,6 +579,22 @@ local function environment(f, files, ordered)
     set("CANON_LDFLAGS", env.LDFLAGS)
     set("CANON_LDLIBS", env.LDLIBS)
     set("CANON_LINK_LIBRARIES", table.concat(f.lib_args, " "))
+    -- Keep every CANON_* value as a compatibility alias while CONAN_* is
+    -- the first-class namespace.
+    local aliases = {}
+    for key, value in pairs(env) do
+        if key:sub(1, 6) == "CANON_" then
+            aliases[#aliases + 1] = { "CONAN_" .. key:sub(7), value }
+        end
+    end
+    for _, alias in ipairs(aliases) do set(alias[1], alias[2]) end
+    set("CONAN_DEPS_JSON", files.conan)
+    set("CONAN_ENV_FILE", files.conan_env)
+    set("CONAN_CANON_JSON", files.canon)
+    local externalConan = getenv("CONAN_CMD")
+    if externalConan ~= "" then set("CONAN_CMD", externalConan) end
+    local externalCanon = getenv("CANON_CMD")
+    if externalCanon ~= "" then set("CANON_CMD", externalCanon) end
     return env
 end
 
@@ -578,8 +623,10 @@ local function defaultFiles(opts, f)
         dir = dir, build_dir = buildDir, install_prefix = installPrefix,
         triplet = (gcpkg.sys.arch() or "unknown") .. "-" .. (gcpkg.sys.os() or "unknown"),
         deps = util.join(dir, "gcpkg-deps.json"),
+        conan = util.join(dir, "gcpkg-conan.json"),
         canon = util.join(dir, "gcpkg-canon.json"),
         env = util.join(dir, "gcpkg-env.sh"),
+        conan_env = util.join(dir, "gcpkg-conan-env.sh"),
         canon_env = util.join(dir, "gcpkg-canon-env.sh"),
         toolchain = util.join(dir, "gcpkg-toolchain.cmake"),
         cache = util.join(dir, "gcpkg-cache.cmake"),
@@ -592,6 +639,7 @@ local function defaultFiles(opts, f)
         meson_wrapper = util.join(dir, "gcpkg-meson.sh"),
         gn_wrapper = util.join(dir, "gcpkg-gn.sh"),
         make_wrapper = util.join(dir, "gcpkg-make.sh"),
+        conan_wrapper = util.join(dir, "gcpkg-conan.sh"),
         canon_wrapper = util.join(dir, "gcpkg-canon.sh"),
         compdb = util.abs(opts.compdb or util.join(buildDir, "compile_commands.json")),
     }
@@ -624,13 +672,20 @@ function M.generate(ordered, opts)
         },
         dependencies = f.dependencies, projects = f.projects,
         systems = systems(opts.systems or opts.system) or { "auto" },
+        inner_package_managers = { "conan", "canon" },
     }
+    local conan = util.deepcopy(metadata)
+    conan.inner_package_manager = "conan"
+    conan.note = "Conan is an opaque inner package manager; gcpkg injects dependencies and does not rewrite conanfile.py/txt."
+    conan.files = files
+    conan.environment = env
     local canon = util.deepcopy(metadata)
     canon.inner_package_manager = "canon"
-    canon.note = "`canon` is treated as an opaque inner package manager under its own name; gcpkg does not require a canon CLI or rename it."
+    canon.note = "canon is a compatibility alias for Conan; existing workspace.yaml files keep working."
     canon.files = files
     canon.environment = env
     fs.write(files.deps, json.encode(metadata, true) .. "\n")
+    fs.write(files.conan, json.encode(conan, true) .. "\n")
     fs.write(files.canon, json.encode(canon, true) .. "\n")
     makeToolchain(files.toolchain, f, files, opts)
     makeCache(files.cache, f, files)
@@ -640,7 +695,8 @@ function M.generate(ordered, opts)
     fs.write(files.gn_args, table.concat(assignments, "\n") .. "\n")
     makeFlagsFile(files.make_flags, f, files)
     makeEnv(files.env, f, files, env)
-    makeWrapper(files.canon_env, ". " .. shquote(files.env) .. "\n# CANON_* variables are exported by gcpkg-env.sh.\n")
+    makeWrapper(files.conan_env, ". " .. shquote(files.env) .. "\n# CONAN_* variables are exported by gcpkg-env.sh.\n")
+    makeWrapper(files.canon_env, ". " .. shquote(files.env) .. "\n# CANON_* is a compatibility alias for CONAN_*.\n")
     makeWrapper(files.cmake_wrapper,
         ". " .. shquote(files.env) .. "\nexec cmake -C " .. shquote(files.cache) .. " \"$@\"\n")
     makeWrapper(files.meson_wrapper,
@@ -655,12 +711,15 @@ function M.generate(ordered, opts)
         " \"CPPFLAGS=${CPPFLAGS}\" \"CFLAGS=${CFLAGS}\" \"CXXFLAGS=${CXXFLAGS}\"" ..
         " \"LDFLAGS=${LDFLAGS}\" \"LDLIBS=${LDLIBS}\"" ..
         " \"PREFIX=" .. files.install_prefix .. "\" \"$@\"\n")
+    makeWrapper(files.conan_wrapper,
+        ". " .. shquote(files.env) .. "\n: \"${CONAN_CMD:=conan}\"\nexec $CONAN_CMD \"$@\"\n")
     makeWrapper(files.canon_wrapper,
-        ". " .. shquote(files.env) .. "\n: \"${CANON_CMD:=canon}\"\nexec $CANON_CMD \"$@\"\n")
-    chmod({ files.env, files.canon_env, files.cmake_wrapper, files.meson_wrapper,
-            files.gn_wrapper, files.make_wrapper, files.canon_wrapper })
+        ". " .. shquote(files.env) .. "\n: \"${CANON_CMD:=${CONAN_CMD:-conan}}\"\nexec $CANON_CMD \"$@\"\n")
+    chmod({ files.env, files.conan_env, files.canon_env, files.cmake_wrapper,
+            files.meson_wrapper, files.gn_wrapper, files.make_wrapper,
+            files.conan_wrapper, files.canon_wrapper })
     return { dir = files.dir, files = files, env = env, flags = f,
-             metadata = metadata, canon = canon, ordered = ordered }
+             metadata = metadata, conan = conan, canon = canon, ordered = ordered }
 end
 
 M.from_manifests = M.generate

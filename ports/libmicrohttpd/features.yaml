@@ -2,7 +2,7 @@ schema: 1
 port: libmicrohttpd
 
 # GNU embeddable HTTP server; depends on gnutls + libgcrypt.
-# Static validation is the default; see tests/linux-kernel.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

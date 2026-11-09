@@ -1,7 +1,5 @@
--- capnproto 1.1.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- capnproto 1.1.0 -- gcpkg port definition.
 -- Cap'n Proto serialization/RPC; static libraries and capnp tools.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

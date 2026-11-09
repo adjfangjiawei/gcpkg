@@ -1,8 +1,5 @@
--- nvme-cli 2.16 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- nvme-cli 2.16 -- gcpkg port definition.
 -- NVMe query CLI built on libnvme.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

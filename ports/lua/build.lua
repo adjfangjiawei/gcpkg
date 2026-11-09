@@ -1,7 +1,5 @@
--- lua 5.4.7 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: dynamic + static (see tests/media.sh).
+-- lua 5.4.7 -- gcpkg port definition.
 -- Hand-written Makefile: 'make linux' then 'make install INSTALL_TOP=<prefix>'. CC is forced to gcpkg-intercept so compdb is produced.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 

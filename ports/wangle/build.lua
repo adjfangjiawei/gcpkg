@@ -1,7 +1,5 @@
--- wangle 2026.10.26.00 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- wangle 2026.10.26.00 -- gcpkg port definition.
 -- Depends on folly + fizz from the same release line.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

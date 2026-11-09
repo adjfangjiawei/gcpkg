@@ -1,7 +1,5 @@
--- taglib 2.0.2 -- ONE port, ONE build.lua + ONE features.yaml.
+-- taglib 2.0.2 -- gcpkg port definition.
 -- Audio metadata library; a pinned utfcpp tarball fills the empty git submodule directory.
--- Static checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
--- Upstream is never patched: all adaptation lives in this file.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local net = require("gcpkg.net")

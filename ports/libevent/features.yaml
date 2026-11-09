@@ -2,7 +2,7 @@ schema: 1
 port: libevent
 
 # Event loop, linked against the existing openssl port.
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

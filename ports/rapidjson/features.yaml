@@ -2,7 +2,7 @@ schema: 1
 port: rapidjson
 
 # Header-only C++ JSON library: no libraries exported, headers only.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

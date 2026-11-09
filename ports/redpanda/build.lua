@@ -1,7 +1,5 @@
--- redpanda 26.2.2 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- redpanda 26.2.2 -- gcpkg port definition.
 -- C++/Seastar monorepo; declared with its CMake entry point. Full build additionally needs clang, Seastar deps and Rust toolchain on the host.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

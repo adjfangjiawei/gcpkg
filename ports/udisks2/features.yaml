@@ -2,7 +2,7 @@ schema: 1
 port: udisks2
 
 # Widest disk-info dependency surface: glib, dbus, libgudev, libatasmart, libnvme (-> liburing), libparted, util-linux, libacl.
-# Static validation is the default; see tests/linux-kernel.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

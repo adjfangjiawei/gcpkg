@@ -1,7 +1,5 @@
--- date 3.0.3 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- date 3.0.3 -- gcpkg port definition.
 -- Header-only C++ date/time library; tz library off.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

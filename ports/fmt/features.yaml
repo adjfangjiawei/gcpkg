@@ -2,7 +2,7 @@ schema: 1
 port: fmt
 
 # C++ formatting library; bottom of the fmt -> spdlog chain.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

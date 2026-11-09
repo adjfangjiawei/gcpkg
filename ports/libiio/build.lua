@@ -1,8 +1,5 @@
--- libiio 0.26 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- libiio 0.26 -- gcpkg port definition.
 -- Industrial I/O kernel interface; CMake, depends on libusb + libxml2. Avahi DNS-SD and libaio are disabled.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

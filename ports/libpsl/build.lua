@@ -1,7 +1,5 @@
--- libpsl 0.21.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- libpsl 0.21.0 -- gcpkg port definition.
 -- GitHub tag archives ship configure.ac only; pre_build regenerates ./configure when needed. Needs libidn2/libunistring headers from the host.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

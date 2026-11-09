@@ -1,8 +1,5 @@
--- libwebp 1.5.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- libwebp 1.5.0 -- gcpkg port definition.
 -- WebP image codec; all command-line tools disabled.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

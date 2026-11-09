@@ -1,8 +1,5 @@
--- benchmark 1.9.1 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- benchmark 1.9.1 -- gcpkg port definition.
 -- Google microbenchmark library; no bundled googletest.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

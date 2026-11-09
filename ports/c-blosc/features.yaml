@@ -2,7 +2,7 @@ schema: 1
 port: c-blosc
 
 # Blosc blocking compressor; uses bundled codecs to stay self-contained.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

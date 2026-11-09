@@ -1,7 +1,5 @@
--- librtsp 1.0.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- librtsp 1.0.0 -- gcpkg port definition.
 -- ireader/media-server is a multi-library repo; the build hook enters librtsp/. Adjust its gcc script per upstream README if the layout changes.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 

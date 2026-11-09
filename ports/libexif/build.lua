@@ -1,8 +1,5 @@
--- libexif 0.6.24 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- libexif 0.6.24 -- gcpkg port definition.
 -- EXIF tag parser; GitHub tag ships only configure.ac.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

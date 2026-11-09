@@ -2,7 +2,7 @@ schema: 1
 port: nghttp3
 
 # HTTP/3 library; library-only CMake build.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

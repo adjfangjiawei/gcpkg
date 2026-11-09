@@ -2,7 +2,7 @@ schema: 1
 port: libbase64
 
 # SIMD base64 codec; CMake (also ships a hand-written Makefile).
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

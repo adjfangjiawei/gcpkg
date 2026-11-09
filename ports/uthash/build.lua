@@ -1,7 +1,5 @@
--- uthash 2.3.0 -- ONE port, ONE build.lua + ONE features.yaml.
+-- uthash 2.3.0 -- gcpkg port definition.
 -- Header-only C containers; one real upstream test TU is compiled for compdb.
--- Static checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
--- Upstream is never patched: all adaptation lives in this file.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 

@@ -2,7 +2,7 @@ schema: 1
 port: libev
 
 # libev event loop; ships a generated configure.
-# Static validation is the default; see tests/r10.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

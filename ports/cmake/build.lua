@@ -1,7 +1,5 @@
--- cmake 3.31.6 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: dynamic + static (see tests/media.sh).
+-- cmake 3.31.6 -- gcpkg port definition.
 -- Built from Kitware's bootstrap (no upstream patch). Exported as a tool port: dependents get its bin/ prepended to PATH.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 

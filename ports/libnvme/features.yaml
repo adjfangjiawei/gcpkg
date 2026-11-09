@@ -2,7 +2,7 @@ schema: 1
 port: libnvme
 
 # NVMe ioctl library; depends on the existing liburing port (io_uring path).
-# Static validation is the default; see tests/linux-kernel.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

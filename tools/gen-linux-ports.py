@@ -347,8 +347,7 @@ def build_lua(p):
     kind = p["kind"]
     out = []
     out.append("-- %s" % p["desc"])
-    out.append("-- ONE library, ONE build.lua and ONE features.yaml. Upstream sources")
-    out.append("-- are downloaded verbatim (sha256 verified) and never patched.")
+    out.append("-- gcpkg port definition.")
     out.append("local recipe = require(\"gcpkg.recipe\")")
     out.append("")
     out.append("return recipe.%s {" % kind)

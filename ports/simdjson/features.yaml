@@ -2,7 +2,7 @@ schema: 1
 port: simdjson
 
 # SIMD JSON parser; developer/test targets disabled.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

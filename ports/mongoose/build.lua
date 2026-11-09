@@ -1,7 +1,5 @@
--- mongoose 7.15 -- ONE port, ONE build.lua + ONE features.yaml.
+-- mongoose 7.15 -- gcpkg port definition.
 -- Single-file embedded networking library; compiled via gcpkg's CC interceptor.
--- Static checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
--- Upstream is never patched: all adaptation lives in this file.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 

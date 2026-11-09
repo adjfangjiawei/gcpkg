@@ -1,7 +1,5 @@
--- ucx 1.23.2 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- ucx 1.23.2 -- gcpkg port definition.
 -- Autotools; CUDA/ROCm support is optional and comes from the 'nvidia' SDK port when enabled.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

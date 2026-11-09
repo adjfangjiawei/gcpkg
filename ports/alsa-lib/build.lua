@@ -1,7 +1,5 @@
--- alsa-lib 1.2.9 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- alsa-lib 1.2.9 -- gcpkg port definition.
 -- Autotools. Host ALSA headers via pkgconfig backend; --disable-python avoids Python SWIG bindings.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

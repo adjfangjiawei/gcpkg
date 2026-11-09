@@ -1,8 +1,5 @@
--- gflags 2.2.2 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- gflags 2.2.2 -- gcpkg port definition.
 -- C++ command-line flags; bottom of the gflags -> glog chain.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

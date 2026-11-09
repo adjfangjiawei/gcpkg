@@ -1,8 +1,5 @@
--- libdeflate 1.26 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- libdeflate 1.26 -- gcpkg port definition.
 -- libdeflate 1.26 ships CMakeLists.txt only (no top-level Makefile).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

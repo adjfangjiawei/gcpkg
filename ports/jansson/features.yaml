@@ -2,7 +2,7 @@ schema: 1
 port: jansson
 
 # JSON C library; complements the existing json-c port.
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true
@@ -19,8 +19,7 @@ features:
     args: []
     conflicts: ["static"]
 
-# Multiple upstream releases (all URL/SHA256 measured). Declaring them here
-# keeps the port at exactly two files; build.lua stays unchanged.
+# Available upstream releases with pinned URL/SHA256.
 versions:
   "2.15.1":
     source:

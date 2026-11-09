@@ -1,7 +1,5 @@
--- fftw 3.3.10 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- fftw 3.3.10 -- gcpkg port definition.
 -- FFTW3 discrete Fourier transform library; single-thread static build.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

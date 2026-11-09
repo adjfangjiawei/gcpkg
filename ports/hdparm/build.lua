@@ -1,8 +1,5 @@
--- hdparm 9.65 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- hdparm 9.65 -- gcpkg port definition.
 -- ATA/SATA disk parameter query; hand-written Makefile.
--- Upstream is never patched: all adaptation is in this file.
 
 
 return {

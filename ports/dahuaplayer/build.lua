@@ -1,7 +1,5 @@
--- dahuaplayer 3.044.0000000.1 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- dahuaplayer 3.044.0000000.1 -- gcpkg port definition.
 -- Proprietary binary SDK from Dahua's support portal (official SHA256 of the Linux64 V3.044 bundle is published there). No anonymous download, no recompilation.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local external = require("gcpkg.build.external")

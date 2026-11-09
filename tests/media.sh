@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Fifth-round regression: media / AI / networking / vendor-SDK ports.
+# Media / AI / networking / vendor-SDK ports.
 #
-# Static by default (the user validates real builds on their own machine):
+# Offline checks by default; set GCPKG_MEDIA_DYNAMIC=1 for real builds.
 #   * registry + features + dependency graph are consistent
 #   * every new port has build.lua + features.yaml
 #   * downloadable ports carry a real URL + 64-hex SHA256
 #   * vendor SDK ports declare the env var that locates the local SDK
-#   * no absolute sandbox paths leak into committed port files
+#   * no machine-specific paths appear in port files
 #   * all declared dependencies resolve to another port
 # Nothing is downloaded and nothing is compiled unless
 # GCPKG_MEDIA_DYNAMIC=1 is set.
@@ -68,7 +68,8 @@ for name in names:
     yml = open(os.path.join(d, "features.yaml")).read()
     assert lua.count("name = ") >= 1 and "version = " in lua, name
     assert "schema: 1" in yml and "features:" in yml and "port: " + name in yml, name
-    assert "/home/user" not in lua and "/home/user" not in yml, "sandbox path leaked: " + name
+    local_home = os.path.expanduser("~")
+    assert local_home not in lua and local_home not in yml, "sandbox path leaked: " + name
     if name in vendor:
         assert 'require("gcpkg.build.external")' in lua, name
         m = re.search(r'env = "(GCPKG_[A-Z_]+)"', lua)

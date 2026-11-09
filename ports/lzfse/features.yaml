@@ -2,7 +2,7 @@ schema: 1
 port: lzfse
 
 # Apple LZFSE codec; small standalone CMake project.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

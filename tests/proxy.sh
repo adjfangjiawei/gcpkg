@@ -2,10 +2,14 @@
 # Proxy support regression. Static part always runs; set
 # GCPKG_PROXY_DYNAMIC=1 to also drive a real local HTTP CONNECT proxy.
 set -euo pipefail
+
+: "${HOME:?HOME must be set}"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+mkdir -p "$CACHE_DIR"
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 BIN="$ROOT/build/bin/gcpkg"
-T=$(mktemp -d /home/user/.cache/gcpkg-proxy-test.XXXXXX)
+T=$(mktemp -d "$CACHE_DIR/gcpkg-proxy-test.XXXXXX")
 PROXY_PID=""
 cleanup() {
     [ -n "$PROXY_PID" ] && kill "$PROXY_PID" 2>/dev/null || true

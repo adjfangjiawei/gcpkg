@@ -10,8 +10,10 @@
 -- compiler interception and compdb import. Anything unusual can still provide
 -- its own build(ctx) function -- the recipe layer never takes that away.
 --
--- Supported kinds: cmake, meson, autotools, make, gn, python, cargo. Meson matters for the Linux
--- plumbing stack (wayland / X11 / systemd / libinput / libdrm / ...).
+-- Supported kinds: cmake, meson, autotools, make, gn, python, cargo, header.
+-- The header recipe copies upstream headers into <prefix>/include and compiles
+-- one generated probe translation unit so clangd gets a real compile command.
+-- Meson matters for the Linux plumbing stack (wayland / X11 / systemd / ...).
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local M = {}
@@ -286,6 +288,59 @@ end
 
 function M.cargo(spec)
     spec.kind = "cargo"
+    return M.define(spec)
+end
+
+-- Header-only tarballs without upstream CMake install rules.  `header` is:
+--   headers = { { src = "include/foo.hpp", dst = "foo.hpp" }, ... }
+--   include = "foo.hpp"       -- header used by the generated probe TU
+--   cxx = true                -- false compiles the probe as C
+--   prelude = { "cstdint" }   -- optional system headers before `include`
+--   flags = { "-std=c++17" }  -- optional compiler flags
+--   license_files = { "LICENSE" } -- copied to prefix/share/doc/<name>
+function M.header(spec)
+    spec.kind = "header"
+    spec.build = spec.build or function(ctx)
+        local h = spec.header or {}
+        local incdir = util.join(ctx.prefix, "include")
+        local libdir = util.join(ctx.prefix, "lib")
+        fs.mkdirs(incdir)
+        fs.mkdirs(libdir)
+        for _, entry in ipairs(h.headers or {}) do
+            local src = util.join(ctx.src, entry.src)
+            local dst = entry.dst and util.join(incdir, entry.dst) or incdir
+            fs.mkdirs(util.dirname(dst))
+            ctx.exec({ "cp", "-a", src, dst }, { cwd = ctx.src, log = ctx.log })
+        end
+        for _, license in ipairs(h.license_files or {}) do
+            local doc = util.join(ctx.prefix, "share", "doc", spec.name or "header")
+            fs.mkdirs(doc)
+            ctx.exec({ "cp", "-a", util.join(ctx.src, license), doc },
+                     { cwd = ctx.src, log = ctx.log })
+        end
+        local cxx = h.cxx ~= false
+        local probe = util.join(ctx.build_dir, cxx and "gcpkg_header_probe.cpp" or "gcpkg_header_probe.c")
+        local lines = {}
+        for _, prelude in ipairs(h.prelude or {}) do
+            lines[#lines + 1] = "#include <" .. tostring(prelude) .. ">"
+        end
+        lines[#lines + 1] = "#include <" .. tostring(h.include) .. ">"
+        lines[#lines + 1] = "int main(void) { return 0; }"
+        fs.write(probe, table.concat(lines, "\n") .. "\n")
+        local cc = require("gcpkg.build.cc")
+        cc.compile {
+            sources = { probe }, includes = { incdir },
+            flags = h.flags or (cxx and { "-std=c++17" } or {}),
+            cwd = ctx.build_dir, outdir = util.join(ctx.build_dir, "obj"),
+            compiler = cxx and ctx.compiler.wrapper_cxx or ctx.compiler.wrapper_cc,
+            exec = ctx.exec, record = ctx.record, log = ctx.log,
+            tag = spec.name or "header",
+        }
+        return {
+            includes = { incdir }, libdirs = { libdir },
+            libs = {}, binaries = {}, compdb_files = {},
+        }
+    end
     return M.define(spec)
 end
 

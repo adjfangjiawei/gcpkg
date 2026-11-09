@@ -1,8 +1,5 @@
--- libxslt 1.1.43 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- libxslt 1.1.43 -- gcpkg port definition.
 -- XSLT processor on top of the existing libxml2 port.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

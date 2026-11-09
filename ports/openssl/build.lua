@@ -1,5 +1,4 @@
 -- OpenSSL port.
--- ONE library, ONE build.lua (this file) and ONE features.yaml.
 --
 -- Nothing in OpenSSL is patched. We only set CC/CXX (already injected by the
 -- engine into ctx.env) to gcpkg-intercept, a transparent compiler wrapper, so
@@ -81,7 +80,6 @@ return {
             libdirs = { libDir },
             libs = { "ssl", "crypto" },
             defines = {},
-            -- Needed when linking OpenSSL statically (the default no-shared).
             link_flags = { "-lpthread", "-ldl" },
             binaries = { util.join(ctx.prefix, "bin") },
         }

@@ -1,7 +1,5 @@
--- dcgm 4.7.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- dcgm 4.7.0 -- gcpkg port definition.
 -- NVIDIA DCGM open-core tree; needs the local CUDA driver/toolkit ('nvidia' SDK port) and vendor-only diagnostics components.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

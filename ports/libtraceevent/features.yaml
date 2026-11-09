@@ -2,7 +2,7 @@ schema: 1
 port: libtraceevent
 
 # ftrace event parser; Meson docs disabled (upstream requires asciidoc).
-# Static validation is the default; see tests/linux-kernel.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

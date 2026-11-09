@@ -1,7 +1,5 @@
--- ada 2.9.2 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- ada 2.9.2 -- gcpkg port definition.
 -- WHATWG URL parser (C++20).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

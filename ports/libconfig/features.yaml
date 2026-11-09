@@ -2,7 +2,7 @@ schema: 1
 port: libconfig
 
 # Structured config parser; docs/examples/tests off (no makeinfo).
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

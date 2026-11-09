@@ -2,7 +2,7 @@ schema: 1
 port: librdkafka
 
 # Kafka C client on zlib; `ssl` feature adds openssl.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

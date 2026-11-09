@@ -2,7 +2,7 @@ schema: 1
 port: btrfs-progs
 
 # Btrfs tools on util-linux/zlib/zstd/lz4; tag archive needs autogen.sh.
-# Static validation is the default; see tests/linux-kernel.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

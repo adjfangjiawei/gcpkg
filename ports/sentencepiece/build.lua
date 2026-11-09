@@ -1,7 +1,5 @@
--- sentencepiece 0.2.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- sentencepiece 0.2.0 -- gcpkg port definition.
 -- SentencePiece tokenizer; bundled protobuf-lite/absl, tests off; jobs=2 caps the memory-heavy trainer TUs.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

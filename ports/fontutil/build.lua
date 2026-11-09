@@ -1,7 +1,6 @@
 -- X.Org font-util: the fontutil.pc file and autoconf macros needed by the
 -- X server build. It is a data-only port (no compiled translation units), but
 -- pkg-config cannot resolve `dependency('fontutil')` without it.
--- ONE library, ONE build.lua and ONE features.yaml; upstream unmodified.
 local recipe = require("gcpkg.recipe")
 
 return recipe.autotools {

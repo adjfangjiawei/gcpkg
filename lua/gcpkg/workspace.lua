@@ -399,17 +399,22 @@ local function render(y, fallbackName)
         out[#out + 1] = "features:"
         dump_table(f, 2, out)
     end
-    -- R13: preserve the OUTER/INNER split.  `gcpkg add/remove` rewrites the
+    -- managed workspace: preserve the OUTER/INNER split.  `gcpkg add/remove` rewrites the
     -- managed dependency block but must never drop the project's own build
-    -- system declaration or its canon command configuration.
+    -- system declaration or its Conan command configuration.
     out[#out + 1] = ""
-    out[#out + 1] = "# Inner build systems managed by gcpkg (auto / cmake / gn / meson / canon / makefile / ninja)."
+    out[#out + 1] = "# Inner build systems managed by gcpkg (auto / cmake / gn / meson / conan / canon alias / makefile / ninja)."
     if y.system ~= nil then
         out[#out + 1] = "system: " .. (type(y.system) == "table" and json.encode(y.system) or scalar(y.system))
     end
     if y.systems ~= nil then out[#out + 1] = "systems: " .. json.encode(render_list(y.systems)) end
     if y.install_prefix ~= nil then out[#out + 1] = "install_prefix: " .. scalar(y.install_prefix) end
     if y.build_dir ~= nil then out[#out + 1] = "build_dir: " .. scalar(y.build_dir) end
+    if y.conan_cmd ~= nil then
+        local cmd = y.conan_cmd
+        if type(cmd) == "string" then cmd = util.shellsplit(cmd) end
+        out[#out + 1] = "conan_cmd: " .. json.encode(cmd)
+    end
     if y.canon_cmd ~= nil then
         local cmd = y.canon_cmd
         if type(cmd) == "string" then cmd = util.shellsplit(cmd) end

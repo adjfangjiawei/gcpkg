@@ -1,8 +1,5 @@
--- lmdb 0.9.31 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- lmdb 0.9.31 -- gcpkg port definition.
 -- LMDB: Makefile lives in libraries/liblmdb; custom build(ctx) uses that cwd.
--- Upstream is never patched: all adaptation is in this file.
 
 local fs = require("gcpkg.fs")
 

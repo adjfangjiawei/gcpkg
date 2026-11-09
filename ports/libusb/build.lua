@@ -1,8 +1,5 @@
--- libusb 1.0.30 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- libusb 1.0.30 -- gcpkg port definition.
 -- Userspace USB access: GitHub tag archives ship configure.ac, so pre_build runs autoreconf.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

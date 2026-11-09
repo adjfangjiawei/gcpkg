@@ -7,12 +7,16 @@
 # download + actually build the pinned versions into a scratch store.
 set -euo pipefail
 
+: "${HOME:?HOME must be set}"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+mkdir -p "$CACHE_DIR"
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 BIN="$ROOT/build/bin/gcpkg"
 [ -x "$BIN" ] || { echo "build the engine first: cmake -S . -B build && cmake --build build -j"; exit 1; }
 
-TMP="${GCPKG_PROJECT_TEST_DIR:-/home/user/.cache/gcpkg-projects-test}"
+TMP="${GCPKG_PROJECT_TEST_DIR:-$CACHE_DIR/gcpkg-projects-test}"
 STORE="$TMP/home"
 rm -rf "$TMP"
 mkdir -p "$STORE"
@@ -34,7 +38,7 @@ python3 - "$OUT" <<'PY'
 import re, sys
 text = open(sys.argv[1]).read()
 n = int(re.search(r"(\d+) ports OK", text).group(1))
-assert n >= 145, n   # older rounds' registry is a subset now
+assert n >= 145, n   # registry is forward compatible
 print("registry:", n, "ports OK")
 PY
 capture graph udisks2

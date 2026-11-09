@@ -1,8 +1,5 @@
--- yyjson 0.10.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- yyjson 0.10.0 -- gcpkg port definition.
 -- Fast JSON reader/writer; CMake.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

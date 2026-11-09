@@ -1,8 +1,5 @@
--- libtraceevent 1.8.4 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- libtraceevent 1.8.4 -- gcpkg port definition.
 -- ftrace event parser; Meson docs disabled (upstream requires asciidoc).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

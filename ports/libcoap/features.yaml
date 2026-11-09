@@ -2,7 +2,7 @@ schema: 1
 port: libcoap
 
 # CoAP RFC 7252; static libcoap-3, DTLS off by default.
-# Static validation is the default; see tests/r10.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

@@ -36,7 +36,6 @@ return recipe.cmake {
                 CURL_USE_GSSAPI = "OFF",
                 CURL_USE_LIBSSH = "OFF",
                 USE_LIBRTMP = "OFF",
-                -- otherwise CMake picks up the host's OpenLDAP and the static
                 -- libcurl would need -lldap/-llber from outside the DAG
                 CURL_DISABLE_LDAP = "ON",
                 CURL_DISABLE_LDAPS = "ON",

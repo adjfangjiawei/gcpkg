@@ -2,7 +2,7 @@ schema: 1
 port: hidapi
 
 # HID device access; CMake over libusb. Static build avoids linking the non-PIC libusb-1.0.a into a .so.
-# Static validation is the default; see tests/linux-kernel.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

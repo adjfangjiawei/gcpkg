@@ -1,8 +1,5 @@
--- mosquitto 2.0.20 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- mosquitto 2.0.20 -- gcpkg port definition.
 -- MQTT client library; `tls` feature enables OpenSSL.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

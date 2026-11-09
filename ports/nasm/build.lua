@@ -1,7 +1,5 @@
 -- nasm 2.16.03 -- tool port: exports bin/ so dependents get nasm on PATH.
--- R9 had to build libvpx with --target=generic-gnu because nasm was MISSING;
--- this port removes that workaround (see ports/libvpx/build.lua).
--- Upstream is never patched; the stock ./configure + make install is used.
+-- Tool port: exports bin/ so dependents get nasm on PATH.
 local recipe = require("gcpkg.recipe")
 return recipe.autotools {
     name = "nasm",

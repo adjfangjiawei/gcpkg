@@ -1,8 +1,5 @@
--- flac 1.4.3 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- flac 1.4.3 -- gcpkg port definition.
 -- FLAC codec on libogg.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

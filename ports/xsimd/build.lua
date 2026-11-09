@@ -1,7 +1,5 @@
--- xsimd 13.0.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- xsimd 13.0.0 -- gcpkg port definition.
 -- Header-only C++ SIMD wrappers.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

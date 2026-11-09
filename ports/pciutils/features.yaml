@@ -2,7 +2,7 @@ schema: 1
 port: pciutils
 
 # PCI enumeration (lspci) + libpci; hand-written Makefile, install target writes /sbin so build.lua collects artifacts into the prefix.
-# Static validation is the default; see tests/linux-kernel.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

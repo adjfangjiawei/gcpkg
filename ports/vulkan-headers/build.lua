@@ -1,7 +1,5 @@
--- vulkan-headers 1.4.363.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- vulkan-headers 1.4.363.0 -- gcpkg port definition.
 -- Khronos Vulkan-Headers: header/registry-only CMake install, feeds the loader.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

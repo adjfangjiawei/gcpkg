@@ -1,7 +1,5 @@
--- msgpack 6.0.1 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- msgpack 6.0.1 -- gcpkg port definition.
 -- MessagePack C/C++; exported as headers (uppercase OPTION() upstream).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

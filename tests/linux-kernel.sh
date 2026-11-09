@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Seventh-round regression: kernel interfaces and disk/storage information.
+# Kernel-interface and storage ports: registry, graphs and optional builds.
 #
 # Static by default (no download, no compile):
 #   * registry / features / three bottom-up graphs (incl. liburing -> libnvme)
@@ -67,7 +67,8 @@ for name in names:
     yml = open(os.path.join(d, "features.yaml")).read()
     assert "name = " in lua and "version = " in lua, name
     assert "schema: 1" in yml and "features:" in yml and "port: " + name in yml, name
-    assert "/home/user" not in lua and "/home/user" not in yml, "sandbox path: " + name
+    local_home = os.path.expanduser("~")
+    assert local_home not in lua and local_home not in yml, "sandbox path: " + name
     assert re.search(r'sha256 = "([0-9a-f]{64})"', lua), "missing real SHA256: " + name
     assert re.search(r'url = "(https?://[^"]+)"', lua), "missing URL: " + name
     block = lua.split("dependencies =", 1)[1].split("}", 1)[0] if "dependencies =" in lua else ""
@@ -78,7 +79,7 @@ assert len(all_ports) >= 145, len(all_ports)
 print("registry has", len(all_ports), "ports total")
 PY
 "$BIN" features udisks2 --ports "$PORTS" >/dev/null
-# liburing was added in round 4; make sure its declaration is still present.
+# liburing is part of the registry; keep its declaration available.
 "$BIN" graph liburing --ports "$PORTS" | grep -q 'liburing' || { echo "liburing port missing" >&2; exit 1; }
 echo "existing liburing port still resolvable"
 

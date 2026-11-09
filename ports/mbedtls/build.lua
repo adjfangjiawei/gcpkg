@@ -1,8 +1,5 @@
--- mbedtls 3.6.7 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- mbedtls 3.6.7 -- gcpkg port definition.
 -- Alternative TLS stack built with CMake; tests/programs disabled.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

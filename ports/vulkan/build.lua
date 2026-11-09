@@ -1,7 +1,5 @@
--- vulkan 1.4.363.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- vulkan 1.4.363.0 -- gcpkg port definition.
 -- Khronos Vulkan-Loader; depends on vulkan-headers and the managed cmake tool port.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

@@ -614,7 +614,8 @@ function M.build(root, cfg, opts)
             if not opts.inject_only then
                 local result = inner.run(ctx, {
                     systems = systems, commands = r.commands,
-                    canon_cmd = r.canon_cmd, cmd = opts.cmd,
+                    conan_cmd = r.conan_cmd, canon_cmd = r.canon_cmd,
+                    cmd = opts.cmd,
                     build_dir = buildDir, install_prefix = prefix,
                 })
                 local entries = mergeCompdb(jsonl, result.compdb_files or {}, ordered)

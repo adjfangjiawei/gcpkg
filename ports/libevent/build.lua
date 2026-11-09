@@ -1,8 +1,5 @@
--- libevent 2.1.13 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- libevent 2.1.13 -- gcpkg port definition.
 -- Event loop, linked against the existing openssl port.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

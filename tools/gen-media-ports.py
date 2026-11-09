@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the fifth-round ports (media / AI / networking / vendor SDKs).
+"""Generate media, AI, networking and vendor-SDK ports from the catalog.
 
 Source of truth: tools/media-catalog.tsv (real upstream URLs and SHA256 for
 every anonymously downloadable tarball) plus the META table below (per-port
@@ -229,13 +229,9 @@ def exports_block(e):
 
 
 def header(row, meta):
-    return ("-- %s %s -- ONE library, ONE build.lua + ONE features.yaml.\n"
-            "-- Verification in this sandbox: %s (see tests/media.sh).\n"
-            "-- %s\n"
-            "-- Upstream is never patched: all adaptation lives in this file.\n" %
+    return ("-- %s %s -- gcpkg port definition.\n"
+            "-- %s\n" %
             (row["name"], row["version"],
-             "static (check / graph / ports / externals)" if meta.get("verified") == "static"
-             else "dynamic + static",
              meta.get("notes", "").replace("\n", " ")))
 
 

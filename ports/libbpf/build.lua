@@ -1,8 +1,5 @@
--- libbpf 1.8.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- libbpf 1.8.0 -- gcpkg port definition.
 -- Kernel tools/lib/bpf Makefile: build in src/ then install with PREFIX=<prefix>; depends on elfutils.
--- Upstream is never patched: all adaptation is in this file.
 
 
 return {

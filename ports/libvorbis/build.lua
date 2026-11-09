@@ -1,8 +1,5 @@
--- libvorbis 1.3.7 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- libvorbis 1.3.7 -- gcpkg port definition.
 -- Vorbis codec on libogg.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

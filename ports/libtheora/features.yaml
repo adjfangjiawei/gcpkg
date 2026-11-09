@@ -2,7 +2,7 @@ schema: 1
 port: libtheora
 
 # Official Xiph release tarball (ships configure); examples disabled.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

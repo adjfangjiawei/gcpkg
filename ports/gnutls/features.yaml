@@ -2,7 +2,7 @@ schema: 1
 port: gnutls
 
 # Widest new dependency surface: nettle, gmp, libtasn1, libidn2, libunistring and the existing zlib port.
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

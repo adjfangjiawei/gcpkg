@@ -1,8 +1,5 @@
--- yaml-cpp 0.8.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests in tests/r10.sh; real
--- builds in GCPKG_R10_DYNAMIC=1 ./tests/r10.sh.
+-- yaml-cpp 0.8.0 -- gcpkg port definition.
 -- YAML parser/emitter; static build.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

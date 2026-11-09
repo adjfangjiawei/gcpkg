@@ -2,7 +2,7 @@ schema: 1
 port: spdlog
 
 # C++ logging on the external fmt port (CMAKE_PREFIX_PATH from deps).
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

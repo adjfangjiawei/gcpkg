@@ -1,7 +1,5 @@
--- cpp-httplib 0.20.1 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- cpp-httplib 0.20.1 -- gcpkg port definition.
 -- Header-only HTTP/HTTPS library; `tls` feature pulls openssl + zlib.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

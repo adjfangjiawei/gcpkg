@@ -1,2 +1,0 @@
-# Keep the user's own `canon` package-manager name; gcpkg does not rename it.
-name = "app"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the sixth-round ports: more Linux base libraries.
+"""Generate Linux base-library ports from the catalog.
 
 Source of truth: tools/linux-base-catalog.tsv (37 real upstream tarballs with
 measured SHA256, build-system kind and dependency list) plus META below
@@ -172,11 +172,8 @@ def build_lua(row):
     name, kind, meta = row["name"], row["kind"], META[row["name"]]
     deps = [d for d in row["deps"].split(",") if d]
     out = [
-        "-- %s %s -- ONE library, ONE build.lua + ONE features.yaml." % (name, row["version"]),
-        "-- Verification: static registry/graph tests here; real builds for a",
-        "-- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).",
+        "-- %s %s -- gcpkg port definition." % (name, row["version"]),
         "-- %s" % meta.get("n", ""),
-        "-- Upstream is never patched: all adaptation is in this file.",
         "",
     ]
     if not kind.startswith("custom-"):
@@ -226,13 +223,35 @@ def build_lua(row):
     return "\n".join(out) + "\n"
 
 
+JANSSON_VERSIONS = """
+# Available upstream releases with pinned URL/SHA256.
+versions:
+  "2.15.1":
+    source:
+      url: "https://codeload.github.com/akheron/jansson/tar.gz/refs/tags/v2.15.1"
+      sha256: "dbf95cb0af903f4fb8b61507d96b45b67db7d1479688ede352e1d571394d06f7"
+  "2.14":
+    source:
+      url: "https://codeload.github.com/akheron/jansson/tar.gz/refs/tags/v2.14"
+      sha256: "c739578bf6b764aa0752db9a2fdadcfe921c78f1228c7ec0bb47fa804c55d17b"
+  "2.13.1":
+    source:
+      url: "https://codeload.github.com/akheron/jansson/tar.gz/refs/tags/v2.13.1"
+      sha256: "f22901582138e3203959c9257cf83eba9929ac41d7be4a42557213a22ebcc7a0"
+  "2.12":
+    source:
+      url: "https://codeload.github.com/akheron/jansson/tar.gz/refs/tags/v2.12"
+      sha256: "76260d30e9bbd0ef392798525e8cd7fe59a6450c54ca6135672e3cd6a1642941"
+"""
+
+
 def features_yaml(row):
-    return "\n".join([
+    lines = [
         "schema: 1",
         "port: %s" % row["name"],
         "",
         "# %s" % META[row["name"]].get("n", ""),
-        "# Static validation is the default; see tests/linux-base.sh.",
+        "# Feature switches for this port.",
         "features:",
         "  no-tests:",
         "    default: true",
@@ -248,7 +267,10 @@ def features_yaml(row):
         "    description: Build shared libraries",
         "    args: []",
         '    conflicts: ["static"]',
-    ]) + "\n"
+    ]
+    if row["name"] == "jansson":
+        lines.append(JANSSON_VERSIONS.rstrip("\n"))
+    return "\n".join(lines) + "\n"
 
 
 def main():

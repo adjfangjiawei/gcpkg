@@ -1,8 +1,5 @@
--- jansson 2.15.1 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- jansson 2.15.1 -- gcpkg port definition.
 -- JSON C library; complements the existing json-c port.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

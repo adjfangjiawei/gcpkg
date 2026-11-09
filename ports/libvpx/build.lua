@@ -1,8 +1,5 @@
--- libvpx 1.15.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- libvpx 1.15.0 -- gcpkg port definition.
 -- VP8/VP9 codec: SIMD configure using the nasm tool port on PATH.
--- Upstream is never patched: all adaptation is in this file.
 
 local fs = require("gcpkg.fs")
 

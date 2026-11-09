@@ -1,7 +1,5 @@
--- crashpad main-f3769d9 -- ONE port, ONE build.lua + ONE features.yaml.
+-- crashpad main-f3769d9 -- gcpkg port definition.
 -- GN-native Crashpad; pinned mini_chromium and Linux-syscall-support tarballs fill empty submodules.
--- Static checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
--- Upstream is never patched: all adaptation lives in this file.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local net = require("gcpkg.net")

@@ -1,8 +1,5 @@
--- pciutils 3.15.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- pciutils 3.15.0 -- gcpkg port definition.
 -- PCI enumeration (lspci) + libpci; hand-written Makefile, install target writes /sbin so build.lua collects artifacts into the prefix.
--- Upstream is never patched: all adaptation is in this file.
 
 
 return {

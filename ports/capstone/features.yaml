@@ -2,7 +2,7 @@ schema: 1
 port: capstone
 
 # Disassembly framework; static library only.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

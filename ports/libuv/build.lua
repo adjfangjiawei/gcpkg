@@ -1,8 +1,5 @@
--- libuv 1.53.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- libuv 1.53.0 -- gcpkg port definition.
 -- Cross-platform async I/O; CMake build.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

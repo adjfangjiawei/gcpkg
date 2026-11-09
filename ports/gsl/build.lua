@@ -1,7 +1,5 @@
--- gsl 2.8 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- gsl 2.8 -- gcpkg port definition.
 -- GNU Scientific Library; stock autotools static build.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

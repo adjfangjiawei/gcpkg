@@ -2,7 +2,7 @@ schema: 1
 port: libgpg-error
 
 # GnuPG common error/portability layer.
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

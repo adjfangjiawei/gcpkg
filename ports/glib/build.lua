@@ -1,8 +1,5 @@
--- glib 2.84.4 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- glib 2.84.4 -- gcpkg port definition.
 -- GLib core; Meson, depends on libffi + zlib + pcre2 (existing L0 ports).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

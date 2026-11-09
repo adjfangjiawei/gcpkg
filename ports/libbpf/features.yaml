@@ -2,7 +2,7 @@ schema: 1
 port: libbpf
 
 # Kernel tools/lib/bpf Makefile: build in src/ then install with PREFIX=<prefix>; depends on elfutils.
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

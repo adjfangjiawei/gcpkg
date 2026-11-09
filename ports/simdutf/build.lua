@@ -1,7 +1,5 @@
--- simdutf 5.6.3 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- simdutf 5.6.3 -- gcpkg port definition.
 -- SIMD Unicode validation/transcoding.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

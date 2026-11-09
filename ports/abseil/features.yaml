@@ -2,7 +2,7 @@ schema: 1
 port: abseil
 
 # Abseil C++ foundation: CMake package config installed for re2.
-# Static validation is the default; see tests/r10.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

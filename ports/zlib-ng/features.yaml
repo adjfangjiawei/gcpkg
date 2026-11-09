@@ -2,7 +2,7 @@ schema: 1
 port: zlib-ng
 
 # zlib-ng in zlib-compat mode; all three test switches must be OFF.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

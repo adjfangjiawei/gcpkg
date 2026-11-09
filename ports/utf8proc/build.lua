@@ -1,8 +1,5 @@
--- utf8proc 2.12.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- utf8proc 2.12.0 -- gcpkg port definition.
 -- Unicode normalization; CMake build.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

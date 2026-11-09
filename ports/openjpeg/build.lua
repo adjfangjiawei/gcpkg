@@ -1,7 +1,5 @@
--- openjpeg 2.5.3 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- openjpeg 2.5.3 -- gcpkg port definition.
 -- OpenJPEG JPEG-2000 codec; static library only.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

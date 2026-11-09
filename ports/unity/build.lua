@@ -1,7 +1,5 @@
--- unity 2.6.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- unity 2.6.0 -- gcpkg port definition.
 -- Unity C test framework; static library and headers.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

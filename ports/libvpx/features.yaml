@@ -2,7 +2,7 @@ schema: 1
 port: libvpx
 
 # VP8/VP9 codec: SIMD configure using the nasm tool port on PATH.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

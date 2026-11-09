@@ -1,7 +1,5 @@
--- cli11 2.4.2 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- cli11 2.4.2 -- gcpkg port definition.
 -- Header-only C++ command-line parser.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

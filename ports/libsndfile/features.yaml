@@ -2,7 +2,7 @@ schema: 1
 port: libsndfile
 
 # Widest new chain: libogg + libvorbis + opus + flac -> libsndfile.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

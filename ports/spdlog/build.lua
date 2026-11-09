@@ -1,8 +1,5 @@
--- spdlog 1.15.3 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- spdlog 1.15.3 -- gcpkg port definition.
 -- C++ logging on the external fmt port (CMAKE_PREFIX_PATH from deps).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

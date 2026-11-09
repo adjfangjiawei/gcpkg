@@ -1,8 +1,5 @@
--- xxhash 0.8.4 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- xxhash 0.8.4 -- gcpkg port definition.
 -- Hand-written Makefile: make && make install PREFIX=<prefix>.
--- Upstream is never patched: all adaptation is in this file.
 
 
 return {

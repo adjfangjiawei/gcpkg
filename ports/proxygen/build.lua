@@ -1,7 +1,5 @@
--- proxygen 2026.10.26.00 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- proxygen 2026.10.26.00 -- gcpkg port definition.
 -- Top of the Facebook stack: folly -> fizz -> wangle/mvfst -> proxygen (plus cmake and the L0 crypto/compression chain).
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

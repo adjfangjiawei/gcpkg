@@ -1,6 +1,5 @@
 -- iptables / nftables userspace packet filtering tools and libxtables
--- ONE library, ONE build.lua and ONE features.yaml. Upstream sources
--- are downloaded verbatim (sha256 verified) and never patched.
+-- gcpkg port definition.
 local recipe = require("gcpkg.recipe")
 
 return recipe.autotools {

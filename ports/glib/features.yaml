@@ -2,7 +2,7 @@ schema: 1
 port: glib
 
 # GLib core; Meson, depends on libffi + zlib + pcre2 (existing L0 ports).
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

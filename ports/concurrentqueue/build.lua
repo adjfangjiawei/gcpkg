@@ -1,7 +1,5 @@
--- concurrentqueue 1.0.4 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- concurrentqueue 1.0.4 -- gcpkg port definition.
 -- Header-only lock-free queue; installs under include/concurrentqueue.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

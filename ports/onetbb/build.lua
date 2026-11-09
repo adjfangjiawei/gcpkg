@@ -1,7 +1,5 @@
--- onetbb 2022.0.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- onetbb 2022.0.0 -- gcpkg port definition.
 -- oneTBB; `python` feature enables the optional Python module.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

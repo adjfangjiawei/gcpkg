@@ -1,8 +1,5 @@
--- libconfig 1.7.3 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- libconfig 1.7.3 -- gcpkg port definition.
 -- Structured config parser; docs/examples/tests off (no makeinfo).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

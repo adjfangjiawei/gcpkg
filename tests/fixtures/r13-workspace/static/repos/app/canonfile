@@ -1,2 +1,0 @@
-# The user's inner package-manager name is deliberately `canon`, unchanged.
-name = "app"

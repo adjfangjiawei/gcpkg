@@ -1,8 +1,5 @@
--- librdkafka 2.8.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- librdkafka 2.8.0 -- gcpkg port definition.
 -- Kafka C client on zlib; `ssl` feature adds openssl.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

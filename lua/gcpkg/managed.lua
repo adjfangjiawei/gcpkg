@@ -2,7 +2,7 @@
 -- gcpkg").  gcpkg is the OUTER meta package manager: it owns the git
 -- repositories, their pins, their dependency tree and their build order.  The
 -- INNER build/dependency systems stay exactly as they are (CMake, GN, Meson,
--- a project's own `canon` package manager, a hand-written Makefile, ...).
+-- a project's own Conan package manager, a hand-written Makefile, ...).
 --
 -- Layout (relative to the workspace root):
 --
@@ -49,13 +49,13 @@ repos:
   # - name: app
   #   path: ../app                 # local checkout (no git maintenance)
   #   depends: [core]
-  #   systems: [canon, cmake]      # inner package manager, then CMake
+  #   systems: [conan, cmake]      # inner package manager, then CMake
   #   commands:
-  #     canon: ["canon", "install", "@canon@"]
+  #     conan: ["conan", "install", ".", "--output-folder=@build@"]
 ]]
 
 local SYSTEMS = {
-    cmake = true, gn = true, meson = true, canon = true,
+    cmake = true, gn = true, meson = true, conan = true, canon = true,
     makefile = true, make = true, ninja = true, auto = true, none = true,
 }
 
@@ -119,7 +119,7 @@ local function list(value)
     return out
 end
 
--- Commands can be written as a string ("canon install @canon@"), as an argv
+-- Commands can be written as a string ("conan install ."), as an argv
 -- array, or as an array of argv arrays (several steps in order).
 local function command_value(v)
     if v == nil or v == false or v == "" then return {} end
@@ -166,7 +166,7 @@ local function systems_value(v)
         s = trim(s):lower()
         if s == "make" then s = "makefile" end
         if not SYSTEMS[s] then
-            error("unknown inner system '" .. s .. "' (expected cmake/gn/meson/canon/makefile/ninja/auto/none)")
+            error("unknown inner system '" .. s .. "' (expected cmake/gn/meson/conan/canon/makefile/ninja/auto/none)")
         end
         out[#out + 1] = s
     end
@@ -201,6 +201,10 @@ function M.encode(data)
         out[#out + 1] = "    systems: " .. json.encode(systems)
         if r.install_prefix then out[#out + 1] = "    install_prefix: " .. quote(r.install_prefix) end
         if r.build_dir then out[#out + 1] = "    build_dir: " .. quote(r.build_dir) end
+        local conan = command_value(r.conan_cmd)
+        if #conan > 0 then
+            out[#out + 1] = "    conan_cmd: " .. json.encode(conan)
+        end
         local canon = command_value(r.canon_cmd)
         if #canon > 0 then
             out[#out + 1] = "    canon_cmd: " .. json.encode(canon)
@@ -248,6 +252,7 @@ local function normalize_repo(r, fallback_name, seen)
         systems = systems_value(r.systems or r.system or "auto"),
         install_prefix = trim(r.install_prefix or r.prefix) ~= "" and trim(r.install_prefix or r.prefix) or nil,
         build_dir = trim(r.build_dir or r.build) ~= "" and trim(r.build_dir or r.build) or nil,
+        conan_cmd = command_value(r.conan_cmd or r.conan_command),
         canon_cmd = command_value(r.canon_cmd or r.canon_command),
         commands = command_value(r.commands or {}),
         packages = list(r.packages or r.dependencies),
@@ -325,6 +330,7 @@ function M.add(root, spec)
         commit = trim(spec.commit) ~= "" and trim(spec.commit) or nil,
         submodules = trim(spec.submodules),
         systems = list(spec.system or spec.systems),
+        conan_cmd = command_value(spec.conan_cmd or spec.cmd),
         canon_cmd = command_value(spec.canon_cmd or spec.cmd),
         commands = command_value(spec.commands or {}),
         depends = list(spec.depends), packages = list(spec.packages),

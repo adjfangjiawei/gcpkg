@@ -1,5 +1,5 @@
 -- Dispatch on whatever build system the upstream library actually uses.
--- Inner package managers such as a project's own `canon` are driven by
+-- Inner package managers such as a project's own Conan are driven by
 -- gcpkg.inner, not by a port build adapter: ports describe exactly one library
 -- and one build system, while managed projects may chain several inner systems.
 local detect = require("gcpkg.detect")

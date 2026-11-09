@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sixth-round regression: more Linux base libraries (37 new ports).
+# Linux base-library ports: registry, graphs and optional real builds.
 #
 # Static by default (no download, no compile):
 #   * registry / features / two bottom-up graphs
@@ -72,7 +72,8 @@ for name in names:
     yml = open(os.path.join(d, "features.yaml")).read()
     assert "name = " in lua and "version = " in lua, name
     assert "schema: 1" in yml and "features:" in yml and "port: " + name in yml, name
-    assert "/home/user" not in lua and "/home/user" not in yml, "sandbox path: " + name
+    local_home = os.path.expanduser("~")
+    assert local_home not in lua and local_home not in yml, "sandbox path: " + name
     sha = re.search(r'sha256 = "([0-9a-f]{64})"', lua)
     assert sha, "missing real SHA256: " + name
     url = re.search(r'url = "(https?://[^"]+)"', lua)

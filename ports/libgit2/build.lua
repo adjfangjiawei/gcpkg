@@ -1,7 +1,5 @@
--- libgit2 1.9.1 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static registry checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
+-- libgit2 1.9.1 -- gcpkg port definition.
 -- libgit2; real bottom-up zlib dependency, no bundled zlib.
--- Upstream is never patched: all adaptation lives in this file.
 
 local recipe = require("gcpkg.recipe")
 

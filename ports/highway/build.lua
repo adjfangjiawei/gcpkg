@@ -1,7 +1,5 @@
--- highway 1.2.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Static checks in tests/r11.sh; GCPKG_R11_DYNAMIC=1 builds it for real.
+-- highway 1.2.0 -- gcpkg port definition.
 -- Google Highway portable SIMD library (core; contrib sort disabled: its vqsort templates need multi-GB RAM per TU).
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

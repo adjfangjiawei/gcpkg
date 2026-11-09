@@ -2,7 +2,7 @@ schema: 1
 port: sqlite3
 
 # SQLite amalgamation; autotools configure + make.
-# Static validation is the default; see tests/linux-base.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

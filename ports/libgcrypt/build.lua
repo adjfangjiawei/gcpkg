@@ -1,8 +1,5 @@
--- libgcrypt 1.11.1 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-base.sh (GCPKG_BASE_DYNAMIC=1).
+-- libgcrypt 1.11.1 -- gcpkg port definition.
 -- GNU crypto library; depends on libgpg-error.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

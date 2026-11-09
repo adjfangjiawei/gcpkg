@@ -2,7 +2,7 @@ schema: 1
 port: jsoncpp
 
 # C++ JSON reader/writer; static lib + tests off.
-# Static validation is the default; see tests/r10.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

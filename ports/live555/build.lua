@@ -1,7 +1,5 @@
--- live555 2021.11.14 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- live555 2021.11.14 -- gcpkg port definition.
 -- Upstream has no install target: ./genMakefiles linux, make, then copy the per-component .a and headers into the gcpkg prefix.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 

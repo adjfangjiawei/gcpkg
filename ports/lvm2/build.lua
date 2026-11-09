@@ -1,8 +1,5 @@
--- lvm2 2.03.43 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/linux-kernel.sh (GCPKG_KERNEL_DYNAMIC=1).
+-- lvm2 2.03.43 -- gcpkg port definition.
 -- device-mapper / LVM2; configure in tarball, depends on util-linux + libaio.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")

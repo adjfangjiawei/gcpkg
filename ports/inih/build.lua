@@ -1,8 +1,5 @@
--- inih r58 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- inih r58 -- gcpkg port definition.
 -- INI parser; only Meson build in the upstream tarball.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

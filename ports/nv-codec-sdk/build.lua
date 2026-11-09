@@ -1,7 +1,5 @@
--- nv-codec-sdk 12.2 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- nv-codec-sdk 12.2 -- gcpkg port definition.
 -- Login-walled archive. Headers (nvEncodeAPI.h, cuviddec.h, nvcuvid.h) plus driver stub libs; depends on the 'nvidia' platform port.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local external = require("gcpkg.build.external")

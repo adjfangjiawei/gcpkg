@@ -2,7 +2,7 @@ schema: 1
 port: wolfssl
 
 # Embedded TLS library; big tarball, autoreconf from configure.ac.
-# Static validation is the default; see tests/extra.sh.
+# Feature switches for this port.
 features:
   no-tests:
     default: true

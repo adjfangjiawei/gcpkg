@@ -1,8 +1,5 @@
--- zlib-ng 2.2.4 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification: static registry/graph tests here; real builds for a
--- subset live in tests/extra.sh (GCPKG_EXTRA_DYNAMIC=1).
+-- zlib-ng 2.2.4 -- gcpkg port definition.
 -- zlib-ng in zlib-compat mode; all three test switches must be OFF.
--- Upstream is never patched: all adaptation is in this file.
 
 local recipe = require("gcpkg.recipe")
 

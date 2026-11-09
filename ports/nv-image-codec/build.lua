@@ -1,7 +1,5 @@
--- nv-image-codec 0.10.0 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- nv-image-codec 0.10.0 -- gcpkg port definition.
 -- nvImageCodec requires CUDA >= 12.1 and optionally CV-CUDA (its samples). Both are declared gcpkg ports.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local recipe = require("gcpkg.recipe")

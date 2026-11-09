@@ -1,7 +1,5 @@
--- nvidia 12.8 -- ONE library, ONE build.lua + ONE features.yaml.
--- Verification in this sandbox: static (check / graph / ports / externals) (see tests/media.sh).
+-- nvidia 12.8 -- gcpkg port definition.
 -- Version string is a placeholder for the store key; the real version is whatever $GCPKG_NVIDIA_HOME (or $CUDA_HOME, or /usr/local/cuda) points at.
--- Upstream is never patched: all adaptation lives in this file.
 
 
 local external = require("gcpkg.build.external")

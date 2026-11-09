@@ -1,7 +1,5 @@
--- readerwriterqueue 1.0.6 -- ONE port, ONE build.lua + ONE features.yaml.
+-- readerwriterqueue 1.0.6 -- gcpkg port definition.
 -- Header-only SPSC C++ queue; two real upstream test TUs are compiled for compdb.
--- Static checks in tests/r12.sh; GCPKG_R12_DYNAMIC=1 builds it for real.
--- Upstream is never patched: all adaptation lives in this file.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 
