@@ -1,6 +1,6 @@
 # Port 目录
 
-注册表当前提供 **316 个 port**。每个 port 对应一个真实上游来源，由 `build.lua` 描述构建，由 `features.yaml` 描述特性与可选版本。
+注册表当前提供 **330 个 port**。每个 port 对应一个真实上游来源，由 `build.lua` 描述构建，由 `features.yaml` 描述特性与可选版本。
 
 ```bash
 gcpkg ports --ports ./ports
@@ -70,7 +70,7 @@ gcpkg versions zlib --ports ./ports
 ## 完整目录
 
 <details>
-<summary>展开全部 316 个 port</summary>
+<summary>展开全部 330 个 port</summary>
 
 ### L0
 
@@ -418,5 +418,25 @@ gcpkg versions zlib --ports ./ports
 | `sol2` | 3.5.0 | lua |
 | `csv2` | 0.2 | — |
 | `inja` | 3.5.0 | nlohmann-json |
+
+
+### 新增常用库（R19 扩展）
+
+| port | 版本 | 直接依赖 |
+| --- | --- | --- |
+| `jsoncons` | 1.10.0 | — |
+| `glaze` | 9.1.0 | — |
+| `maddy` | 1.6.0 | — |
+| `immer` | 0.9.1 | — |
+| `termcolor` | 2.1.0 | — |
+| `clipp` | 1.2.3 | — |
+| `argh` | 1.3.2 | — |
+| `args` | 6.6.1 | — |
+| `robin-hood-hashing` | 3.11.5 | — |
+| `ordered-map` | 1.2.0 | — |
+| `sparse-map` | 0.7.0 | — |
+| `quill` | 13.1.0 | — |
+| `docopt` | 0.6.3 | — |
+| `minizip-ng` | 4.2.2 | zlib |
 
 </details>

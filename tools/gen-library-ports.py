@@ -7,9 +7,9 @@ below (installed headers, probe headers, CMake switches and exported libraries).
 The engine only reads ports/<name>/build.lua + features.yaml at runtime; every
 port stays exactly TWO files and upstream sources are never patched.
 
-Nineteen header-only libraries use recipe.header: copy upstream headers into
+Forty-five header-only libraries use recipe.header: copy upstream headers into
 <prefix>/include, copy license files into <prefix>/share/doc, and compile one
-generated probe translation unit so clangd gets a real compile command. Five
+generated probe translation unit so clangd gets a real compile command. Seven
 compiled libraries use recipe.cmake with upstream tests/examples/tools disabled.
 
     python3 tools/gen-library-ports.py
@@ -241,6 +241,76 @@ META.update({
         n="Amalgamated Jinja-style template engine; depends on nlohmann-json."),
 })
 
+
+
+META.update({
+    "jsoncons": dict(kind="header", include="jsoncons/json.hpp",
+        headers=H(("include/jsoncons", "jsoncons")),
+        flags=["-std=c++17"], license_files=["LICENSE"],
+        n="Header-only JSON, JSON Pointer, JSON Patch and CBOR library."),
+    "glaze": dict(kind="header", include="glaze/glaze.hpp",
+        headers=H(("include/glaze", "glaze")), flags=["-std=c++23"],
+        license_files=["LICENSE"],
+        n="Header-only C++23 JSON and binary serialization; probe uses -std=c++23."),
+    "maddy": dict(kind="header", include="maddy/parser.h",
+        headers=H(("include/maddy", "maddy")), flags=["-std=c++17"],
+        license_files=["LICENSE"],
+        n="Header-only C++ Markdown parser; whole maddy/ tree installed."),
+    "immer": dict(kind="header", include="immer/vector.hpp",
+        headers=H(("immer", "immer")), flags=["-std=c++17"],
+        license_files=["LICENSE"],
+        n="Header-only immutable and persistent data structures."),
+    "termcolor": dict(kind="header", include="termcolor/termcolor.hpp",
+        headers=H(("include/termcolor", "termcolor")), prelude=["cstdint"],
+        flags=["-std=c++17"], license_files=["LICENSE"],
+        n="Header-only terminal colors; cstdint prelude fixes upstream uint8_t."),
+    "clipp": dict(kind="header", include="clipp.h",
+        headers=H(("include/clipp.h", "clipp.h")), flags=["-std=c++17"],
+        license_files=["LICENSE"],
+        n="Header-only command-line argument parser."),
+    "argh": dict(kind="header", include="argh.h",
+        headers=H(("argh.h", "argh.h")), flags=["-std=c++17"],
+        license_files=["LICENSE"],
+        n="Header-only minimalist command-line argument parser."),
+    "args": dict(kind="header", include="args.hxx",
+        headers=H(("args.hxx", "args.hxx")), flags=["-std=c++17"],
+        license_files=["LICENSE"],
+        n="Header-only C++ command-line argument parser."),
+    "robin-hood-hashing": dict(kind="header", include="robin_hood.h",
+        headers=H(("src/include/robin_hood.h", "robin_hood.h")),
+        flags=["-std=c++17"], license_files=["LICENSE"],
+        n="Header-only robin-hood hash map and set."),
+    "ordered-map": dict(kind="header", include="tsl/ordered_map.h",
+        headers=H(("include/tsl", "tsl")), flags=["-std=c++17"],
+        license_files=["LICENSE"],
+        n="Header-only insertion-order preserving hash map and set."),
+    "sparse-map": dict(kind="header", include="tsl/sparse_map.h",
+        headers=H(("include/tsl", "tsl")), flags=["-std=c++17"],
+        license_files=["LICENSE"],
+        n="Header-only sparse hash map and set."),
+    "quill": dict(kind="header", include="quill/Backend.h",
+        headers=H(("include/quill", "quill")),
+        flags=["-std=c++17", "-pthread"], license_files=["LICENSE"],
+        n="Header-only low-latency asynchronous logging; probe links pthread."),
+    "docopt": dict(kind="cmake",
+        defs={"WITH_TESTS": "OFF", "WITH_EXAMPLE": "OFF",
+              "USE_BOOST_REGEX": "OFF"},
+        libs=["docopt"], link_flags=[],
+        license_files=["LICENSE-Boost-1.0", "LICENSE-MIT"],
+        n="C++11 docopt parser; static/shared library built with std::regex."),
+    "minizip-ng": dict(kind="cmake",
+        defs={"MZ_COMPAT": "OFF", "MZ_ZLIB": "ON", "MZ_ZLIB_FLAVOR": "zlib",
+              "MZ_BZIP2": "OFF", "MZ_LZMA": "OFF", "MZ_PPMD": "OFF",
+              "MZ_ZSTD": "OFF", "MZ_OPENSSL": "OFF", "MZ_LIBBSD": "OFF",
+              "MZ_ICONV": "OFF", "MZ_PKCRYPT": "OFF", "MZ_WZAES": "OFF",
+              "MZ_FETCH_LIBS": "OFF", "MZ_FORCE_FETCH_LIBS": "OFF",
+              "MZ_BUILD_TESTS": "OFF", "MZ_BUILD_UNIT_TESTS": "OFF",
+              "MZ_BUILD_FUZZ_TESTS": "OFF", "MZ_CODE_COVERAGE": "OFF",
+              "MZ_SANITIZER": "OFF", "MZ_FILE32_API": "OFF"},
+        libs=["minizip-ng"], link_flags=["-lz"],
+        license_files=["LICENSE"],
+        n="Modern zip library; zlib compression only, optional codecs/crypto off."),
+})
 
 def L(s):
     return json.dumps(str(s), ensure_ascii=False)
