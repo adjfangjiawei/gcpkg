@@ -21,7 +21,7 @@ Project workflow (pnpm-style):
   gcpkg list [DIR]                  show project deps, scopes, versions and lock
   gcpkg versions PORT               list versions declared for a port
   gcpkg proxy [URL|--unset]         show / set / clear the proxy configuration
-  gcpkg proxy --check               verify the proxy listener / WSL host mapping
+  gcpkg proxy --check               verify the configured proxy listener
   gcpkg store show                show the effective package store
   gcpkg store set DIR              persist a user-wide store directory
   gcpkg store unset                remove the persisted store directory
@@ -281,10 +281,6 @@ local function doctor(cfg, o)
     log.info("store config        : " .. config.path())
     log.info("proxy               : " .. proxy.summary())
     local activeProxy = proxy.active()
-    local proxyHint = proxy.wsl_hint(activeProxy)
-    if proxyHint then
-        log.info("proxy host hint    : " .. proxyHint)
-    end
     local listenerOk, listenerReason = proxy.check(activeProxy)
     if listenerOk then
         log.info("proxy listener     : " .. listenerReason)

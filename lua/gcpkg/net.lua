@@ -28,10 +28,20 @@ function M.download(url, dest, expected, opts)
     -- download or a 20-second connect stall. The probe uses host:port only.
     proxy.assert_reachable("download " .. url)
     gcpkg.log.step("downloading " .. url)
-    -- Proxy credentials stay in the child environment, never in argv: build
-    -- logs and --verbose output cannot leak them. curl/git read *_proxy env.
-    gcpkg.exec({ "curl", "-fL", "--retry", "3", "--connect-timeout", "20", "-o", dest, url },
-               { log = opts.log, env = proxy.env() })
+    -- Proxy credentials stay in a private 0600 curl config, never in argv.
+    -- -q ignores any inherited .curlrc; -K then forces THIS resolved proxy.
+    local env = proxy.env()
+    local cmd = { "curl" }
+    if env.GCPKG_CURL_CONFIG then
+        cmd[#cmd + 1] = "-q"
+        cmd[#cmd + 1] = "-K"
+        cmd[#cmd + 1] = env.GCPKG_CURL_CONFIG
+    end
+    for _, a in ipairs({ "-fL", "--retry", "3", "--connect-timeout", "20",
+                         "-o", dest, url }) do
+        cmd[#cmd + 1] = a
+    end
+    gcpkg.exec(cmd, { log = opts.log, env = env })
     if expected then
         local got = M.sha256(dest)
         if got ~= expected then
@@ -64,6 +74,8 @@ function M.git_clone(url, ref, dest, opts)
     cmd[#cmd + 1] = url
     cmd[#cmd + 1] = dest
     proxy.assert_reachable("clone " .. url)
+    -- proxy.env() also carries GIT_CONFIG_COUNT/KEY_0/VALUE_0, which forces
+    -- git's http.proxy without putting a credentialed URL on the command line.
     gcpkg.exec(cmd, { log = opts.log, env = proxy.env() })
 end
 

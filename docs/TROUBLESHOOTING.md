@@ -23,18 +23,7 @@ gcpkg ports --ports ./ports
 
 ### 下载失败
 
-先用 `gcpkg proxy` 查看生效代理，再用 `gcpkg proxy --check` 验证代理软件是否可连接；必要时用 `--proxy`、`--no-proxy` 或 `GCPKG_PROXY` 覆盖。凭据不会打印到日志；网络问题可结合 `gcpkg --verbose` 与 store 中的日志目录定位。gcpkg 会在下载和 `git clone` 前做一次快速代理预检，无法连接时直接给出宿主地址与 Allow LAN 等提示。
-
-### WSL 代理连不上 Windows 宿主软件
-
-WSL 的 `127.0.0.1` 是 Linux 子系统自身的回环地址。若 `gcpkg proxy http://127.0.0.1:7890 -g` 后 `gcpkg proxy --check` 报连接失败，请确认：
-
-1. Windows 代理软件已开启 **Allow LAN** 或绑定到 `0.0.0.0`，而不是只监听 Windows 的 `127.0.0.1`；
-2. `gcpkg proxy` 输出的 host hint 与 WSL 默认网关一致；必要时用 `GCPKG_WSL_HOST=<windows-host-ip>` 指定；
-3. 防火墙允许 WSL 虚拟网卡访问代理端口；
-4. `GCPKG_WSL_HOST=off` 可用于确认代理确实运行在 WSL 内部。
-
-gcpkg 会保留配置文件中的原始 URL，只把运行时 `*_proxy` 改写到检测到的宿主网关；`gcpkg doctor` 也会显示当前代理监听状态。完整说明见 [PROXY.md](PROXY.md)。
+先用 `gcpkg proxy` 查看生效代理，再用 `gcpkg proxy --check` 验证代理监听是否可连接；必要时用 `--proxy`、`--no-proxy` 或 `GCPKG_PROXY` 覆盖。下载不再只依赖 `*_proxy` 环境变量：`curl` 使用 `-q -K` 私有配置，`CURL_HOME` 覆盖构建钩子内的 curl，Git 使用 `GIT_CONFIG_*` 显式配置 `http.proxy`，因此继承的 `~/.curlrc`、`NO_PROXY=*`、`~/.gitconfig` 或封装脚本不能把已设置的代理绕掉。凭据不会打印到日志；网络问题可结合 `gcpkg --verbose` 与 store 中的日志目录定位。gcpkg 会在下载和 `git clone` 前做一次快速代理预检，无法连接时直接给出诊断。
 
 ### `Compatibility with CMake < 3.5 has been removed`
 

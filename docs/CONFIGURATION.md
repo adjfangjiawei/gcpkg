@@ -59,7 +59,7 @@ gcpkg install curl --proxy=http://127.0.0.1:7890
 gcpkg install curl --no-proxy
 ```
 
-项目配置写在 `<project>/gcpkg.yaml`，用户级配置写在 `$GCPKG_HOME/gcpkg.yaml`。凭据不会进入命令行或日志。WSL 的回环代理会自动映射到 Windows 宿主网关；`gcpkg proxy --check` 可验证监听与映射。完整优先级见 [PROXY.md](PROXY.md)。
+项目配置写在 `<project>/gcpkg.yaml`，用户级配置写在 `$GCPKG_HOME/gcpkg.yaml`。凭据不会进入命令行或日志；解析出的代理会以私有 curl 配置和 Git 配置显式下发给所有网络命令，而不是只写环境变量。完整优先级见 [PROXY.md](PROXY.md)。
 
 ## 常用环境变量
 
@@ -69,7 +69,6 @@ gcpkg install curl --no-proxy
 | `GCPKG_STORE` / `GCPKG_HOME` | store 或旧版工作根目录 |
 | `GCPKG_PORTS` | 公有 port roots |
 | `GCPKG_PROXY` / `GCPKG_NO_PROXY` | 会话级代理 |
-| `GCPKG_WSL_HOST` | WSL 宿主代理 IP；`off` / `none` / `loopback` 禁用映射 |
 | `GCPKG_PROXY_CHECK` | 设为 `0` 跳过代理监听预检 |
 | `GCPKG_RUST_HOME` | Rust 工具链位置，供 external port 使用 |
 | `XDG_CONFIG_HOME` | 用户级配置根目录 |

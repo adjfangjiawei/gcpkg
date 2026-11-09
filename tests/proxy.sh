@@ -11,8 +11,11 @@ ROOT=$(pwd)
 BIN="$ROOT/build/bin/gcpkg"
 T=$(mktemp -d "$CACHE_DIR/gcpkg-proxy-test.XXXXXX")
 PROXY_PID=""
+HTTP_PID=""
+REAL_GIT=$(command -v git || true)
 cleanup() {
     [ -n "$PROXY_PID" ] && kill "$PROXY_PID" 2>/dev/null || true
+    [ -n "$HTTP_PID" ] && kill "$HTTP_PID" 2>/dev/null || true
     rm -rf "$T"
 }
 trap cleanup EXIT
@@ -28,6 +31,7 @@ ok() { echo "  ok: $1"; }
 fail() { echo "PROXY TEST FAILED: $1" >&2; exit 1; }
 has() { grep -Fq -- "$2" "$1" || fail "expected '$2' in $1"; }
 hasnt() { ! grep -Fq -- "$2" "$1" || fail "unexpected '$2' in $1"; }
+[ -n "$REAL_GIT" ] || fail "git is required for the proxy regression"
 
 echo "== registry is still healthy =="
 "${GP[@]}" check > "$T/check.log" 2>&1
@@ -103,8 +107,17 @@ grep -Fq 'env = proxy.env()' "$ROOT/lua/gcpkg/net.lua" || fail "curl download lo
     fail "git clone lost proxy env"
 grep -Fq 'proxy.assert_reachable' "$ROOT/lua/gcpkg/net.lua" ||
     fail "downloads lost proxy preflight"
-grep -Fq 'GCPKG_WSL_HOST' "$ROOT/lua/gcpkg/proxy.lua" ||
-    fail "WSL loopback proxy host handling is missing"
+if grep -Fq 'GCPKG_WSL_HOST' "$ROOT/lua/gcpkg/proxy.lua"; then
+    fail "WSL host guessing was not removed"
+fi
+grep -Fq '"-q"' "$ROOT/lua/gcpkg/net.lua" ||
+    fail "curl no longer ignores inherited .curlrc"
+grep -Fq 'GCPKG_CURL_CONFIG' "$ROOT/lua/gcpkg/net.lua" ||
+    fail "curl private config lost"
+grep -Fq 'CURL_HOME' "$ROOT/lua/gcpkg/proxy.lua" ||
+    fail "nested curl forcing lost"
+grep -Fq 'GIT_CONFIG_COUNT' "$ROOT/lua/gcpkg/proxy.lua" ||
+    fail "git http.proxy forcing lost"
 grep -Fq 'proxy.env()' "$ROOT/lua/gcpkg/port.lua" || fail "build hooks lost proxy env"
 grep -Fq 'proxy.env()' "$ROOT/lua/gcpkg/project.lua" || fail "project builds lost proxy env"
 ok "CLI surface, validation, engine wiring"
@@ -156,9 +169,18 @@ ok "project gcpkg.yaml proxy reached curl"
 
 # 4. git clones get the same proxy environment (fake git records $https_proxy).
 mkdir -p "$T/probe-ports/gitproxyprobe" "$T/fakebin"
+mkdir -p "$T/git-home"
+cat > "$T/git-home/.gitconfig" <<'CFG'
+[http]
+    proxy = "http://127.0.0.1:1"
+CFG
 cat > "$T/fakebin/git" <<'SH'
 #!/bin/sh
-printf '%s\n' "$https_proxy" > "$GCPKG_TEST_GIT_ENV"
+{
+    printf 'https_proxy=%s\n' "${https_proxy:-}"
+    printf 'GIT_CONFIG_VALUE_0=%s\n' "${GIT_CONFIG_VALUE_0:-}"
+    "${REAL_GIT}" config --get http.proxy 2>/dev/null || true
+} > "$GCPKG_TEST_GIT_ENV"
 last=""
 for a in "$@"; do last="$a"; done
 mkdir -p "$last"
@@ -178,11 +200,17 @@ return {
 LUA
 printf 'schema: 1\nport: gitproxyprobe\nfeatures: {}\n' > "$T/probe-ports/gitproxyprobe/features.yaml"
 GCPKG_TEST_GIT_ENV="$T/git.env" PATH="$T/fakebin:$PATH" \
+    HOME="$T/git-home" GIT_CONFIG_GLOBAL="$T/git-home/.gitconfig" \
+    REAL_GIT="$REAL_GIT" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.proxy \
+    GIT_CONFIG_VALUE_0="http://127.0.0.1:1" \
     timeout 120 "${GP[@]}" install gitproxyprobe --ports "$T/probe-ports" \
         --store "$T/store-git" --proxy="http://127.0.0.1:$PORT" > "$T/git.log" 2>&1 ||
     fail "git-clone probe failed: $(tail -4 "$T/git.log" | tr '\n' ' ')"
+has "$T/git.env" "https_proxy=http://127.0.0.1:$PORT"
+has "$T/git.env" "GIT_CONFIG_VALUE_0=http://127.0.0.1:$PORT"
 has "$T/git.env" "http://127.0.0.1:$PORT"
-ok "git clone inherited https_proxy"
+hasnt "$T/git.env" "http://127.0.0.1:1"
+ok "Git http.proxy forced over hostile gitconfig and GIT_CONFIG_* env"
 
 # 5. --check must verify the proxy listener without external network traffic.
 "${GP[@]}" proxy --proxy="http://127.0.0.1:$PORT" --check > "$T/check-proxy.log" 2>&1 ||
@@ -190,4 +218,92 @@ ok "git clone inherited https_proxy"
 has "$T/check-proxy.log" "proxy listener reachable"
 ok "proxy --check verified the listener"
 
-echo "proxy test OK (dynamic: curl proxy, bypass, project config, git env, check, no leaks)"
+
+echo "== dynamic: hostile .curlrc / NO_PROXY cannot bypass configured proxy =="
+HTTP_PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
+mkdir -p "$T/hostile/http" "$T/hostile/home" "$T/hostile/xdg" "$T/hostile/curlhome" \
+         "$T/hostile/src/probe-1.0" "$T/hostile/ports/curlbypassprobe"
+printf 'probe\n' > "$T/hostile/src/probe-1.0/probe.txt"
+printf 'nested\n' > "$T/hostile/http/nested.txt"
+tar -czf "$T/hostile/http/probe.tar.gz" -C "$T/hostile/src" probe-1.0
+python3 -m http.server "$HTTP_PORT" --bind 127.0.0.1 \
+    --directory "$T/hostile/http" > "$T/hostile/http.log" 2>&1 &
+HTTP_PID=$!
+for _ in $(seq 1 30); do
+    python3 -c "import socket,sys; socket.create_connection(('127.0.0.1',int(sys.argv[1])),0.3).close()" \
+        "$HTTP_PORT" 2>/dev/null && break
+    sleep 0.1
+done
+python3 -c "import socket,sys; socket.create_connection(('127.0.0.1',int(sys.argv[1])),1).close()" \
+    "$HTTP_PORT" 2>/dev/null || fail "local HTTP origin did not start"
+
+cat > "$T/hostile/curlhome/.curlrc" <<'CFG'
+proxy = ""
+noproxy = "*"
+CFG
+cp "$T/hostile/curlhome/.curlrc" "$T/hostile/home/.curlrc"
+cp "$T/hostile/curlhome/.curlrc" "$T/hostile/xdg/curlrc"
+cat > "$T/hostile/ports/curlbypassprobe/build.lua" <<LUA_PORT
+return {
+    name = "curlbypassprobe", version = "1.0.0",
+    source = { url = "http://127.0.0.1:$HTTP_PORT/probe.tar.gz", strip = 1 },
+    dependencies = {},
+    build = function(ctx)
+        ctx.exec({ "curl", "-sS", "-o", ctx.src .. "/nested.txt",
+                   "http://127.0.0.1:$HTTP_PORT/nested.txt" }, { check = true })
+        return { includes = {}, libdirs = {}, libs = {}, binaries = {} }
+    end,
+}
+LUA_PORT
+printf 'schema: 1\nport: curlbypassprobe\nfeatures: {}\n' > \
+    "$T/hostile/ports/curlbypassprobe/features.yaml"
+
+: > "$T/proxy.log"
+HOME="$T/hostile/home" XDG_CONFIG_HOME="$T/hostile/xdg" \
+CURL_HOME="$T/hostile/curlhome" NO_PROXY='*' no_proxy='*' \
+HTTPS_PROXY="http://127.0.0.1:1" HTTP_PROXY="http://127.0.0.1:1" \
+timeout 180 "${GP[@]}" install curlbypassprobe \
+    --ports "$T/hostile/ports" --store "$T/store-hostile" \
+    --proxy="http://127.0.0.1:$PORT" -j 2 > "$T/hostile-install.log" 2>&1 ||
+    fail "configured proxy was bypassed: $(tail -8 "$T/hostile-install.log" | tr '\n' ' ')"
+has "$T/proxy.log" "GET http://127.0.0.1:$HTTP_PORT/probe.tar.gz"
+has "$T/proxy.log" "GET http://127.0.0.1:$HTTP_PORT/nested.txt"
+ok "curl download and nested build-hook curl both used configured proxy"
+
+# The exact user-facing path: $GCPKG_HOME/gcpkg.yaml, not a CLI --proxy.
+"${GP[@]}" proxy "http://127.0.0.1:$PORT" -g > "$T/hostile-set-global.log" 2>&1 ||
+    fail "could not save global proxy: $(tail -4 "$T/hostile-set-global.log" | tr '\n' ' ')"
+HOME="$T/hostile/home" XDG_CONFIG_HOME="$T/hostile/xdg" \
+CURL_HOME="$T/hostile/curlhome" NO_PROXY='*' no_proxy='*' \
+    "${GP[@]}" proxy --check > "$T/hostile-check.log" 2>&1 ||
+    fail "global proxy --check failed: $(tail -6 "$T/hostile-check.log" | tr '\n' ' ')"
+has "$T/hostile-check.log" '[$GCPKG_HOME/gcpkg.yaml]'
+has "$T/hostile-check.log" "proxy listener"
+: > "$T/proxy.log"
+HOME="$T/hostile/home" XDG_CONFIG_HOME="$T/hostile/xdg" \
+CURL_HOME="$T/hostile/curlhome" NO_PROXY='*' no_proxy='*' \
+timeout 180 "${GP[@]}" install curlbypassprobe \
+    --ports "$T/hostile/ports" --store "$T/store-global" -j 2 \
+    > "$T/global-install.log" 2>&1 ||
+    fail "global gcpkg.yaml proxy was bypassed: $(tail -8 "$T/global-install.log" | tr '\n' ' ')"
+has "$T/proxy.log" "GET http://127.0.0.1:$HTTP_PORT/probe.tar.gz"
+has "$T/proxy.log" "GET http://127.0.0.1:$HTTP_PORT/nested.txt"
+ok "global gcpkg.yaml proxy reached curl despite hostile .curlrc"
+
+cat > "$T/hostile/curlhome/.curlrc" <<CFG
+proxy = "http://127.0.0.1:$PORT"
+noproxy = ""
+CFG
+cp "$T/hostile/curlhome/.curlrc" "$T/hostile/home/.curlrc"
+cp "$T/hostile/curlhome/.curlrc" "$T/hostile/xdg/curlrc"
+: > "$T/proxy.log"
+HOME="$T/hostile/home" XDG_CONFIG_HOME="$T/hostile/xdg" \
+CURL_HOME="$T/hostile/curlhome" \
+timeout 180 "${GP[@]}" install curlbypassprobe \
+    --ports "$T/hostile/ports" --store "$T/store-direct" \
+    --no-proxy -j 2 > "$T/direct-install.log" 2>&1 ||
+    fail "--no-proxy direct install failed: $(tail -8 "$T/direct-install.log" | tr '\n' ' ')"
+[ ! -s "$T/proxy.log" ] || fail "--no-proxy still used proxy despite hostile .curlrc"
+ok "--no-proxy forces direct despite hostile .curlrc"
+
+echo "proxy test OK (dynamic: forced curl/git, global config, hostile .curlrc, bypass, no leaks)"

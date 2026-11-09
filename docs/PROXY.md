@@ -1,6 +1,6 @@
 # 代理
 
-代理配置由引擎统一解析，并作为环境变量传给下载、`git clone` 与所有构建子进程。上游构建系统内部再次发起下载时也会继承同一配置。gcpkg 显式选中的代理不会再继承系统里的 `NO_PROXY=*`，避免配置被环境悄悄绕过；标准环境变量代理仍遵循系统 `NO_PROXY`。
+代理配置由引擎统一解析，并且**不只是显示或写进环境变量**：解析结果会作为显式参数/配置强制下发给下载、`git clone` 与所有构建子进程。上游构建系统内部再次发起下载时也会继承同一份强制配置。gcpkg 显式选中的代理不会再继承系统里的 `NO_PROXY=*` 或用户级 `~/.curlrc` 覆盖；标准环境变量代理仍遵循系统 `NO_PROXY`。
 
 ```bash
 gcpkg proxy
@@ -21,7 +21,9 @@ gcpkg doctor
 
 URL 支持 `http://`、`https://`、`socks5://`、`socks5h://`，可以内嵌 `user:password@`。格式错误会直接报错。`--noproxy` 与配置文件中的 `no_proxy` 都是逗号分隔列表，支持精确主机名、后缀域名和 `*`。
 
-`gcpkg proxy --check`（也可写 `gcpkg proxy check`）会检查生效代理的监听端口是否可连接，并打印 WSL 主机映射提示；它只验证代理软件本身，不等同于验证公网可达。`install` 的下载与 `git clone` 在真正发起网络请求前也会做一次快速预检，无法连接时立即给出诊断，而不是等待 curl 的长超时。设置 `GCPKG_PROXY_CHECK=0` 会跳过这些连通性探测。
+`gcpkg proxy --check`（也可写 `gcpkg proxy check`）只检查生效代理的监听端口是否可连接；它不等同于验证请求是否真的经过代理。`install` 的下载与 `git clone` 在真正发起网络请求前也会做一次快速预检，无法连接时立即给出诊断，而不是等待 curl 的长超时。设置 `GCPKG_PROXY_CHECK=0` 会跳过这些连通性探测。**连通性通过不代表代理被使用**；真正的保证来自下面的显式下发。
+
+**代理不是只“显示出来”**：解析出的地址会被强制下发给网络命令。下载使用的 `curl` 带 `-q -K <private .curlrc>`，忽略继承的 `~/.curlrc` / `NO_PROXY` 覆盖；所有子进程还获得 `CURL_HOME`，因此 port 构建钩子内部再调用 curl 也使用同一份私有配置。`git clone` 及子进程内的 Git 获得 `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_0=http.proxy` / `GIT_CONFIG_VALUE_0`，显式设置 `http.proxy`。凭据放在权限为 `0600` 的私有配置文件或环境变量中，不进入 argv、命令行日志或 `gcpkg --verbose`。`--no-proxy` 会写入空的 `proxy` 与 `noproxy="*"`，强制直连。
 
 ## 优先级
 
@@ -37,29 +39,7 @@ URL 支持 `http://`、`https://`、`socks5://`、`socks5h://`，可以内嵌 `u
 
 `no_proxy` 的顺序为 `--noproxy` → `GCPKG_NO_PROXY` → 项目 `no_proxy:` → 用户级 `no_proxy:` → `NO_PROXY`。其中最后一项只对来源 6 生效；来源 2–5 是 gcpkg 显式配置，不会被系统 `NO_PROXY=*` 覆盖。
 
-## WSL 与 Windows 宿主代理
-
-在 WSL 中，`127.0.0.1` 指的是 Linux 子系统自己的回环地址，并不是运行代理软件的 Windows 宿主。直接写 `gcpkg proxy http://127.0.0.1:7890 -g` 时，配置里仍保存用户输入的 URL，但 gcpkg 会在检测到 WSL、且本机回环没有监听该端口时，把下发给子进程的有效代理改写到宿主网关 IP：
-
-1. `ip route` 的默认网关；
-2. `/etc/resolv.conf` 的 `nameserver`；
-3. `host.docker.internal` 解析出的 IPv4。
-
-`gcpkg proxy` 与 `gcpkg doctor` 会显示原始 URL、改写后的有效 URL 和 host hint。宿主代理软件还必须允许来自 WSL 的连接，例如开启 **Allow LAN** 或绑定到 `0.0.0.0`；只监听 Windows 自身的 `127.0.0.1` 仍会拒绝连接。此时 `gcpkg proxy --check` 与 `install` 预检会明确报出连接失败、宿主地址以及 Allow LAN 提示。
-
-```bash
-# 自动发现宿主网关并验证
-gcpkg proxy http://127.0.0.1:7890 -g
-gcpkg proxy --check
-
-# 强制指定宿主网关（例如 WSL 虚拟网卡地址）
-GCPKG_WSL_HOST=172.20.0.1 gcpkg proxy --check
-
-# 保留 Linux 子系统自己的回环地址
-GCPKG_WSL_HOST=off gcpkg proxy --check
-```
-
-`GCPKG_WSL_HOST=auto` 与未设置该变量等价；`off`、`none`、`loopback` 都禁用改写。非 WSL 环境不会做任何地址替换。
+**不会改写地址**：配置里保存什么 URL，curl / Git / 构建子进程就使用什么 URL。gcpkg 不再猜测 WSL 宿主网关、不替换 `127.0.0.1`，也不把「配置命中」与「请求真的经过代理」混为一谈。若该地址本身不可连接，预检会直接报错，但不会偷偷换成别的地址或退回直连。
 
 ## 配置文件
 
@@ -83,4 +63,12 @@ no_proxy: "localhost,127.0.0.1,.internal"
 | `all_proxy` / `ALL_PROXY` | SOCKS 与其他协议 |
 | `no_proxy` / `NO_PROXY` | 绕过列表 |
 
-下载、Git 操作、port 构建钩子、项目构建与工作区命令都使用同一组变量。WSL 地址改写只作用于这组运行时变量，不会改写用户配置文件。
+下载、Git 操作、port 构建钩子、项目构建与工作区命令都使用同一组变量，并且额外获得：
+
+| 变量 | 用途 |
+| --- | --- |
+| `CURL_HOME` | 指向 gcpkg 生成的私有 `.curlrc` 目录，构建钩子内嵌的 curl 也强制走该配置 |
+| `GCPKG_CURL_CONFIG` | 私有 `.curlrc` 完整路径，供 `net.download` 用 `-K` 显式读取 |
+| `GIT_CONFIG_COUNT` / `GIT_CONFIG_KEY_0` / `GIT_CONFIG_VALUE_0` | 显式设置 Git 的 `http.proxy`，覆盖 `~/.gitconfig` 与外层 `GIT_CONFIG_*` |
+
+私有 `.curlrc` 权限为 `0600`、所在目录为 `0700`；`curl` 调用以 `-q` 开头忽略继承配置，再用 `-K` 读取该文件。这样「设置了代理」与「请求实际经过代理」是同一件事，不再依赖环境是否恰好没有覆盖它。

@@ -1,45 +1,41 @@
--- Unit test for proxy precedence, WSL host mapping, listener checks and
--- credential redaction. Runs with a small gcpkg.sys shim (no network).
+-- Unit test for proxy precedence, explicit curl/git forcing, private config
+-- generation, listener probes and credential redaction. Runs with a small
+-- gcpkg.sys shim (no network, no real filesystem).
 local root = os.getenv("GCPKG_LUA_ROOT") or "."
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. package.path
 
 local fakeEnv = {}
-local routeResponse = ""
-local resolvText = nil
-local getentResponse = ""
+local written = {}
+local madeDirs = {}
+local execCalls = {}
 local curlCode = 7
+local probeEnvSeen = nil
 
 gcpkg = { sys = {}, args = {}, version = "unit" }
 function gcpkg.sys.getenv(k) return fakeEnv[k] end
 function gcpkg.sys.cwd() return "." end
-function gcpkg.sys.mkdir() return true end
-function gcpkg.sys.read(path)
-    if path == "/etc/resolv.conf" then return resolvText end
-    return nil
-end
-function gcpkg.sys.write() return true end
+function gcpkg.sys.mkdir(path) madeDirs[path] = true; return true end
+function gcpkg.sys.read(path) return nil end
+function gcpkg.sys.write(path, data) written[path] = data; return true end
 function gcpkg.sys.append() return true end
-function gcpkg.sys.isfile() return false end
-function gcpkg.sys.isdir() return false end
-function gcpkg.sys.exists() return false end
+function gcpkg.sys.isfile(path) return written[path] ~= nil end
+function gcpkg.sys.isdir(path) return madeDirs[path] == true end
+function gcpkg.sys.exists(path) return written[path] ~= nil or madeDirs[path] == true end
 function gcpkg.sys.listdir() return {} end
 function gcpkg.sys.realpath(p) return p end
 function gcpkg.sys.yaml_parse() return {} end
 function gcpkg.sys.log() end
-function gcpkg.sys.exec() return 0 end
+function gcpkg.sys.exec(o)
+    execCalls[#execCalls + 1] = o.cmd or {}
+    return 0
+end
 function gcpkg.sys.set_verbose() end
 function gcpkg.sys.nproc() return 2 end
 function gcpkg.sys.capture(o)
     local cmd = o.cmd or {}
-    if cmd[1] == "sh" and tostring(cmd[3] or ""):find("ip route", 1, true) then
-        if routeResponse ~= "" then return 0, routeResponse end
-        return 1, ""
-    end
-    if cmd[1] == "getent" then
-        if getentResponse ~= "" then return 0, getentResponse end
-        return 1, ""
-    end
+    probeEnvSeen = o.env or {}
     if cmd[1] == "curl" then
+        assert(cmd[2] == "-q", "listener probe must ignore inherited curl configs")
         for _, arg in ipairs(cmd) do
             if tostring(arg):find("pw", 1, true) then
                 error("proxy credentials leaked into listener probe argv", 0)
@@ -64,68 +60,60 @@ end
 
 local function resetWorld(values, opts)
     setEnv(values)
-    routeResponse = (opts and opts.route) or ""
-    resolvText = opts and opts.resolv or nil
-    getentResponse = (opts and opts.getent) or ""
+    written = {}
+    madeDirs = {}
+    execCalls = {}
+    probeEnvSeen = nil
     curlCode = (opts and opts.curl) or 7
     proxy.reset()
 end
 
 local base = { HOME = "home", GCPKG_HOME = "home/.gcpkg" }
+local function cfgPath()
+    return "home/.gcpkg/curl/.curlrc"
+end
+local function cfgDir()
+    return "home/.gcpkg/curl"
+end
+local function execHas(sub)
+    for _, cmd in ipairs(execCalls) do
+        if table.concat(cmd, " "):find(sub, 1, true) then return true end
+    end
+    return false
+end
+local function assertForced(env, url, noProxy, gitValue)
+    assertf(env.https_proxy == url, "proxy.env() did not set https_proxy")
+    assertf(env.no_proxy == noProxy, "proxy.env() did not set no_proxy")
+    assertf(env.CURL_HOME == cfgDir(), "proxy.env() did not override CURL_HOME")
+    assertf(env.GCPKG_CURL_CONFIG == cfgPath(),
+            "proxy.env() did not generate a private curl config")
+    assertf(env.GIT_CONFIG_COUNT == "1" and env.GIT_CONFIG_KEY_0 == "http.proxy" and
+            env.GIT_CONFIG_VALUE_0 == gitValue,
+            "proxy.env() did not force git http.proxy")
+    local cfg = written[cfgPath()] or ""
+    assertf(cfg:find('proxy = "' .. url .. '"', 1, true),
+            "private curl config missing proxy = " .. url)
+    assertf(cfg:find('noproxy = "' .. noProxy .. '"', 1, true),
+            "private curl config missing noproxy")
+    assertf(execHas("chmod 700 " .. cfgDir()), "curl config dir was not chmod 700")
+    assertf(execHas("chmod 600 " .. cfgPath()), "curl config was not chmod 600")
+end
 
--- 1. WSL gateway discovered from `ip route`, local loopback has no listener.
+-- 1. Explicit --proxy ignores inherited NO_PROXY=* and forces curl/git.
 resetWorld({
-    HOME = base.HOME, GCPKG_HOME = base.GCPKG_HOME,
-    WSL_DISTRO_NAME = "TestWSL", NO_PROXY = "*",
-}, { route = "127.0.0.2\n", curl = 7 })
+    HOME = base.HOME, GCPKG_HOME = base.GCPKG_HOME, NO_PROXY = "*",
+}, { curl = 0 })
 local p = proxy.resolve({ proxy = "http://127.0.0.1:7890" })
-assertf(p.url == "http://127.0.0.2:7890", "WSL ip-route gateway was not applied")
-assertf(p.wsl and p.wsl.rewritten == true, "WSL rewrite flag is missing")
+assertf(p.url == "http://127.0.0.1:7890", "explicit --proxy was rewritten")
 assertf(p.no_proxy == "", "standard NO_PROXY bypassed an explicit gcpkg proxy")
 local env = proxy.env({ proxy = "http://127.0.0.1:7890" })
-assertf(env.https_proxy == p.url, "proxy.env() did not use the rewritten host")
-assertf(env.no_proxy == "", "proxy.env() leaked standard NO_PROXY")
+assertForced(env, p.url, "", p.url)
 local ok, msg = proxy.check(p)
-assertf(not ok, "unreachable proxy unexpectedly passed the check")
-assertf(msg:find("Allow LAN", 1, true), "failure omitted Allow LAN diagnosis")
-assertf(msg:find("GCPKG_WSL_HOST", 1, true), "failure omitted WSL host override")
+assertf(ok, "reachable proxy failed the check: " .. tostring(msg))
+assertf(probeEnvSeen.CURL_HOME == "" and probeEnvSeen.GIT_CONFIG_COUNT == "",
+        "listener probe did not clear forced config env")
 
--- 2. Gateway discovered from /etc/resolv.conf when ip route is unavailable.
-resetWorld({
-    HOME = base.HOME, GCPKG_HOME = base.GCPKG_HOME,
-    WSL_DISTRO_NAME = "TestWSL",
-}, { resolv = "nameserver 172.20.0.1\n", curl = 7 })
-p = proxy.resolve({ proxy = "http://127.0.0.1:7890" })
-assertf(p.url == "http://172.20.0.1:7890", "resolv.conf gateway was not applied")
-assertf(p.wsl and p.wsl.rewritten == true, "resolv.conf rewrite flag is missing")
-ok, msg = proxy.check(p)
-assertf(not ok, "unreachable resolv.conf gateway unexpectedly passed")
-assertf(msg:find("Allow LAN", 1, true), "resolv.conf failure omitted Allow LAN")
-
--- 3. GCPKG_WSL_HOST=off keeps the Linux loopback; a reachable listener passes.
-resetWorld({
-    HOME = base.HOME, GCPKG_HOME = base.GCPKG_HOME,
-    WSL_DISTRO_NAME = "TestWSL", GCPKG_WSL_HOST = "off",
-}, { route = "127.0.0.2\n", curl = 0 })
-p = proxy.resolve({ proxy = "http://127.0.0.1:7890" })
-assertf(p.url == "http://127.0.0.1:7890", "GCPKG_WSL_HOST=off rewrote loopback")
-assertf(p.wsl and p.wsl.keep == true and p.wsl.explicit == true,
-        "GCPKG_WSL_HOST=off decision is missing")
-ok, msg = proxy.check(p)
-assertf(ok, "reachable local proxy listener failed the check: " .. tostring(msg))
-
--- 4. An explicit host overrides both discovery and a reachable local listener.
-resetWorld({
-    HOME = base.HOME, GCPKG_HOME = base.GCPKG_HOME,
-    WSL_DISTRO_NAME = "TestWSL", GCPKG_WSL_HOST = "10.0.0.5",
-}, { route = "127.0.0.2\n", curl = 0 })
-p = proxy.resolve({ proxy = "http://127.0.0.1:7890" })
-assertf(p.url == "http://10.0.0.5:7890", "explicit WSL host was not applied")
-assertf(p.wsl and p.wsl.explicit == true, "explicit WSL host flag is missing")
-ok = proxy.check(p)
-assertf(ok, "reachable explicit WSL host failed the check")
-
--- 5. Standard environment proxy still honors standard NO_PROXY.
+-- 2. Standard environment proxy still honors standard NO_PROXY.
 resetWorld({
     HOME = base.HOME, GCPKG_HOME = base.GCPKG_HOME,
     HTTPS_PROXY = "http://proxy.example:8080", NO_PROXY = "*",
@@ -136,10 +124,28 @@ assertf(p.no_proxy == "*", "standard NO_PROXY was not honored")
 ok, msg = proxy.check(p)
 assertf(ok and msg:find("bypass", 1, true), "NO_PROXY=* did not skip the probe")
 env = proxy.env({})
-assertf(env.https_proxy == p.url and env.no_proxy == "*",
-        "standard proxy env was not rebuilt correctly")
+assertForced(env, p.url, "*", p.url)
 
--- 6. Credentials redacted in diagnostics, never in probe argv; env still gets them.
+-- 3. --no-proxy forces direct even with a hostile inherited proxy.
+resetWorld({
+    HOME = base.HOME, GCPKG_HOME = base.GCPKG_HOME,
+    GCPKG_PROXY = "http://proxy.example:8080",
+}, { curl = 0 })
+p = proxy.resolve({ no_proxy = true })
+assertf(p.disabled == true, "--no-proxy did not disable the proxy")
+env = proxy.env({ no_proxy = true })
+assertForced(env, "", "*", "")
+ok, msg = proxy.check(p)
+assertf(ok and msg:find("direct", 1, true), "--no-proxy did not report direct")
+
+-- 4. No proxy resolved at all: still force direct, never inherit .curlrc.
+resetWorld({ HOME = base.HOME, GCPKG_HOME = base.GCPKG_HOME }, { curl = 0 })
+p = proxy.resolve({})
+assertf(p.url == nil and not p.disabled, "unexpected proxy resolution")
+env = proxy.env({})
+assertForced(env, "", "*", "")
+
+-- 5. Credentials stay out of argv/logs; private 0600 config and env carry them.
 resetWorld({
     HOME = base.HOME, GCPKG_HOME = base.GCPKG_HOME,
     GCPKG_PROXY = "http://user:pw@127.0.0.1:7890",
@@ -152,7 +158,9 @@ assertf(msg:find("http://***@127.0.0.1:7890", 1, true),
         "proxy credentials were not redacted in diagnostics")
 assertf(not msg:find("pw", 1, true), "proxy credentials leaked into diagnostics")
 env = proxy.env({})
-assertf(env.https_proxy == p.url,
-        "credentialed proxy URL was not supplied to the child environment")
+assertForced(env, p.url, "", p.url)
+assertf((written[cfgPath()] or ""):find("user:pw@", 1, true),
+        "credentialed URL missing from private curl config")
+assertf(not execHas("pw"), "proxy credentials leaked into an exec argv")
 
 print("proxy unit OK")

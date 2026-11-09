@@ -66,7 +66,7 @@ store 保存下载的源码、prefix、manifest、编译数据库与构建日志
 ./build/bin/gcpkg externals
 ```
 
-WSL 下的 `127.0.0.1` 会按需映射到 Windows 宿主网关，`gcpkg proxy --check` 会验证代理监听并给出 Allow LAN 提示；详见 [docs/PROXY.md](docs/PROXY.md)。CMake 4 对旧版上游库的策略兼容也由引擎统一处理，详见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)。
+`gcpkg proxy` 保存的代理会通过私有 curl 配置（`-q -K` / `CURL_HOME`）和 Git `GIT_CONFIG_*` 显式下发给下载、克隆与构建钩子，不会被 `~/.curlrc`、`NO_PROXY=*` 或 `~/.gitconfig` 静默绕开；详见 [docs/PROXY.md](docs/PROXY.md)。CMake 4 对旧版上游库的策略兼容也由引擎统一处理，详见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)。
 
 `--ports` 可以写 `DIR[:DIR...]`，项目私有 port 放在 `<project>/gcpkg-ports/`，用户级 port 放在 `$GCPKG_HOME/ports/`。
 
