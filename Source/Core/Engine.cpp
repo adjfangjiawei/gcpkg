@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cerrno>
 #include <cctype>
 #include <cstdio>
@@ -162,6 +163,22 @@ int l_capture(lua_State* L) {
 }
 
 // ---------------------------------------------------------------- filesystem --
+
+int l_now(lua_State* L) {
+    using namespace std::chrono;
+    double seconds = duration<double>(steady_clock::now().time_since_epoch()).count();
+    lua_pushnumber(L, seconds);
+    return 1;
+}
+
+int l_size(lua_State* L) {
+    std::string path = luaL_checkstring(L, 1);
+    std::error_code ec;
+    auto n = fs::file_size(path, ec);
+    lua_pushinteger(L, ec ? 0 : static_cast<lua_Integer>(n));
+    return 1;
+}
+
 
 int l_read(lua_State* L) {
     std::string path = luaL_checkstring(L, 1);
@@ -389,6 +406,9 @@ int l_log(lua_State* L) {
     const char* msg = luaL_optstring(L, 2, "");
     FILE* out = std::string(level) == "error" ? stderr : stdout;
     std::fprintf(out, "[gcpkg:%s] %s\n", level, msg);
+    // Keep phase lines ordered with child curl/tar output even when stdout is
+    // redirected to a file (where C stdio would otherwise be fully buffered).
+    std::fflush(out);
     return 0;
 }
 
@@ -561,6 +581,8 @@ void createEnv(lua_State* L, Context* c) {
     lua_newtable(L);  // gcpkg.sys
     reg(L, c, "exec", l_exec);
     reg(L, c, "capture", l_capture);
+    reg(L, c, "now", l_now);
+    reg(L, c, "size", l_size);
     reg(L, c, "read", l_read);
     reg(L, c, "write", l_write);
     reg(L, c, "append", l_append);

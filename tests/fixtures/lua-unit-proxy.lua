@@ -31,6 +31,8 @@ function gcpkg.sys.exec(o)
 end
 function gcpkg.sys.set_verbose() end
 function gcpkg.sys.nproc() return 2 end
+function gcpkg.sys.now() return 0 end
+function gcpkg.sys.size() return 0 end
 function gcpkg.sys.capture(o)
     local cmd = o.cmd or {}
     probeEnvSeen = o.env or {}

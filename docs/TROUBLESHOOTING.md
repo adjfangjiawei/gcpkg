@@ -25,6 +25,22 @@ gcpkg ports --ports ./ports
 
 先用 `gcpkg proxy` 查看生效代理，再用 `gcpkg proxy --check` 验证代理监听是否可连接；必要时用 `--proxy`、`--no-proxy` 或 `GCPKG_PROXY` 覆盖。下载不再只依赖 `*_proxy` 环境变量：`curl` 使用 `-q -K` 私有配置，`CURL_HOME` 覆盖构建钩子内的 curl，Git 使用 `GIT_CONFIG_*` 显式配置 `http.proxy`，因此继承的 `~/.curlrc`、`NO_PROXY=*`、`~/.gitconfig` 或封装脚本不能把已设置的代理绕掉。凭据不会打印到日志；网络问题可结合 `gcpkg --verbose` 与 store 中的日志目录定位。gcpkg 会在下载和 `git clone` 前做一次快速代理预检，无法连接时直接给出诊断。
 
+### 终端停在 `downloading ...`
+
+`downloading` 只表示请求开始。完成后会依次打印：
+
+```text
+[gcpkg:info] downloaded 11.2 MiB in 1.3s (8.6 MiB/s) -> <store>/cache/...
+[gcpkg:step] extracting cmake-3.31.6.tar.gz (11.2 MiB) -> <store>/src/...
+[gcpkg:info]   expanding source tree: progress is printed while tar runs
+tar:   expanding source tree: R: 20459520 (20MiB, 166MiB/s)
+[gcpkg:info] extracted cmake-3.31.6.tar.gz in 2.1s
+```
+
+这些阶段同时出现在终端与 `<store>/logs/<port>.log`。`cloning` / `cloned` 与 `cached` / `reusing prepared sources` 也有同样的阶段日志，不会只显示一次 `downloading` 就沉默。
+
+旧行为用 GNU tar 默认参数逐条目恢复 owner、权限、mtime、ACL、SELinux 与 xattr。CMake 源码归档约 2.9 万条目，本地 `strace` 实测会多出约 8 万次元数据系统调用；在元数据开销高的挂载盘上，网络流量停止后磁盘仍会忙很久。现在解压使用 `-m --no-same-owner --no-same-permissions --no-acls --no-selinux --no-xattrs`，只写文件内容，并用 `--checkpoint` 周期性打印已读取字节与速率：系统调用约减半，且能看出仍在推进。源码构建不需要归档里的 owner/mtime/ACL 元数据。
+
 ### `Compatibility with CMake < 3.5 has been removed`
 
 CMake 4 移除了对 `cmake_minimum_required(VERSION < 3.5)` 的兼容，老版本上游库（例如旧 zlib）会在 configure 阶段失败。gcpkg 会检测 `cmake --version`：当主版本大于等于 4 时，统一为所有 CMake port 与内层构建传入 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`，并在注入环境与构建子进程中设置同名环境变量。无需为单个 port 改 `CMakeLists.txt`。

@@ -118,6 +118,10 @@ grep -Fq 'CURL_HOME' "$ROOT/lua/gcpkg/proxy.lua" ||
     fail "nested curl forcing lost"
 grep -Fq 'GIT_CONFIG_COUNT' "$ROOT/lua/gcpkg/proxy.lua" ||
     fail "git http.proxy forcing lost"
+grep -Fq -- '--no-same-owner' "$ROOT/lua/gcpkg/net.lua" ||
+    fail "metadata-light tar flags lost"
+grep -Fq 'extracting' "$ROOT/lua/gcpkg/net.lua" ||
+    fail "extract phase log lost"
 grep -Fq 'proxy.env()' "$ROOT/lua/gcpkg/port.lua" || fail "build hooks lost proxy env"
 grep -Fq 'proxy.env()' "$ROOT/lua/gcpkg/project.lua" || fail "project builds lost proxy env"
 ok "CLI surface, validation, engine wiring"
@@ -268,6 +272,9 @@ timeout 180 "${GP[@]}" install curlbypassprobe \
     fail "configured proxy was bypassed: $(tail -8 "$T/hostile-install.log" | tr '\n' ' ')"
 has "$T/proxy.log" "GET http://127.0.0.1:$HTTP_PORT/probe.tar.gz"
 has "$T/proxy.log" "GET http://127.0.0.1:$HTTP_PORT/nested.txt"
+has "$T/hostile-install.log" "downloaded"
+has "$T/hostile-install.log" "extracting"
+has "$T/hostile-install.log" "extracted"
 ok "curl download and nested build-hook curl both used configured proxy"
 
 # The exact user-facing path: $GCPKG_HOME/gcpkg.yaml, not a CLI --proxy.
@@ -288,6 +295,9 @@ timeout 180 "${GP[@]}" install curlbypassprobe \
     fail "global gcpkg.yaml proxy was bypassed: $(tail -8 "$T/global-install.log" | tr '\n' ' ')"
 has "$T/proxy.log" "GET http://127.0.0.1:$HTTP_PORT/probe.tar.gz"
 has "$T/proxy.log" "GET http://127.0.0.1:$HTTP_PORT/nested.txt"
+has "$T/global-install.log" "downloaded"
+has "$T/global-install.log" "extracting"
+has "$T/global-install.log" "extracted"
 ok "global gcpkg.yaml proxy reached curl despite hostile .curlrc"
 
 cat > "$T/hostile/curlhome/.curlrc" <<CFG
@@ -306,4 +316,30 @@ timeout 180 "${GP[@]}" install curlbypassprobe \
 [ ! -s "$T/proxy.log" ] || fail "--no-proxy still used proxy despite hostile .curlrc"
 ok "--no-proxy forces direct despite hostile .curlrc"
 
-echo "proxy test OK (dynamic: forced curl/git, global config, hostile .curlrc, bypass, no leaks)"
+
+echo "== dynamic: metadata-light tar flags and visible expansion progress =="
+mkdir -p "$T/shim"
+cat > "$T/shim/tar" <<'SH'
+#!/bin/sh
+printf '%s\n' "$*" >> "$GCPKG_TEST_TAR_ARGV"
+exec /usr/bin/tar "$@"
+SH
+chmod +x "$T/shim/tar"
+: > "$T/tar.argv"
+HOME="$T/hostile/home" XDG_CONFIG_HOME="$T/hostile/xdg" \
+CURL_HOME="$T/hostile/curlhome" NO_PROXY='*' no_proxy='*' \
+PATH="$T/shim:$PATH" GCPKG_TEST_TAR_ARGV="$T/tar.argv" \
+    timeout 180 "${GP[@]}" install curlbypassprobe \
+        --ports "$T/hostile/ports" --store "$T/store-tar" \
+        --proxy="http://127.0.0.1:$PORT" -j 2 > "$T/tar-install.log" 2>&1 ||
+    fail "tar-flag probe install failed: $(tail -8 "$T/tar-install.log" | tr '\n' ' ')"
+has "$T/tar-install.log" "downloaded"
+has "$T/tar-install.log" "extracting"
+has "$T/tar-install.log" "extracted"
+has "$T/tar.argv" "--no-same-owner"
+has "$T/tar.argv" "--no-same-permissions"
+has "$T/tar.argv" "-m"
+has "$T/tar.argv" "--checkpoint"
+ok "phase logs + metadata-light tar flags + checkpoint progress"
+
+echo "proxy test OK (dynamic: forced curl/git, phase logs, metadata-light tar, no leaks)"

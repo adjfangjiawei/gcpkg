@@ -25,6 +25,8 @@ function gcpkg.sys.log() end
 function gcpkg.sys.exec() return 0 end
 function gcpkg.sys.set_verbose() end
 function gcpkg.sys.nproc() return 2 end
+function gcpkg.sys.now() return 0 end
+function gcpkg.sys.size() return 0 end
 function gcpkg.sys.capture(o)
     if o.cmd and o.cmd[1] == "cmake" and o.cmd[2] == "--version" then
         return 0, cmakeVersion

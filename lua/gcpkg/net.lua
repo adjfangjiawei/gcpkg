@@ -6,6 +6,64 @@ local util = require("gcpkg.util")
 local proxy = require("gcpkg.proxy")
 local M = {}
 
+local function now()
+    if gcpkg.sys.now then
+        return gcpkg.sys.now()
+    end
+    return os.time()
+end
+
+local function fileSize(path)
+    if gcpkg.sys.size then
+        return gcpkg.sys.size(path) or 0
+    end
+    local out, code = gcpkg.capture({ "stat", "-c", "%s", path })
+    return code == 0 and tonumber(out) or 0
+end
+
+local function humanBytes(n)
+    n = tonumber(n) or 0
+    if n >= 1024 * 1024 then
+        return string.format("%.1f MiB", n / (1024 * 1024))
+    elseif n >= 1024 then
+        return string.format("%.1f KiB", n / 1024)
+    end
+    return tostring(n) .. " B"
+end
+
+local function humanDuration(seconds)
+    seconds = math.max(tonumber(seconds) or 0, 0)
+    if seconds < 1 then
+        return "<1s"
+    elseif seconds < 60 then
+        return string.format("%.1fs", seconds)
+    end
+    return string.format("%dm %.0fs", math.floor(seconds / 60), seconds % 60)
+end
+
+-- Print a phase on the terminal AND append it to the per-port build log.
+-- gcpkg.log goes to stdout; child curl/tar output is redirected to opts.log
+-- by gcpkg.exec, so without this the build log has no phase markers either.
+local function phase(opts, level, message)
+    opts = opts or {}
+    gcpkg.log[level](message)
+    if opts.log and opts.log ~= "" then
+        pcall(fs.append, opts.log, "[gcpkg:" .. level .. "] " .. message .. "\n")
+    end
+end
+
+local function shellQuote(value)
+    return "'" .. tostring(value):gsub("'", "'\"'\"'") .. "'"
+end
+
+local function shellJoin(args)
+    local out = {}
+    for _, arg in ipairs(args) do
+        out[#out + 1] = shellQuote(arg)
+    end
+    return table.concat(out, " ")
+end
+
 function M.sha256(path)
     local out, code = gcpkg.capture({ "sha256sum", path })
     if code ~= 0 then
@@ -19,15 +77,18 @@ function M.download(url, dest, expected, opts)
     fs.mkdirs(util.dirname(dest))
     if fs.isfile(dest) then
         if not expected or M.sha256(dest) == expected then
+            phase(opts, "info", "cached " .. util.basename(dest) ..
+                  " (" .. humanBytes(fileSize(dest)) .. ")")
             return dest
         end
-        gcpkg.log.warn("checksum mismatch, re-downloading " .. url)
+        phase(opts, "warn", "checksum mismatch, re-downloading " .. url)
         fs.rm(dest)
     end
     -- A configured but unreachable proxy must not turn into a silent direct
     -- download or a 20-second connect stall. The probe uses host:port only.
     proxy.assert_reachable("download " .. url)
-    gcpkg.log.step("downloading " .. url)
+    phase(opts, "step", "downloading " .. url)
+    local started = now()
     -- Proxy credentials stay in a private 0600 curl config, never in argv.
     -- -q ignores any inherited .curlrc; -K then forces THIS resolved proxy.
     local env = proxy.env()
@@ -42,6 +103,15 @@ function M.download(url, dest, expected, opts)
         cmd[#cmd + 1] = a
     end
     gcpkg.exec(cmd, { log = opts.log, env = env })
+    local elapsed = math.max(now() - started, 0)
+    local size = fileSize(dest)
+    local rate = ""
+    if elapsed >= 0.1 then
+        rate = string.format(" (%.1f MiB/s)",
+              size / (1024 * 1024) / elapsed)
+    end
+    phase(opts, "info", string.format("downloaded %s in %s%s -> %s",
+          humanBytes(size), humanDuration(elapsed), rate, dest))
     if expected then
         local got = M.sha256(dest)
         if got ~= expected then
@@ -55,12 +125,45 @@ end
 function M.extract(archive, dest, strip, opts)
     opts = opts or {}
     fs.mkdirs(dest)
+    local started = now()
+    local base = util.basename(archive)
+    local size = fileSize(archive)
+    phase(opts, "step", "extracting " .. base .. " (" .. humanBytes(size) ..
+          ") -> " .. dest)
+    phase(opts, "info", "  expanding source tree: progress is printed while tar runs")
+
     if util.endswith(archive, ".zip") then
-        gcpkg.exec({ "unzip", "-q", "-o", archive, "-d", dest }, { log = opts.log })
+        local cmd = { "unzip", "-q", "-o", archive, "-d", dest }
+        gcpkg.exec(cmd, { log = opts.log })
     else
-        gcpkg.exec({ "tar", "-xf", archive, "-C", dest,
-                     "--strip-components=" .. tostring(strip or 1) }, { log = opts.log })
+        -- GNU tar defaults to restoring owner, mode, mtime, ACLs, SELinux and
+        -- xattrs for EVERY entry. A CMake source tree has ~29k entries; on
+        -- metadata-heavy mounts those extra syscalls dominate the wall time.
+        -- Source builds only need the bytes, so skip all of that metadata.
+        local tarArgs = {
+            "tar", "-xf", archive, "-C", dest,
+            "--strip-components=" .. tostring(strip or 1),
+            "-m", "--no-same-owner", "--no-same-permissions",
+            "--no-acls", "--no-selinux", "--no-xattrs",
+            -- %T reports bytes read and the current rate; echo= writes to
+            -- stderr, which the pipeline below shows on the terminal too.
+            "--checkpoint=2000",
+            "--checkpoint-action=echo=  expanding source tree: %T",
+        }
+        if opts.log and opts.log ~= "" then
+            fs.append(opts.log, "+ " .. table.concat(tarArgs, " ") .. "\n")
+            -- tee keeps tar's progress/errors on the terminal while also
+            -- appending them to the per-port log. pipefail preserves tar's RC.
+            local inner = shellJoin(tarArgs) .. " 2>&1"
+            local cmd = { "bash", "-o", "pipefail", "-c",
+                          inner .. " | tee -a " .. shellQuote(opts.log) }
+            gcpkg.exec(cmd, {})
+        else
+            gcpkg.exec(tarArgs, {})
+        end
     end
+    phase(opts, "info", string.format("extracted %s in %s",
+          base, humanDuration(math.max(now() - started, 0))))
 end
 
 function M.git_clone(url, ref, dest, opts)
@@ -74,9 +177,13 @@ function M.git_clone(url, ref, dest, opts)
     cmd[#cmd + 1] = url
     cmd[#cmd + 1] = dest
     proxy.assert_reachable("clone " .. url)
+    phase(opts, "step", "cloning " .. url)
+    local started = now()
     -- proxy.env() also carries GIT_CONFIG_COUNT/KEY_0/VALUE_0, which forces
     -- git's http.proxy without putting a credentialed URL on the command line.
     gcpkg.exec(cmd, { log = opts.log, env = proxy.env() })
+    phase(opts, "info", string.format("cloned %s in %s", url,
+          humanDuration(math.max(now() - started, 0))))
 end
 
 -- prepare(source, srcDir, opts) -> srcDir
@@ -110,9 +217,10 @@ function M.prepare(source, srcDir, opts)
     end
     if fs.isfile(marker) then
         if fs.read(marker) == identity then
+            phase(opts, "info", "reusing prepared sources " .. srcDir)
             return srcDir
         end
-        gcpkg.log.warn("source identity changed, refreshing " .. srcDir)
+        phase(opts, "warn", "source identity changed, refreshing " .. srcDir)
         fs.rm(srcDir)
     end
     fs.mkdirs(srcDir)
