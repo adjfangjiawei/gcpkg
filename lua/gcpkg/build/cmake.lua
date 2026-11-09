@@ -3,6 +3,7 @@
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local cmake_version = require("gcpkg.cmake_version")
+local toolchain = require("gcpkg.toolchain")
 local M = {}
 
 local function define_key(arg)
@@ -32,6 +33,23 @@ local function dedup_defines(cmd)
     return out
 end
 
+local function toolchain_from_arg(arg)
+    if define_key(arg) == "CMAKE_TOOLCHAIN_FILE" then
+        return tostring(arg):match("^%-D[^=]+=(.*)$")
+    end
+    return nil
+end
+
+local function cache_toolchain(args)
+    for i = 1, #args - 1 do
+        if tostring(args[i]) == "-C" then
+            local text = fs.read(args[i + 1]) or ""
+            return text:match('set%(CMAKE_TOOLCHAIN_FILE%s+"([^"]+)"')
+        end
+    end
+    return nil
+end
+
 local function policy_env(base)
     return util.merge(base or {}, cmake_version.policy_env(base))
 end
@@ -47,6 +65,20 @@ function M.configure(o)
                   "-DCMAKE_INSTALL_PREFIX=" .. (o.prefix or util.join(build, "install")) }
     local defines = type(o.defines) == "table" and o.defines or {}
     local args = o.args or {}
+    local chainloads = {}
+    if o.toolchain then chainloads[#chainloads + 1] = o.toolchain end
+    for _, a in ipairs(args) do
+        local t = toolchain_from_arg(a)
+        if t then chainloads[#chainloads + 1] = t end
+    end
+    if defines.CMAKE_TOOLCHAIN_FILE then
+        chainloads[#chainloads + 1] = tostring(defines.CMAKE_TOOLCHAIN_FILE)
+    end
+    local cacheChain = cache_toolchain(args)
+    if cacheChain then chainloads[#chainloads + 1] = cacheChain end
+    local crossArgs = toolchain.cmake_args({
+        chainload = chainloads, compiler_from_env = true,
+    })
     local policy_set = defines.CMAKE_POLICY_VERSION_MINIMUM ~= nil or
                        (baseEnv and baseEnv.CMAKE_POLICY_VERSION_MINIMUM ~= nil and
                         baseEnv.CMAKE_POLICY_VERSION_MINIMUM ~= "")
@@ -63,13 +95,18 @@ function M.configure(o)
         cmd[#cmd + 1] = "-G"
         cmd[#cmd + 1] = o.generator
     end
-    if o.toolchain then
+    if o.toolchain and not toolchain.is_cross() then
         cmd[#cmd + 1] = "-DCMAKE_TOOLCHAIN_FILE=" .. o.toolchain
     end
     for _, k in ipairs(util.keys(defines)) do
         cmd[#cmd + 1] = "-D" .. k .. "=" .. tostring(defines[k])
     end
     for _, a in ipairs(args) do
+        cmd[#cmd + 1] = tostring(a)
+    end
+    -- Cross toolchain comes last: dedup_defines keeps it, and it chain-loads
+    -- any port/project toolchain instead of dropping dependency injection.
+    for _, a in ipairs(crossArgs) do
         cmd[#cmd + 1] = tostring(a)
     end
     exec(dedup_defines(cmd), { cwd = o.src, log = o.log, env = env })

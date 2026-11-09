@@ -13,6 +13,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
+#include <cctype>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -42,8 +43,31 @@ std::string jsonQuote(const std::string& s) {
     return out;
 }
 
+std::vector<std::string> splitFlags(const std::string& text) {
+    std::vector<std::string> out;
+    std::string current;
+    char quote = 0;
+    for (char ch : text) {
+        if (quote) {
+            if (ch == quote) quote = 0;
+            else current += ch;
+        } else if (ch == '\'' || ch == '"') {
+            quote = ch;
+        } else if (std::isspace(static_cast<unsigned char>(ch))) {
+            if (!current.empty()) {
+                out.push_back(current);
+                current.clear();
+            }
+        } else {
+            current += ch;
+        }
+    }
+    if (!current.empty()) out.push_back(current);
+    return out;
+}
+
 bool isCxxName(const std::string& base) {
-    for (const char* needle : {"c++", "cxx", "g++", "clang++", "cpp"}) {
+    for (const char* needle : {"c++", "cxx", "g++", "clang++", "clang-cl", "cpp"}) {
         if (base.find(needle) != std::string::npos) {
             return true;
         }
@@ -64,13 +88,27 @@ int main(int argc, char** argv) {
 
     const char* real = std::getenv(cxx ? "GCPKG_CXX_REAL" : "GCPKG_CC_REAL");
     if (!real || !*real) {
-        real = cxx ? "c++" : "cc";
+        real = cxx ? "clang++" : "clang";
     }
 
     std::vector<std::string> args;
     args.emplace_back(real);
     for (int i = 1; i < argc; ++i) {
         args.emplace_back(argv[i] ? argv[i] : "");
+    }
+    // Cross flags travel in a dedicated variable so CMake/Meson/Makefile CFLAGS
+    // cannot make us lose --target/--sysroot. Deduplicate against argv: many
+    // build systems already got the same flags from toolchain.env().
+    const char* extra = std::getenv("GCPKG_COMPILER_FLAGS");
+    if (extra && *extra) {
+        auto insertPos = args.begin() + 1;
+        for (const auto& flag : splitFlags(extra)) {
+            bool exists = false;
+            for (std::size_t i = 1; i < args.size(); ++i) {
+                if (args[i] == flag) { exists = true; break; }
+            }
+            if (!exists) insertPos = args.insert(insertPos, flag) + 1;
+        }
     }
 
     const char* log = std::getenv("GCPKG_INTERCEPT_LOG");

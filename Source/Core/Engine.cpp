@@ -392,12 +392,43 @@ int l_nproc(lua_State* L) {
     return 1;
 }
 
+std::string compilerBaseName(const std::string& value) {
+    std::string out = value;
+    const std::size_t slash = out.find_last_of("/\\");
+    if (slash != std::string::npos) out = out.substr(slash + 1);
+    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    if (out.size() > 4 && out.substr(out.size() - 4) == ".exe") out.resize(out.size() - 4);
+    return out;
+}
+
+bool implicitCompilerDefault(const std::string& value) {
+    if (value.find("gcpkg-intercept") != std::string::npos) return true;
+    const std::string base = compilerBaseName(value);
+    for (const char* name : {"cc", "c++", "gcc", "g++", "cl", "cl.exe", "msvc"}) {
+        if (base == name) return true;
+    }
+    return false;
+}
+
 int l_compiler(lua_State* L) {
     bool cxx = lua_isstring(L, 1) && std::string(lua_tostring(L, 1)) == "cxx";
+    // Lua/toolchain.lua overrides gcpkg.sys.compiler in normal operation. This
+    // C++ fallback must still never silently choose gcc or MSVC.
+    const char* explicitEnv = std::getenv(cxx ? "GCPKG_CXX" : "GCPKG_CC");
+    if (explicitEnv && *explicitEnv && !implicitCompilerDefault(explicitEnv)) {
+        lua_pushstring(L, explicitEnv);
+        return 1;
+    }
     const char* envName = cxx ? "CXX" : "CC";
-    const char* fallback = cxx ? "c++" : "cc";
     const char* v = std::getenv(envName);
-    lua_pushstring(L, (v && *v) ? v : fallback);
+    if (v && *v && !implicitCompilerDefault(v)) {
+        lua_pushstring(L, v);
+        return 1;
+    }
+    const char* fallback = cxx ? "clang++" : "clang";
+    lua_pushstring(L, fallback);
     return 1;
 }
 

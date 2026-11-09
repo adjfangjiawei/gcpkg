@@ -18,13 +18,13 @@ gcpkg 不替换项目或上游库的构建系统。它为每个 port 选择 adap
 
 ## CMake
 
-port 可在 `cmake.defines` 中写上游选项，并通过 `CMAKE_PREFIX_PATH` 自动获得已安装依赖 prefix。项目模式使用 `gcpkg-toolchain.cmake` 与 `gcpkg-cache.cmake`，把 include、libdir、libs 与链接 flags 注入 CMake。用户已有 toolchain 会通过 `GCPKG_CHAINLOAD_TOOLCHAIN_FILE` 保留。
+port 可在 `cmake.defines` 中写上游选项，并通过 `CMAKE_PREFIX_PATH` 自动获得已安装依赖 prefix。项目模式使用 `gcpkg-toolchain.cmake` 与 `gcpkg-cache.cmake`，把 include、libdir、libs 与链接 flags 注入 CMake。用户已有 toolchain 会通过 `GCPKG_CHAINLOAD_TOOLCHAIN_FILE` 保留。交叉编译时另外生成 `<store>/toolchain-<triple>.cmake`，设置 `CMAKE_SYSTEM_NAME/PROCESSOR`、clang 编译器、`*_COMPILER_TARGET` 与 `CMAKE_SYSROOT`，并 chain-load 端口/项目原 toolchain。
 
 CMake 4 移除了对 `cmake_minimum_required(VERSION < 3.5)` 的兼容。引擎检测到 CMake 主版本大于等于 4 时，会统一传入 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`，并在注入环境、configure / build / install 子进程中设置同名环境变量；用户显式提供的 `-D` 或环境变量优先。adapter 还对重复的 `-DNAME=VALUE` 去重（最后一个生效）：菜谱默认值与特性参数可以写同名选项，最终命令行只出现一次。以上对所有 CMake port 与内层构建生效，不需要为某个上游库打补丁。
 
 ## Meson
 
-`gcpkg-meson.ini` 提供编译 / 链接参数与 `cmake_prefix_path`。Meson 原生 compdb、prefix 与 sysconfdir / localstatedir 都按 gcpkg store 布局设置。
+`gcpkg-meson.ini` 提供编译 / 链接参数与 `cmake_prefix_path`。Meson 原生 compdb、prefix 与 sysconfdir / localstatedir 都按 gcpkg store 布局设置。交叉时生成 `gcpkg-cross.ini` / `<store>/meson-<triple>.ini`，包含 `[binaries]`、`c_args/cpp_args` 与 `[host_machine]`，以 `--cross-file` 下发。
 
 ## GN
 
@@ -32,7 +32,7 @@ CMake 4 移除了对 `cmake_minimum_required(VERSION < 3.5)` 的兼容。引擎�
 
 ## Makefile 与 Autotools
 
-命令行变量覆盖 `CC/CXX/CPPFLAGS/LDFLAGS/LDLIBS/PREFIX`，因此 Makefile 里写死的 `CC=gcc` 也会经过拦截层。Autotools 使用 `--prefix` 安装到该 port 的 prefix；需要 `autoreconf -fi` 的上游可写 `pre_build`。
+命令行变量覆盖 `CC/CXX/CPPFLAGS/LDFLAGS/LDLIBS/PREFIX`，因此 Makefile 里写死的 `CC=gcc` 也会先被 wrapper 接管，再转发给实际选中的 clang（不是 gcc）。Autotools 使用 `--prefix` 安装到该 port 的 prefix；交叉时自动追加 `--host=<target>` / `--build=<host>`；需要 `autoreconf -fi` 的上游可写 `pre_build`。
 
 ## 头文件库
 

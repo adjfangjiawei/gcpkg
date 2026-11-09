@@ -3,6 +3,7 @@
 -- translation units appear in compile_commands.json alongside dependencies.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
+local toolchain = require("gcpkg.toolchain")
 local M = {}
 
 local function flags(o)
@@ -31,7 +32,12 @@ function M.compile(o)
     for _, src in ipairs(o.sources or {}) do
         local absSrc = util.abs(src, cwd)
         local obj = util.join(outdir, util.stem(absSrc) .. ".o")
-        local cmd = { compiler, "-c", absSrc, "-o", obj }
+        local cmd = { compiler }
+        for _, f in ipairs(toolchain.flags()) do cmd[#cmd + 1] = f end
+        cmd[#cmd + 1] = "-c"
+        cmd[#cmd + 1] = absSrc
+        cmd[#cmd + 1] = "-o"
+        cmd[#cmd + 1] = obj
         for _, a in ipairs(tail) do
             cmd[#cmd + 1] = a
         end
@@ -48,6 +54,7 @@ function M.link(o)
     local cwd = util.abs(o.cwd or fs.cwd())
     local compiler = o.compiler or gcpkg.sys.compiler(o.cxx and "cxx" or "cc")
     local cmd = { compiler }
+    for _, f in ipairs(toolchain.flags()) do cmd[#cmd + 1] = f end
     for _, obj in ipairs(o.objects or {}) do
         cmd[#cmd + 1] = obj
     end

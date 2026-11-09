@@ -13,6 +13,7 @@ local inject = require("gcpkg.inject")
 local inner = require("gcpkg.inner")
 local compdb = require("gcpkg.compdb")
 local port = require("gcpkg.port")
+local toolchain = require("gcpkg.toolchain")
 local workspace = require("gcpkg.workspace")
 local storeMod = require("gcpkg.store")
 local features = require("gcpkg.features")
@@ -354,10 +355,11 @@ function M.submodule(root, action, opts)
 end
 
 local function compilerValue(kind, fallback)
-    local v = gcpkg.sys.compiler(kind)
-    if not v or v == "" or v:find("gcpkg-intercept") or
+    local ok, v = pcall(gcpkg.sys.compiler, kind)
+    if not ok or not v or v == "" or v:find("gcpkg-intercept") or
        v:find("/cc$") or v:find("/c%+%+$") then
-        return fallback
+        local ok2, real = pcall(toolchain.compiler_for_files, kind)
+        return (ok2 and real) or (kind == "cxx" and "clang++" or "clang")
     end
     return v
 end
@@ -480,7 +482,8 @@ local function makeContext(root, r, dir, injection, buildDir, prefix, jsonl, log
     local ccLink, cxxLink = util.join(binDir, "cc"), util.join(binDir, "c++")
     fs.symlink(gcpkg.sys.wrapper_bin(), ccLink)
     fs.symlink(gcpkg.sys.wrapper_bin(), cxxLink)
-    local interceptEnv = util.merge(proxy.env(), injection.env, {
+    local injectBase = util.merge(proxy.env(), injection.env)
+    local interceptEnv = util.merge(injectBase, toolchain.env(injectBase), {
         CC = ccLink, CXX = cxxLink,
         GCPKG_CC_REAL = compilerValue("cc", "cc"),
         GCPKG_CXX_REAL = compilerValue("cxx", "c++"),
@@ -495,7 +498,8 @@ local function makeContext(root, r, dir, injection, buildDir, prefix, jsonl, log
         includes = injection.flags.includes, libdirs = injection.flags.libdirs,
         libs = injection.flags.libs, defines = injection.flags.defines,
         link_flags = injection.flags.link_flags, dependencies = ordered,
-        features = cfg.requests or {}, arch = gcpkg.sys.arch(), os = gcpkg.sys.os(),
+        features = cfg.requests or {}, arch = toolchain.target_arch(),
+        os = toolchain.target_os(),
         compiler = { cc = compilerValue("cc", "cc"), cxx = compilerValue("cxx", "c++"),
                      wrapper_cc = ccLink, wrapper_cxx = cxxLink },
     }
@@ -612,12 +616,18 @@ function M.build(root, cfg, opts)
             local ctx = makeContext(root, r, dir, injection, buildDir, prefix,
                                     jsonl, logPath, cfg, ordered)
             if not opts.inject_only then
+                toolchain.describe_once()
+                local buildStart = gcpkg.sys.now and gcpkg.sys.now() or nil
                 local result = inner.run(ctx, {
                     systems = systems, commands = r.commands,
                     conan_cmd = r.conan_cmd, canon_cmd = r.canon_cmd,
                     cmd = opts.cmd,
                     build_dir = buildDir, install_prefix = prefix,
                 })
+                if buildStart and gcpkg.sys.now then
+                    log.info("  compiled in " ..
+                             string.format("%.1fs", gcpkg.sys.now() - buildStart))
+                end
                 local entries = mergeCompdb(jsonl, result.compdb_files or {}, ordered)
                 compdb.write(entries, util.join(g, "compdb", r.name .. ".json"))
                 allEntries = util.concat(allEntries, entries)

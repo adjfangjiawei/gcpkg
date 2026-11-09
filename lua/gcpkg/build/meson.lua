@@ -11,6 +11,7 @@
 -- --no-cache / a changed recipe works without deleting anything.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
+local toolchain = require("gcpkg.toolchain")
 local M = {}
 
 function M.all(o)
@@ -40,8 +41,15 @@ function M.all(o)
     for k, v in pairs(o.options or {}) do
         setup[#setup + 1] = "-D" .. tostring(k) .. "=" .. tostring(v)
     end
+    local hasCross = false
     for _, a in ipairs(o.args or {}) do
         setup[#setup + 1] = tostring(a)
+        if tostring(a):match("^%-%-cross%-file") then hasCross = true end
+    end
+    if not hasCross then
+        for _, a in ipairs(toolchain.meson_args()) do
+            setup[#setup + 1] = tostring(a)
+        end
     end
 
     exec(setup, { cwd = src, log = o.log, env = o.env })

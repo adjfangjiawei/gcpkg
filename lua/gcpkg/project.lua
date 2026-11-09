@@ -16,6 +16,7 @@ local workspace = require("gcpkg.workspace")
 local proxy = require("gcpkg.proxy")
 local inject = require("gcpkg.inject")
 local inner = require("gcpkg.inner")
+local toolchain = require("gcpkg.toolchain")
 local M = {}
 
 local function load(project_dir)
@@ -160,7 +161,8 @@ function M.build(projectDir, cfg, opts)
     local ccLink, cxxLink = util.join(binDir, "cc"), util.join(binDir, "c++")
     fs.symlink(wrapper, ccLink)
     fs.symlink(wrapper, cxxLink)
-    local interceptEnv = util.merge(proxy.env(), injection.env, {
+    local injectBase = util.merge(proxy.env(), injection.env)
+    local interceptEnv = util.merge(injectBase, toolchain.env(injectBase), {
         CC = ccLink,
         CXX = cxxLink,
         GCPKG_CC_REAL = gcpkg.sys.compiler("cc"),
@@ -189,8 +191,8 @@ function M.build(projectDir, cfg, opts)
         link_flags = util.uniq(linkFlags),
         dependencies = ordered,
         features = requests,
-        arch = gcpkg.sys.arch(),
-        os = gcpkg.sys.os(),
+        arch = toolchain.target_arch(),
+        os = toolchain.target_os(),
         intercept_log = jsonl,
         compdb_log = jsonl,
         env = interceptEnv,
@@ -229,8 +231,14 @@ function M.build(projectDir, cfg, opts)
         if type(spec.build) ~= "function" then
             error(projectDir .. "/gcpkg.lua must define build(ctx), or remove it to auto-drive the inner build system")
         end
+        toolchain.describe_once()
         log.step("building project " .. ctx.name)
+        local buildStart = gcpkg.sys.now and gcpkg.sys.now() or nil
         local extras = spec.build(ctx) or {}
+        if buildStart and gcpkg.sys.now then
+            log.info("  compiled in " ..
+                     string.format("%.1fs", gcpkg.sys.now() - buildStart))
+        end
         for _, extra in ipairs(extras.compdb_files or {}) do
             -- returned by build() so e.g. a CMake-driven project can contribute
             jsonl = util.join(gdir, "compdb", "project.jsonl")

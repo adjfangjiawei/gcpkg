@@ -10,6 +10,13 @@ local yaml = require("gcpkg.yaml")
 local json = require("gcpkg.json")
 local M = {}
 
+local TOOLCHAIN_KEYS = { "cc", "cxx", "target", "triple", "sysroot",
+                         "cross_prefix", "llvm_home" }
+local function contains(list, value)
+    for _, v in ipairs(list) do if v == value then return true end end
+    return false
+end
+
 local function getenv(key)
     return gcpkg.sys.getenv(key) or ""
 end
@@ -38,6 +45,30 @@ end
 
 function M.read()
     return yaml.parse_file(M.path()) or {}
+end
+
+-- compiler:/toolchain: blocks are the canonical user/project toolchain config;
+-- flat keys are accepted for compatibility. Nested blocks win over flat keys.
+function M.toolchain_block(y)
+    y = type(y) == "table" and y or {}
+    local out = {}
+    for _, key in ipairs(TOOLCHAIN_KEYS) do
+        if type(y[key]) == "string" and y[key] ~= "" then out[key] = y[key] end
+    end
+    for _, block in ipairs({ y.compiler, y.toolchain }) do
+        if type(block) == "table" then
+            for _, key in ipairs(TOOLCHAIN_KEYS) do
+                if type(block[key]) == "string" and block[key] ~= "" then
+                    out[key] = block[key]
+                end
+            end
+        end
+    end
+    return out
+end
+
+function M.read_toolchain()
+    return M.toolchain_block(M.read() or {})
 end
 
 function M.store()
@@ -80,6 +111,60 @@ end
 function M.unset_store()
     local lines = without_store(fs.lines(M.path()))
     fs.write(M.path(), table.concat(lines, "\n") .. "\n")
+end
+
+local function without_toolchain_block(lines)
+    local out, skipping = {}, false
+    for _, line in ipairs(lines or {}) do
+        if line:match("^%s*compiler%s*:") or line:match("^%s*toolchain%s*:") then
+            skipping = true
+        elseif skipping then
+            if line:match("^%s*$") or line:match("^%s+") then
+                -- drop the old block's indented keys / blank lines
+            else
+                skipping = false
+                out[#out + 1] = line
+            end
+        else
+            local top = line:match("^([%w_]+)%s*:")
+            if not (top and contains(TOOLCHAIN_KEYS, top)) then
+                out[#out + 1] = line
+            end
+        end
+    end
+    return out
+end
+
+-- Persist one compiler/cross/LLVM key without destroying `store:` or other
+-- user-level YAML. `value == nil` removes the key.
+function M.set_toolchain_value(key, value)
+    assert(contains(TOOLCHAIN_KEYS, key), "unknown toolchain key: " .. tostring(key))
+    local t = M.read_toolchain()
+    if value == nil then
+        t[key] = nil
+    else
+        value = expand(value)
+        if key == "llvm_home" and not fs.isdir(value) then
+            error("LLVM home does not exist: " .. value)
+        end
+        t[key] = value
+    end
+    local lines = without_toolchain_block(fs.lines(M.path()))
+    local body = {}
+    for _, k in ipairs(TOOLCHAIN_KEYS) do
+        if t[k] then body[#body + 1] = "  " .. k .. ": " .. json.encode(tostring(t[k])) end
+    end
+    local text = table.concat(lines, "\n")
+    if text ~= "" then text = text .. "\n" end
+    if #body > 0 then
+        text = text .. "compiler:\n" .. table.concat(body, "\n") .. "\n"
+    end
+    fs.write(M.path(), text)
+    return t[key]
+end
+
+function M.unset_toolchain_value(key)
+    return M.set_toolchain_value(key, nil)
 end
 
 -- Precedence, highest first: --store, GCPKG_STORE, GCPKG_HOME, persistent

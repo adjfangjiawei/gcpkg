@@ -6,6 +6,7 @@ local proxy = require("gcpkg.proxy")
 local config = require("gcpkg.config")
 local managed = require("gcpkg.managed")
 local meta = require("gcpkg.meta")
+local toolchain = require("gcpkg.toolchain")
 local M = {}
 
 local USAGE = [[
@@ -38,6 +39,9 @@ Build / inspection:
   gcpkg graph PORT                  print the bottom-up build order for a port
   gcpkg check                       validate all ports (files + dependencies)
   gcpkg doctor                      show toolchain / paths / wrapper status
+  gcpkg toolchain                   show selected compilers + cross settings
+  gcpkg llvm show|use DIR|unset|install [VERSION]
+                                    LLVM binary toolchain (no source build)
   gcpkg port new NAME               scaffold build.lua + features.yaml
 
 Managed workspaces (outer gcpkg / inner CMake, GN, Meson, Conan, Makefile):
@@ -68,6 +72,12 @@ Options:
                                    $GCPKG_HOME, user config, or ~/.gcpkg)
   --ports=DIR[:DIR...]             public port registry roots
   --share=DIR                      engine root (contains lua/ and ports/)
+  --cc=CMD, --cxx=CMD              explicit C/C++ compilers (highest priority)
+  --target=TRIPLE, --triple=TRIPLE cross target (e.g. aarch64-linux-gnu)
+  --sysroot=DIR                    target sysroot
+  --cross-prefix=PREFIX            cross binutils prefix (default TRIPLE-)
+  --llvm-home=DIR                  select an installed LLVM/Clang binary tree
+  --llvm-version=N                 version for `gcpkg llvm install`
   --feature=PORT:NAME, -f ...      enable a feature (prefix '-' disables it)
   -j N, --jobs=N                   parallel jobs
   --no-cache                       force rebuild even if the store is fresh
@@ -103,6 +113,11 @@ Examples:
   gcpkg workspace sync -C ws && gcpkg workspace build -C ws
   gcpkg inject apps/demo --install --system=cmake
   gcpkg build apps/demo --system=conan,cmake
+  gcpkg toolchain
+  gcpkg llvm show
+  gcpkg llvm install 23 --dry-run
+  gcpkg llvm use /usr/lib/llvm-23
+  gcpkg build apps/demo --target=aarch64-linux-gnu --sysroot=/srv/sysroot
 ]]
 
 local function parse(args)
@@ -144,6 +159,38 @@ local function parse(args)
             o.store = a:match("^--store=(.*)$")
         elseif a == "--store" then
             o.store = nextval()
+        elseif a:match("^--cc=") then
+            o.cc = a:match("^--cc=(.*)$")
+        elseif a == "--cc" then
+            o.cc = nextval()
+        elseif a:match("^--cxx=") then
+            o.cxx = a:match("^--cxx=(.*)$")
+        elseif a == "--cxx" then
+            o.cxx = nextval()
+        elseif a:match("^--target=") then
+            o.target = a:match("^--target=(.*)$")
+        elseif a == "--target" then
+            o.target = nextval()
+        elseif a:match("^--triple=") then
+            o.triple = a:match("^--triple=(.*)$")
+        elseif a == "--triple" then
+            o.triple = nextval()
+        elseif a:match("^--sysroot=") then
+            o.sysroot = a:match("^--sysroot=(.*)$")
+        elseif a == "--sysroot" then
+            o.sysroot = nextval()
+        elseif a:match("^--cross-prefix=") then
+            o.cross_prefix = a:match("^--cross-prefix=(.*)$")
+        elseif a == "--cross-prefix" then
+            o.cross_prefix = nextval()
+        elseif a:match("^--llvm-home=") then
+            o.llvm_home = a:match("^--llvm-home=(.*)$")
+        elseif a == "--llvm-home" then
+            o.llvm_home = nextval()
+        elseif a:match("^--llvm-version=") then
+            o.llvm_version = a:match("^--llvm-version=(.*)$")
+        elseif a == "--llvm-version" then
+            o.llvm_version = nextval()
         elseif a:match("^--ports=") then
             o.ports = a:match("^--ports=(.*)$")
         elseif a == "--ports" then
@@ -291,11 +338,77 @@ local function doctor(cfg, o)
     local wrapper = gcpkg.sys.wrapper_bin()
     log.info("compiler interceptor: " .. wrapper ..
              (fs.isfile(wrapper) and " [ok]" or " [MISSING]"))
-    for _, tool in ipairs({ "cc", "c++", "make", "cmake", "perl", "curl", "tar",
-                            "pkg-config", "ninja", "meson", "git" }) do
+    toolchain.describe()
+    for _, tool in ipairs({ "clang", "clang++", "llvm-ar", "cmake", "make",
+                            "perl", "curl", "tar", "pkg-config", "ninja",
+                            "meson", "git" }) do
         log.info(string.format("  %-12s %s", tool, gcpkg.have(tool) and "ok" or "missing"))
     end
     return 0
+end
+
+local function llvmCli(o, cfg)
+    local log = require("gcpkg.log")
+    local action = o.positional[2] or "show"
+    local version = o.llvm_version or o.positional[3] or ""
+    local installer = "wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && " ..
+                      "sudo ./llvm.sh " .. (version ~= "" and version or "<version>")
+    if action == "show" then
+        local ok, roots = pcall(toolchain.llvm_roots)
+        if not ok or type(roots) ~= "table" then roots = {} end
+        local shown = {}
+        for i = 1, math.min(5, #roots) do shown[#shown + 1] = roots[i] end
+        log.step("LLVM binary toolchain (no source build):")
+        log.info("  platform          : " .. toolchain.normalize_platform() ..
+                 " (WSL == linux)")
+        log.info("  selected home     : " ..
+                 (toolchain.llvm_home() or roots[1] or "(none)"))
+        log.info("  config            : " .. config.path())
+        if #shown > 0 then
+            for _, root in ipairs(shown) do
+                log.info("  detected          : " .. root)
+            end
+        else
+            log.info("  detected          : (none)")
+        end
+        log.info("  official installer: " .. installer)
+        log.info("  select after install: gcpkg llvm use /usr/lib/llvm-<version>")
+        log.info("  external port     : gcpkg install llvm")
+        return 0
+    elseif action == "use" then
+        local path = o.positional[3]
+        if not path then error("gcpkg llvm use needs a directory") end
+        local absolute = config.set_toolchain_value("llvm_home", path)
+        log.step("LLVM home set to " .. absolute)
+        log.info("  config: " .. config.path())
+        log.info("  next  : gcpkg toolchain / gcpkg install llvm")
+        return 0
+    elseif action == "unset" then
+        config.unset_toolchain_value("llvm_home")
+        log.step("LLVM home selection removed")
+        return 0
+    elseif action == "install" then
+        local script = util.join(cfg.share or gcpkg.sys.share(), "tools",
+                                 "llvm-install.sh")
+        log.step("LLVM official binary installer (no source build):")
+        log.info("  " .. installer)
+        log.info("  script: " .. script)
+        if o.dry_run then
+            log.info("  dry run: not executing " .. script)
+            return 0
+        end
+        if toolchain.normalize_platform() == "windows" then
+            log.warn("  native Windows: install LLVM binaries, then `gcpkg llvm use <dir>`")
+            return 0
+        end
+        if not fs.isfile(script) then error("missing installer helper: " .. script) end
+        local argv = { script }
+        if version ~= "" then argv[#argv + 1] = version end
+        gcpkg.exec(argv)
+        return 0
+    end
+    error("unknown llvm action '" .. tostring(action) ..
+          "' (expected show|use|unset|install)")
 end
 
 local function project_dir(o)
@@ -457,6 +570,17 @@ function M.main(args)
     local st = storeMod.new(storeRoot)
     st.source = storeSource
     gcpkg.sys.add_root(util.join(st.root, "lua"))
+    local wsRoot = managed.find_root(o.dir or fs.cwd())
+    local wy = wsRoot and workspace.read_yaml(util.join(wsRoot, "workspace.yaml")) or {}
+    toolchain.configure({
+        cc = o.cc, cxx = o.cxx,
+        target = o.target, triple = o.triple,
+        sysroot = o.sysroot, cross_prefix = o.cross_prefix,
+        llvm_home = o.llvm_home,
+        project = util.merge(config.toolchain_block(wy), config.toolchain_block(py)),
+        user = config.read_toolchain(),
+        state_dir = st.root,
+    })
     local cfg = {
         store = st, ports = roots, requests = o.requests, jobs = o.jobs,
         no_cache = o.no_cache, share = o.share or gcpkg.sys.share(),
@@ -469,6 +593,12 @@ function M.main(args)
 
     if cmd == "workspace" then
         return workspaceCli(o, cfg)
+    elseif cmd == "toolchain" then
+        toolchain.validate()
+        toolchain.describe()
+        return 0
+    elseif cmd == "llvm" then
+        return llvmCli(o, cfg)
     elseif cmd == "sync" or cmd == "update" then
         meta.sync(managedRoot(o), cfg,
                   util.merge(o, { update = (cmd == "update" or o.update == true) }))
@@ -621,8 +751,12 @@ function M.main(args)
             if sdk then
                 n = n + 1
                 local set = os.getenv(sdk.env or "") and "set" or "unset"
+                local detail = sdk.url or sdk.description or ""
+                if sdk.installer then
+                    detail = detail .. " | install: " .. sdk.installer
+                end
                 log.info(string.format("  %-16s %-28s %-6s %s", name,
-                    sdk.env or "?", set, sdk.url or sdk.description or ""))
+                    sdk.env or "?", set, detail))
             end
         end
         log.step(n .. " external SDK ports (point the env var at the SDK before install)")

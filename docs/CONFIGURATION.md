@@ -18,10 +18,17 @@ $XDG_CONFIG_HOME/gcpkg/config.yaml
 ~/.config/gcpkg/config.yaml
 ```
 
-三者按此顺序选择。文件目前只需一个键：
+三者按此顺序选择。`store` 与编译器/交叉编译配置可以共存：
 
 ```yaml
 store: "/absolute/path/to/store"
+compiler:
+  cc: "/usr/lib/llvm-23/bin/clang-23"
+  cxx: "/usr/lib/llvm-23/bin/clang++-23"
+  llvm_home: "/usr/lib/llvm-23"
+  target: "aarch64-linux-gnu"
+  sysroot: "/srv/aarch64/sysroot"
+  cross_prefix: "aarch64-linux-gnu-"
 ```
 
 命令行参数与环境变量都可以在单次调用中覆盖持久化配置：
@@ -48,6 +55,21 @@ store: "/absolute/path/to/store"
 
 `gcpkg doctor` 会列出实际 roots。覆盖同名 port 时，第一个命中的目录生效。
 
+## 编译器与交叉编译
+
+默认永远是 clang（包括 `clang-23` / `clang++-23` 这类带版本名），不会隐式选 gcc/MSVC。优先级为 CLI > 项目 `gcpkg.yaml`/`workspace.yaml` > 用户 `config.yaml` > 环境变量 > 自动探查：
+
+```bash
+gcpkg toolchain
+gcpkg build . --cc=/usr/bin/clang-23 --cxx=/usr/bin/clang++-23
+gcpkg build . --target=aarch64-linux-gnu --sysroot=/srv/sysroot
+gcpkg llvm show
+gcpkg llvm install 23 --dry-run
+gcpkg llvm use /usr/lib/llvm-23
+```
+
+`llvm` 是外部二进制工具 port，不从源码编译；`tools/llvm-install.sh` 使用 `wget https://apt.llvm.org/llvm.sh`。Windows 静态策略同样为 clang、拒绝 `cl.exe`/MSVC；WSL 与 Linux 完全同一路径。完整说明见 [TOOLCHAIN.md](TOOLCHAIN.md)。
+
 ## 代理
 
 ```bash
@@ -71,7 +93,13 @@ gcpkg install curl --no-proxy
 | `GCPKG_PROXY` / `GCPKG_NO_PROXY` | 会话级代理 |
 | `GCPKG_PROXY_CHECK` | 设为 `0` 跳过代理监听预检 |
 | `GCPKG_RUST_HOME` | Rust 工具链位置，供 external port 使用 |
+| `GCPKG_LLVM_HOME` / `LLVM_HOME` | LLVM/Clang 二进制根目录 |
+| `GCPKG_CC` / `GCPKG_CXX` | 显式编译器选择 |
+| `GCPKG_TARGET` / `GCPKG_TRIPLE` | 交叉目标三元组 |
+| `GCPKG_SYSROOT` | 目标 sysroot |
+| `GCPKG_CROSS_PREFIX` | 交叉 binutils 前缀（默认 `<target>-`） |
+| `GCPKG_COMPILER_FLAGS` | 拦截层注入真实编译器 argv 的 `--target` / `--sysroot` |
 | `XDG_CONFIG_HOME` | 用户级配置根目录 |
-| `CC` / `CXX` | 构建使用的编译器；gcpkg 会保留并追加拦截层所需的设置 |
+| `CC` / `CXX` | 仅在不是 `cc`/`gcc`/`cl.exe` 等默认值时视为显式选择；`CC/CXX` wrapper 仍由拦截层保留 |
 
 `gcpkg doctor` 是查看当前生效配置与工具链状态的入口。

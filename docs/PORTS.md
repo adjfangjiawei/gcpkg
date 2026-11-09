@@ -1,6 +1,6 @@
 # Port 目录
 
-注册表当前提供 **301 个 port**。每个 port 对应一个真实上游来源，由 `build.lua` 描述构建，由 `features.yaml` 描述特性与可选版本。
+注册表当前提供 **302 个 port**。每个 port 对应一个真实上游来源，由 `build.lua` 描述构建，由 `features.yaml` 描述特性与可选版本。
 
 ```bash
 gcpkg ports --ports ./ports
@@ -65,12 +65,12 @@ gcpkg versions zlib --ports ./ports
 
 ## 外部 SDK 与系统组件
 
-少数库需要登录或专有 SDK。`gcpkg externals` 列出这些 port 和对应环境变量；在本机设置变量后再安装即可。系统 `-dev` 组件通过 `pkgconfig` backend 接入，不走源码下载。
+少数库需要登录或专有 SDK。`gcpkg externals` 列出这些 port 和对应环境变量；在本机设置变量后再安装即可。`llvm` 也是外部 SDK port：它接入官方二进制 LLVM/Clang，不从源码编译；Linux/WSL 可用 `gcpkg llvm install 23`（内部调用 `wget https://apt.llvm.org/llvm.sh`），再用 `gcpkg llvm use DIR` 选择安装目录。系统 `-dev` 组件通过 `pkgconfig` backend 接入，不走源码下载。
 
 ## 完整目录
 
 <details>
-<summary>展开全部 301 个 port</summary>
+<summary>展开全部 302 个 port</summary>
 
 ### L0
 
@@ -202,6 +202,7 @@ gcpkg versions zlib --ports ./ports
 | `libxkbcommon` | 1.7.0 | — |
 | `libyaml` | 0.2.5 | — |
 | `live555` | 2021.11.14 | — |
+| `llvm` | system | — |
 | `lm-sensors` | 3.6.0 | — |
 | `lmdb` | 0.9.31 | — |
 | `lua` | 5.4.7 | — |

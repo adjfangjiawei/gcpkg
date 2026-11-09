@@ -24,12 +24,19 @@ local function resolve(sdk)
             return v, e
         end
     end
-    return sdk.default, sdk.env
+    local fallback = sdk.default
+    if type(fallback) == "function" then
+        local ok, value = pcall(fallback, sdk)
+        fallback = ok and value or nil
+    end
+    return fallback, sdk.env
 end
 
 local function hint(sdk)
-    return "set " .. tostring(sdk.env) .. "=/path/to/sdk" ..
-           (sdk.url and ("  (download: " .. sdk.url .. ")") or "")
+    local out = "set " .. tostring(sdk.env) .. "=/path/to/sdk"
+    if sdk.installer then out = out .. "; install: " .. sdk.installer end
+    if sdk.url then out = out .. "  (download: " .. sdk.url .. ")" end
+    return out
 end
 
 -- Build the port table. `spec.sdk` is also exposed verbatim so

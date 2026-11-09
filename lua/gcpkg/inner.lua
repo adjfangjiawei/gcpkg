@@ -11,6 +11,7 @@ local fs = require("gcpkg.fs")
 local util = require("gcpkg.util")
 local detect = require("gcpkg.detect")
 local log = require("gcpkg.log")
+local toolchain = require("gcpkg.toolchain")
 
 local M = {}
 
@@ -173,13 +174,17 @@ end
 local function runMeson(ctx, opts, compdb)
     local meson = require("gcpkg.build.meson")
     local files = ctx.inject.files
+    local mesonArgs = { "--native-file=" .. files.meson }
+    if toolchain.is_cross() and fs.isfile(files.cross_meson) then
+        mesonArgs[#mesonArgs + 1] = "--cross-file=" .. files.cross_meson
+    end
     local result = meson.all {
         src = ctx.project_dir,
         build_dir = util.abs(opts.build_dir or ctx.build_dir or files.build_dir),
         prefix = files.install_prefix,
         exec = ctx.exec, log = ctx.log, jobs = ctx.jobs,
         env = ctx.env, libdir = "lib", wrap_mode = "nodownload",
-        args = { "--native-file=" .. files.meson },
+        args = mesonArgs,
     }
     for _, p in ipairs(result.compdb_files or {}) do compdb[#compdb + 1] = p end
     collectCompdb(ctx, opts, compdb)
@@ -207,9 +212,13 @@ local function runMakefile(ctx, opts, compdb)
     local make = require("gcpkg.build.make")
     local files = ctx.inject.files
     local env = ctx.env or {}
+    local function compilerDefault(kind, fallback)
+        local ok, value = pcall(toolchain.compiler, kind)
+        return (ok and value and value ~= "" and value) or fallback
+    end
     local vars = {
-        CC = env.CC or (ctx.compiler or {}).wrapper_cc or "cc",
-        CXX = env.CXX or (ctx.compiler or {}).wrapper_cxx or "c++",
+        CC = env.CC or (ctx.compiler or {}).wrapper_cc or compilerDefault("cc", "clang"),
+        CXX = env.CXX or (ctx.compiler or {}).wrapper_cxx or compilerDefault("cxx", "clang++"),
         CPPFLAGS = env.CPPFLAGS or "", CFLAGS = env.CFLAGS or "",
         CXXFLAGS = env.CXXFLAGS or "", LDFLAGS = env.LDFLAGS or "",
         LDLIBS = env.LDLIBS or "", PREFIX = files.install_prefix,

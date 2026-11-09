@@ -15,6 +15,7 @@ gcpkg build apps/demo --system=conan,cmake
 | `gcpkg-toolchain.cmake` | CMake | toolchain、prefix、用户原 toolchain 的 chain-load |
 | `gcpkg-cache.cmake` | CMake | cache 变量与 `CMAKE_EXPORT_COMPILE_COMMANDS` |
 | `gcpkg-meson.ini` | Meson | native file 中的编译 / 链接参数与 `cmake_prefix_path` |
+| `gcpkg-cross.ini` | Meson（交叉） | `[binaries]`、cross flags、`[host_machine]`；以 `--cross-file` 使用 |
 | `gcpkg-gn.gni` / `gcpkg-gn-args.gn` | GN | 可声明的 `gcpkg_*` args |
 | `gcpkg-flags.mk` | GNU make | 原始 GNU make 变量，供 `-include` 使用 |
 | `gcpkg-env.sh` | 所有工具 | `GCPKG_*`、`CONAN_*` / 兼容 `CANON_*`、编译与链接 flags |
@@ -33,7 +34,8 @@ GCPKG_INSTALL_PREFIX / GCPKG_TARGET_TRIPLET / GCPKG_COMPILE_COMMANDS
 GCPKG_PREFIX_PATH / GCPKG_CMAKE_PREFIX_PATH / GCPKG_INCLUDE_PATH
 GCPKG_LIBRARY_PATH / GCPKG_BINARY_PATH / GCPKG_PKG_CONFIG_PATH
 GCPKG_CMAKE_TOOLCHAIN_FILE / GCPKG_CMAKE_CACHE_FILE
-GCPKG_MESON_NATIVE_FILE / GCPKG_GN_GNI / GCPKG_GN_ARGS_FILE / GCPKG_MAKE_FLAGS_FILE
+GCPKG_MESON_NATIVE_FILE / GCPKG_MESON_CROSS_FILE / GCPKG_GN_GNI / GCPKG_GN_ARGS_FILE / GCPKG_MAKE_FLAGS_FILE
+GCPKG_CMAKE_CROSS_FILE / GCPKG_CROSS_PREFIX / GCPKG_SYSROOT / GCPKG_COMPILER_FLAGS / GCPKG_LLVM_HOME
 GCPKG_DEPS_JSON / GCPKG_CONAN_JSON / GCPKG_CANON_JSON / GCPKG_ENV_FILE
 GCPKG_CPPFLAGS / GCPKG_CFLAGS / GCPKG_CXXFLAGS / GCPKG_LDFLAGS / GCPKG_LDLIBS
 
@@ -47,7 +49,7 @@ CONAN_PREFIX_PATH / CANON_INCLUDE_PATH / CONAN_LIBRARY_PATH / CANON_LINK_LIBRARI
 ## 各内层系统
 
 - **CMake**：使用 `-C gcpkg-cache.cmake` 注入 toolchain 与 prefix；链接库写入 `CMAKE_C_STANDARD_LIBRARIES` / `CMAKE_CXX_STANDARD_LIBRARIES`，保持静态库顺序。已有 toolchain 会转为 `GCPKG_CHAINLOAD_TOOLCHAIN_FILE`。
-- **Meson**：`--native-file=gcpkg-meson.ini` 提供编译 / 链接参数和 `cmake_prefix_path`，原生 compdb 直接合并。
+- **Meson**：`--native-file=gcpkg-meson.ini` 提供编译 / 链接参数和 `cmake_prefix_path`，原生 compdb 直接合并；交叉时追加 `--cross-file=gcpkg-cross.ini`。
 - **GN**：`CPATH`、`LIBRARY_PATH`、`PKG_CONFIG_PATH` 让硬编码编译器的 toolchain 找到依赖；`.gni` 与 args 文件供声明 `gcpkg_*` args 的项目使用。
 - **Makefile**：命令行变量覆盖 `CC/CXX/CPPFLAGS/LDFLAGS/LDLIBS/PREFIX`；`make install` 装入 `GCPKG_INSTALL_PREFIX`。
 - **Conan**：通过 `CONAN_*`、`gcpkg-conan.json`、`CONAN_CMD` 或 `commands.conan` 接入，不解析 Conan 输出，不改写 `conanfile.py` / `conanfile.txt`。详见 [CONAN.md](CONAN.md)。

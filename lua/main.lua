@@ -7,6 +7,10 @@ gcpkg.util = util
 gcpkg.path = util.join
 gcpkg.fs = require("gcpkg.fs")
 gcpkg.log = require("gcpkg.log")
+local toolchain = require("gcpkg.toolchain")
+gcpkg.toolchain = toolchain
+-- sys.compiler is the single compiler knob; the C++ fallback never picks gcc.
+gcpkg.sys.compiler = toolchain.compiler
 local exec = require("gcpkg.exec")
 gcpkg.exec = exec.run
 gcpkg.capture = exec.capture

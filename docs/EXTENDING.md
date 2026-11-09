@@ -94,7 +94,7 @@ port.build = function(ctx)
 end
 ```
 
-`ctx` 提供 `src`、`build_dir`、`prefix`、`exec`、`log`、`env`、`jobs`、`compiler`、`record`、`feature_args()`、`all_dependencies` 等字段。自定义 `build(ctx)` 仍需返回 `includes`、`libdirs`、`libs`、`binaries` 与可选 `compdb_files`。
+`ctx` 提供 `src`、`build_dir`、`prefix`、`exec`、`log`、`env`、`jobs`、`compiler`、`record`、`feature_args()`、`all_dependencies` 等字段。`ctx.compiler.cc/cxx` 是实际选中的 clang；`ctx.env` 已包含 target/sysroot flags 与 `GCPKG_COMPILER_FLAGS`，拦截层会把这些 flags 注入真实编译器 argv 并写进 compdb。自定义 `build(ctx)` 仍需返回 `includes`、`libdirs`、`libs`、`binaries` 与可选 `compdb_files`。
 
 ## features.yaml
 

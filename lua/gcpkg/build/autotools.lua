@@ -1,4 +1,5 @@
 local util = require("gcpkg.util")
+local toolchain = require("gcpkg.toolchain")
 local M = {}
 
 function M.configure(o)
@@ -8,6 +9,9 @@ function M.configure(o)
                   "--prefix=" .. (o.prefix or "/usr/local") }
     for _, a in ipairs(o.args or {}) do
         cmd[#cmd + 1] = tostring(a)
+    end
+    for _, a in ipairs(toolchain.autotools_args()) do
+        cmd[#cmd + 1] = a
     end
     exec(cmd, { cwd = cwd, log = o.log, env = o.env })
 end

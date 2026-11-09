@@ -8,6 +8,7 @@ local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local json = require("gcpkg.json")
 local yaml = require("gcpkg.yaml")
+local toolchain = require("gcpkg.toolchain")
 local features = require("gcpkg.features")
 local store = require("gcpkg.store")
 local compdb = require("gcpkg.compdb")
@@ -167,10 +168,13 @@ function M.dependency_env(ordered)
 end
 
 local function compilerValue(kind, fallback)
-    local v = gcpkg.sys.compiler(kind)
-    if not v or v == "" or v:find("gcpkg-intercept") or v:find("/cc$") or v:find("/c%+%+$") then
-        -- Guard against recursing into our own wrapper symlink.
-        return fallback
+    local ok, v = pcall(gcpkg.sys.compiler, kind)
+    if not ok or not v or v == "" or v:find("gcpkg-intercept") or
+       v:find("/cc$") or v:find("/c%+%+$") then
+        -- Guard against recursing into our own wrapper symlink. The fallback is
+        -- still clang, never cc/c++/gcc/MSVC.
+        local ok2, real = pcall(toolchain.compiler_for_files, kind)
+        return (ok2 and real) or (kind == "cxx" and "clang++" or "clang")
     end
     return v
 end
@@ -283,6 +287,7 @@ function M.install(spec_name, cfg)
         portName, version, f.hash,
         (type(spec.source) == "table" and (spec.source.url or spec.source.git or spec.source.dir)) or "custom",
         gcpkg.sys.os(), gcpkg.sys.arch(), table.concat(depKeys, ","),
+        "toolchain=" .. toolchain.fingerprint(),
         "build=" .. buildHash, "features=" .. featureHash,
     }))
 
@@ -329,7 +334,8 @@ function M.install(spec_name, cfg)
     fs.write(jsonl, "")
     local ccReal = compilerValue("cc", "cc")
     local cxxReal = compilerValue("cxx", "c++")
-    local env = util.merge(M.dependency_env(ordered), f.env, proxy.env(), {
+    local baseEnv = util.merge(M.dependency_env(ordered), f.env, proxy.env())
+    local env = util.merge(baseEnv, toolchain.env(baseEnv), {
         CC = ccLink,
         CXX = cxxLink,
         GCPKG_CC_REAL = ccReal,
@@ -350,8 +356,8 @@ function M.install(spec_name, cfg)
         store = st,
         log = logPath,
         jobs = cfg.jobs or gcpkg.sys.nproc(),
-        arch = gcpkg.sys.arch(),
-        os = gcpkg.sys.os(),
+        arch = toolchain.target_arch(),
+        os = toolchain.target_os(),
         features = f,
         env = env,
         dependencies = manifests,
@@ -402,8 +408,14 @@ function M.install(spec_name, cfg)
     if type(spec.build) ~= "function" then
         error(key .. "/build.lua must define build(ctx)")
     end
+    toolchain.describe_once()
     gcpkg.log.step("building " .. key .. " features=[" .. table.concat(f.list, ",") .. "]")
+    local buildStart = gcpkg.sys.now and gcpkg.sys.now() or nil
     local exports = spec.build(ctx) or {}
+    if buildStart and gcpkg.sys.now then
+        gcpkg.log.info("  compiled in " ..
+                       string.format("%.1fs", gcpkg.sys.now() - buildStart))
+    end
 
     -- 5. compilation database (intercepted + build-system-native ones).
     -- Rewrite the JSONL with the UNION so it is the single source of truth:
