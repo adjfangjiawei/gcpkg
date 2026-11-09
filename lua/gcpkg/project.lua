@@ -14,21 +14,47 @@ local compdb = require("gcpkg.compdb")
 local port = require("gcpkg.port")
 local workspace = require("gcpkg.workspace")
 local proxy = require("gcpkg.proxy")
+local inject = require("gcpkg.inject")
+local inner = require("gcpkg.inner")
 local M = {}
 
 local function load(project_dir)
     local luaPath = util.join(project_dir, "gcpkg.lua")
     local yamlPath = util.join(project_dir, "gcpkg.yaml")
-    if not fs.isfile(luaPath) then
-        error("no gcpkg.lua in " .. project_dir)
-    end
+    local y = yaml.parse_file(yamlPath) or {}
     gcpkg.sys.add_root(util.join(project_dir, "lua"))
     gcpkg.sys.add_root(util.join(project_dir, ".gcpkg", "lua"))
+    if not fs.isfile(luaPath) then
+        -- A project can be described by gcpkg.yaml alone.  gcpkg then drives
+        -- the project's OWN build systems (CMake, GN, Meson, canon, Makefile)
+        -- without ever rewriting its sources.
+        if not fs.isfile(yamlPath) then
+            error("no gcpkg.lua or gcpkg.yaml in " .. project_dir)
+        end
+        local auto = {
+            name = y.project or util.basename(project_dir),
+            version = y.version or "0",
+            dependencies = {},
+            systems = y.systems or y.system,
+            commands = y.commands or {},
+            canon_cmd = y.canon_cmd or y.cmd,
+        }
+        auto.build = function(ctx)
+            return inner.run(ctx, {
+                systems = ctx.cfg and (ctx.cfg.systems or ctx.cfg.system) or auto.systems,
+                commands = auto.commands,
+                canon_cmd = auto.canon_cmd,
+                cmd = ctx.cfg and ctx.cfg.cmd or nil,
+                build_dir = ctx.build_dir,
+                install_prefix = ctx.install_prefix,
+            })
+        end
+        return auto, y
+    end
     local spec = gcpkg.sys.loadchunk(luaPath)
     if type(spec) ~= "table" then
         error(luaPath .. " must return a table")
     end
-    local y = yaml.parse_file(yamlPath) or {}
     return spec, y
 end
 
@@ -102,11 +128,24 @@ function M.build(projectDir, cfg, opts)
 
     local gdir = util.join(projectDir, ".gcpkg")
     local buildDir = util.join(gdir, "build")
+    local installPrefix = util.abs(spec.install_prefix or y.install_prefix or
+                                   util.join(gdir, "install"), projectDir)
     local projectLog = util.join(gdir, "logs", "project.log")
     local jsonl = util.join(gdir, "compdb", "project.jsonl")
     fs.mkdirs(buildDir)
+    fs.mkdirs(installPrefix)
     fs.mkdirs(util.dirname(projectLog))
     fs.mkdirs(util.dirname(jsonl))
+    -- vcpkg-style injection: toolchain/cache/native files, env scripts,
+    -- pkg-config dir, CANON_* / GCPKG_* variables, all generated under .gcpkg.
+    local injection = inject.generate(ordered, {
+        out_dir = util.join(gdir, "inject"), project_dir = projectDir,
+        workspace_root = projectDir, project_name = spec.name or y.project or util.basename(projectDir),
+        build_dir = buildDir, install_prefix = installPrefix,
+        compdb = util.join(buildDir, "compile_commands.json"),
+        systems = cfg.systems or cfg.system or spec.systems or y.systems or y.system,
+        projects = spec.projects or y.projects or {},
+    })
     if opts.skip_build ~= true then
         fs.write(projectLog, "== gcpkg project " .. (spec.name or util.basename(projectDir)) .. " ==\n")
         fs.write(jsonl, "")
@@ -119,7 +158,7 @@ function M.build(projectDir, cfg, opts)
     local ccLink, cxxLink = util.join(binDir, "cc"), util.join(binDir, "c++")
     fs.symlink(wrapper, ccLink)
     fs.symlink(wrapper, cxxLink)
-    local interceptEnv = util.merge(proxy.env(), {
+    local interceptEnv = util.merge(proxy.env(), injection.env, {
         CC = ccLink,
         CXX = cxxLink,
         GCPKG_CC_REAL = gcpkg.sys.compiler("cc"),
@@ -135,6 +174,10 @@ function M.build(projectDir, cfg, opts)
         project_dir = projectDir,
         build_dir = buildDir,
         gcpkg_dir = gdir,
+        inject = injection,
+        inject_dir = injection.dir,
+        install_prefix = installPrefix,
+        cfg = cfg,
         log = projectLog,
         jobs = cfg.jobs or gcpkg.sys.nproc(),
         includes = util.uniq(includes),
@@ -164,7 +207,8 @@ function M.build(projectDir, cfg, opts)
     end
     ctx.capture = function(cmd, o)
         o = o or {}
-        return gcpkg.capture(cmd, { cwd = o.cwd or projectDir, env = o.env })
+        return gcpkg.capture(cmd, { cwd = o.cwd or projectDir,
+                                    env = util.merge(interceptEnv, o.env or {}) })
     end
     ctx.record = function(entry)
         return compdb.record(jsonl, entry)
@@ -177,10 +221,11 @@ function M.build(projectDir, cfg, opts)
         end
         return nil
     end
+    ctx.inner = function(o) return inner.run(ctx, o) end
 
     if opts.skip_build ~= true then
         if type(spec.build) ~= "function" then
-            error(projectDir .. "/gcpkg.lua must define build(ctx)")
+            error(projectDir .. "/gcpkg.lua must define build(ctx), or remove it to auto-drive the inner build system")
         end
         log.step("building project " .. ctx.name)
         local extras = spec.build(ctx) or {}

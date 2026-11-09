@@ -358,6 +358,16 @@ local function dependencies_block(deps)
     return out
 end
 
+local function render_list(v)
+    if type(v) == "table" then
+        if v[1] ~= nil then return v end
+        return util.keys(v)
+    end
+    local out = {}
+    for part in tostring(v or ""):gmatch("[^,%s]+") do out[#out + 1] = part end
+    return out
+end
+
 local function render(y, fallbackName)
     local roots = y.ports or { LOCAL_PORTS_DIR }
     if type(roots) == "string" then
@@ -388,6 +398,28 @@ local function render(y, fallbackName)
     else
         out[#out + 1] = "features:"
         dump_table(f, 2, out)
+    end
+    -- R13: preserve the OUTER/INNER split.  `gcpkg add/remove` rewrites the
+    -- managed dependency block but must never drop the project's own build
+    -- system declaration or its canon command configuration.
+    out[#out + 1] = ""
+    out[#out + 1] = "# Inner build systems managed by gcpkg (auto / cmake / gn / meson / canon / makefile / ninja)."
+    if y.system ~= nil then
+        out[#out + 1] = "system: " .. (type(y.system) == "table" and json.encode(y.system) or scalar(y.system))
+    end
+    if y.systems ~= nil then out[#out + 1] = "systems: " .. json.encode(render_list(y.systems)) end
+    if y.install_prefix ~= nil then out[#out + 1] = "install_prefix: " .. scalar(y.install_prefix) end
+    if y.build_dir ~= nil then out[#out + 1] = "build_dir: " .. scalar(y.build_dir) end
+    if y.canon_cmd ~= nil then
+        local cmd = y.canon_cmd
+        if type(cmd) == "string" then cmd = util.shellsplit(cmd) end
+        out[#out + 1] = "canon_cmd: " .. json.encode(cmd)
+    end
+    if type(y.commands) == "table" then
+        out[#out + 1] = "commands: " .. json.encode(y.commands)
+    end
+    if type(y.projects) == "table" then
+        out[#out + 1] = "projects: " .. json.encode(y.projects)
     end
     return table.concat(out, "\n") .. "\n"
 end

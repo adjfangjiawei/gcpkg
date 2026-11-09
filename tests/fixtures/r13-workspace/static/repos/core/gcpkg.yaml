@@ -1,0 +1,4 @@
+schema: 1
+project: core
+dependencies: []
+system: cmake

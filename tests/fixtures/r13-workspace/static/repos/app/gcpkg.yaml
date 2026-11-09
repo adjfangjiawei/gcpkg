@@ -1,0 +1,7 @@
+schema: 1
+project: app
+dependencies: []
+depends: [core]
+system: [canon, cmake]
+canon_cmd: ["canon", "install", "@canon@"]
+features: {}

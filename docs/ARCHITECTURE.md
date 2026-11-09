@@ -54,6 +54,8 @@ require("gcpkg.build.auto")       -- 探测上游构建系统后分派
 
 新构建系统 = 在 `lua/gcpkg/build/` 放一个 Lua 文件；port 里 `require` 它就获得对应构建函数。这正是"包含 cmake 就支持 cmake 构建函数"的含义。
 
+R13 起，分层图的用户数据还包括 `workspace.yaml` / `workspace.lock`，Lua 引擎还包括 `managed → meta → git` 的外层工作区链与 `inject → inner` 的内层系统链；详见第 16 节。
+
 ## 2. 数据模型
 
 ### 特性（features.yaml）
@@ -710,7 +712,28 @@ Crashpad 补 mini_chromium / LSS，TagLib 补 utfcpp，均不修改上游。
 **28 PASS / 0 FAIL、4527 条 compile commands**；项目模式合并 compdb 718 条。
 详见 `docs/GN.md` 与 `docs/ROUND12_LIBRARIES.md`。
 
-## 16. 构建 gcpkg 本体
+## 16. 第十三轮：外层托管工作区与内层依赖注入（2026-11-09）
+
+R13 不改变「一个库 = build.lua + features.yaml」和上游零修改原则，而是在它们之外加一层工作区：
+
+```text
+workspace.yaml / workspace.lock
+  → managed.lua（规范化、稳定拓扑、环检测、隐式边）
+  → meta.lua（sync/update/pin/build/inject、跨项目 prefix、统一 compdb）
+  → git.lua（clone/fetch/checkout/status、递归 submodule、gitlink pin）
+  → inject.lua（vcpkg 风格 toolchain/cache/native/gni/flags/env/canon JSON）
+  → inner.lua（CMake / GN / Meson / canon / Makefile / Ninja / none 串联）
+```
+
+`workspace.lock` 把 6 个仓库 commit、3 层递归 submodule pin、resolved package、构建顺序和 `systems` 全部固定下来。`sync` 默认优先使用已记录 commit，只有 `update` / `--update` 才接受 ref 变化；显式 `commit:` 永远优先。子模块 gitlink 与 lock 不一致时报错，要求用户显式更新。循环依赖由三色 DFS 拒绝，而不是乱序构建。
+
+内层系统由项目自己声明或 `detect.lua` 探测。`systems: [canon, cmake]` 会先跑用户自己的 `canon`，再跑 CMake，二者复用同一份 `ctx.env`；`canon` 名称保持用户原词，不改名、不解析其 CLI 输出，详见 `docs/CANON.md`。YAML-only 项目不再需要 `gcpkg.lua`：`project.lua` 生成自动 `build(ctx)`，`cli.lua` 的 `project_dir(o)` 保证顶层 `build` / `compdb` / `inject` 都指向正确目录。
+
+注入文件把 catalog port 与已经构建项目的 `prefix/include|lib|bin` 合并成统一 flags，再按各构建系统的原生格式写出：CMake `-C cache` + `CMAKE_*_STANDARD_LIBRARIES*`、Meson `--native-file`（单引号数组）、GN `.gni` / args、Makefile 原始 `:=` 变量、pkg-config 链接、`GCPKG_*` / `CANON_*` 环境、deps/canon JSON 与 wrappers。`GCPKG_INJECT_DIR` guard 防止 env script 与 toolchain 重复注入 flags；`-l...` 始终位于 CMake object 之后，静态链接顺序正确。
+
+`tests/r13.sh` 默认做纯静态回归：10 个 Lua 模块 `luac -p`、277 ports、CLI help / doctor、静态 fixture 的 `core → app → leaf` 与循环拒绝、`workspace add/remove` 和 `gcpkg add/remove` 对 `canon` 字段的保留、顶层 `inject --install` 的完整文件束。`GCPKG_R13_DYNAMIC=1` 时调用 `tests/fixtures/r13-workspace/dynamic.sh`，在干净 local-Git 工作区真跑 6 仓库、5 种内层组合、三个 submodule、pin/unpin、CMake/Meson/GN/Makefile/flags/env 语法、二进制输出、统一 compdb 与顶层 YAML-only 项目。最终实测 **6/6 仓库构建、16 条 compile commands、全部 tracked 源码 clean**；详见 `docs/ROUND13_MANAGED_WORKSPACES.md`。
+
+## 17. 构建 gcpkg 本体
 
 
 

@@ -3,6 +3,8 @@ local fs = require("gcpkg.fs")
 local features = require("gcpkg.features")
 local workspace = require("gcpkg.workspace")
 local proxy = require("gcpkg.proxy")
+local managed = require("gcpkg.managed")
+local meta = require("gcpkg.meta")
 local M = {}
 
 local USAGE = [[
@@ -23,6 +25,7 @@ Build / inspection:
   gcpkg build [PROJECT_DIR]         build a project + merged compile_commands.json
   gcpkg install [PORT@VERSION]     with no argument: install ALL project deps
   gcpkg compdb [PROJECT_DIR]        rebuild merged compile_commands.json only
+  gcpkg inject [DIR] [--install]    write vcpkg-style toolchain/env injection
   gcpkg features PORT               list a library's YAML features
   gcpkg backends                    list external package-manager adapters
   gcpkg externals                   list vendor SDK ports + the env var each needs
@@ -32,9 +35,24 @@ Build / inspection:
   gcpkg doctor                      show toolchain / paths / wrapper status
   gcpkg port new NAME               scaffold build.lua + features.yaml
 
+Managed workspaces (outer gcpkg / inner CMake, GN, Meson, canon, Makefile):
+  gcpkg workspace new DIR [--name=NAME]
+  gcpkg workspace add --name=NAME (--url=URL|--path=PATH) [--ref=REF]
+                       [--commit=SHA] [--submodules=recursive]
+                       [--system=cmake,canon] [--depends=a,b] [--packages=zlib]
+  gcpkg workspace remove NAME
+  gcpkg workspace list | graph | status
+  gcpkg workspace sync [--update] [--force]   clone/fetch/checkout/submodules
+  gcpkg workspace update                     fetch latest + refresh pins
+  gcpkg workspace pin NAME [SHA] [--unpin]
+  gcpkg workspace build [--only=NAME] [--system=...] [--cmd=...] [--dry-run]
+  gcpkg workspace inject [NAME]              injection files only, no inner build
+  gcpkg workspace submodule status|sync|pin|add [REPO] [--repo=NAME]
+  gcpkg sync | status | tree [-C DIR]         short aliases for a workspace
+
 Options:
-  -C DIR, --dir=DIR                operate on a project in another directory
-  --name=NAME                      (new) project name
+  -C DIR, --dir=DIR                operate on a project/workspace in another directory
+  --name=NAME                      (new/add) project or repo name
   -g, --global                     (add/remove/proxy) user-wide config
   --local                          (add/proxy) project-specific config
   --proxy=URL                      one-shot proxy (http/https/socks5, user:pass@host)
@@ -49,6 +67,22 @@ Options:
   --verbose                        print every executed command
   -h, --help                       this help
 
+Managed-workspace / injection options:
+  --url=URL, --path=PATH          git remote or local checkout for `workspace add`
+  --ref=REF, --commit=SHA         branch/tag and optional pinned commit
+  --submodules=recursive          recursive git submodule sync (or normal/shallow)
+  --system=SYSTEMS                 inner systems, comma-separated (canon,cmake,...)
+  --depends=LIST, --packages=LIST  repository edges and catalog dependencies
+  --cmd=COMMAND                    override an inner command; @canon@ etc. expand
+  --only=NAME                      build/inject one repository (+ its dependencies)
+  --repo=NAME                      target repo for `workspace submodule`
+  --out=DIR                        injection output directory
+  --install                        (inject) install dependencies before injection
+  --install-prefix=DIR, --build-dir=DIR, --compdb=FILE
+  --workspace-root=DIR, --project-name=NAME
+  --update, --force, --unpin, --dry-run, --git-commit
+  --sha=SHA, --message=MSG         (submodule add) pin + optional commit message
+
 Examples:
   gcpkg new apps/demo && gcpkg add zlib@1.2.13 -C apps/demo
   gcpkg new apps/other && gcpkg add zlib@1.3.1 -C apps/other
@@ -57,6 +91,10 @@ Examples:
   gcpkg install openssl --feature=openssl:shared
   gcpkg graph udisks2                       # feature-conditional deps
   gcpkg compdb . --ports ./ports:~/my-ports
+  gcpkg workspace new ws && gcpkg workspace add -C ws --name=app --url=... --system=canon,cmake
+  gcpkg workspace sync -C ws && gcpkg workspace build -C ws
+  gcpkg inject apps/demo --install --system=cmake
+  gcpkg build apps/demo --system=canon,cmake
 ]]
 
 local function parse(args)
@@ -124,6 +162,98 @@ local function parse(args)
             o.jobs = tonumber(nextval()) or o.jobs
         elseif a:match("^%-j%d+$") then
             o.jobs = tonumber(a:match("^%-j(%d+)$"))
+        elseif a:match("^--url=") then
+            o.url = a:match("^--url=(.*)$")
+        elseif a == "--url" then
+            o.url = nextval()
+        elseif a:match("^--path=") then
+            o.path = a:match("^--path=(.*)$")
+        elseif a == "--path" then
+            o.path = nextval()
+        elseif a:match("^--ref=") then
+            o.ref = a:match("^--ref=(.*)$")
+        elseif a == "--ref" then
+            o.ref = nextval()
+        elseif a:match("^--commit=") then
+            o.commit = a:match("^--commit=(.*)$")
+        elseif a == "--commit" then
+            o.commit = nextval()
+        elseif a:match("^--submodules=") then
+            o.submodules = a:match("^--submodules=(.*)$")
+        elseif a == "--submodules" then
+            o.submodules = nextval()
+        elseif a:match("^--system=") then
+            o.system = a:match("^--system=(.*)$")
+        elseif a == "--system" then
+            o.system = nextval()
+        elseif a:match("^--systems=") then
+            o.systems = a:match("^--systems=(.*)$")
+        elseif a == "--systems" then
+            o.systems = nextval()
+        elseif a:match("^--depends=") then
+            o.depends = a:match("^--depends=(.*)$")
+        elseif a == "--depends" then
+            o.depends = nextval()
+        elseif a:match("^--packages=") then
+            o.packages = a:match("^--packages=(.*)$")
+        elseif a == "--packages" then
+            o.packages = nextval()
+        elseif a:match("^--only=") then
+            o.only = a:match("^--only=(.*)$")
+        elseif a == "--only" then
+            o.only = nextval()
+        elseif a:match("^--repo=") then
+            o.repo = a:match("^--repo=(.*)$")
+        elseif a == "--repo" then
+            o.repo = nextval()
+        elseif a:match("^--cmd=") then
+            o.cmd = a:match("^--cmd=(.*)$")
+        elseif a == "--cmd" then
+            o.cmd = nextval()
+        elseif a:match("^--out=") then
+            o.out = a:match("^--out=(.*)$")
+        elseif a == "--out" then
+            o.out = nextval()
+        elseif a:match("^--install-prefix=") then
+            o.install_prefix = a:match("^--install-prefix=(.*)$")
+        elseif a == "--install-prefix" then
+            o.install_prefix = nextval()
+        elseif a:match("^--build-dir=") then
+            o.build_dir = a:match("^--build-dir=(.*)$")
+        elseif a == "--build-dir" then
+            o.build_dir = nextval()
+        elseif a:match("^--compdb=") then
+            o.compdb = a:match("^--compdb=(.*)$")
+        elseif a == "--compdb" then
+            o.compdb = nextval()
+        elseif a:match("^--workspace-root=") then
+            o.workspace_root = a:match("^--workspace-root=(.*)$")
+        elseif a == "--workspace-root" then
+            o.workspace_root = nextval()
+        elseif a:match("^--project-name=") then
+            o.project_name = a:match("^--project-name=(.*)$")
+        elseif a == "--project-name" then
+            o.project_name = nextval()
+        elseif a:match("^--sha=") then
+            o.sha = a:match("^--sha=(.*)$")
+        elseif a == "--sha" then
+            o.sha = nextval()
+        elseif a:match("^--message=") then
+            o.message = a:match("^--message=(.*)$")
+        elseif a == "--message" then
+            o.message = nextval()
+        elseif a == "--install" then
+            o.install = true
+        elseif a == "--update" then
+            o.update = true
+        elseif a == "--force" then
+            o.force = true
+        elseif a == "--unpin" then
+            o.unpin = true
+        elseif a == "--dry-run" then
+            o.dry_run = true
+        elseif a == "--git-commit" then
+            o.git_commit = true
         else
             o.positional[#o.positional + 1] = a
         end
@@ -170,6 +300,79 @@ local function tail(list, from)
     return out
 end
 
+local function managedRoot(o)
+    local start = o.dir and util.abs(o.dir) or fs.cwd()
+    local root = managed.find_root(start)
+    if not root then
+        error("not inside a managed workspace (no workspace.yaml); run `gcpkg workspace new DIR`")
+    end
+    return root
+end
+
+local function workspaceCli(o, cfg)
+    local log = require("gcpkg.log")
+    local sub = o.positional[2]
+    if not sub then error("workspace needs a subcommand (new/add/remove/list/graph/status/sync/update/pin/build/inject/submodule)") end
+    local root = sub ~= "new" and managedRoot(o) or nil
+    if sub == "new" then
+        local dir = o.positional[3] or o.dir
+        if not dir then error("workspace new needs a directory (gcpkg workspace new DIR)") end
+        meta.init(dir, o.name)
+        log.info("  add repos: gcpkg workspace add -C " .. dir .. " --name=NAME --url=URL")
+        log.info("  then:      gcpkg workspace sync -C " .. dir)
+        return 0
+    elseif sub == "add" then
+        local name = o.name or o.positional[3]
+        if not name then error("workspace add needs --name=NAME") end
+        meta.add(root, {
+            name = name, url = o.url, path = o.path, ref = o.ref,
+            commit = o.commit, submodules = o.submodules,
+            system = o.system or o.systems,
+            depends = o.depends, packages = o.packages,
+            canon_cmd = o.cmd, commands = o.commands,
+        })
+        return 0
+    elseif sub == "remove" then
+        local name = o.positional[3] or o.name
+        if not name then error("workspace remove needs a repo name") end
+        meta.remove(root, name)
+        return 0
+    elseif sub == "list" then
+        return meta.list(root, cfg, o)
+    elseif sub == "graph" then
+        return meta.graph(root, cfg, o)
+    elseif sub == "status" then
+        return meta.status(root, cfg, o)
+    elseif sub == "sync" or sub == "update" then
+        local opts = util.merge(o, { update = (sub == "update" or o.update == true),
+                                     force = o.force })
+        meta.sync(root, cfg, opts)
+        return 0
+    elseif sub == "pin" then
+        local name = o.positional[3]
+        local sha = o.positional[4]
+        if not name then error("workspace pin needs a repo name") end
+        meta.pin(root, name, sha, { unpin = o.unpin })
+        return 0
+    elseif sub == "build" then
+        local opts = util.merge(o, { only = o.only or o.positional[3],
+                                     dry_run = o.dry_run, cmd = o.cmd })
+        meta.build(root, cfg, opts)
+        return 0
+    elseif sub == "inject" then
+        local repo = o.repo or o.only or o.positional[3]
+        local opts = util.merge(o, { only = repo, repo = repo })
+        meta.inject(root, cfg, opts)
+        return 0
+    elseif sub == "submodule" then
+        local action = o.positional[3]
+        local repo = o.repo or o.positional[4]
+        if not action then error("workspace submodule needs status|sync|pin|add") end
+        return meta.submodule(root, action, util.merge(o, { repo = repo }))
+    end
+    error("unknown workspace subcommand: " .. tostring(sub))
+end
+
 function M.main(args)
     local o = parse(args or gcpkg.args)
     if o.verbose then
@@ -190,11 +393,20 @@ function M.main(args)
     local port = require("gcpkg.port")
     local storeMod = require("gcpkg.store")
     local log = require("gcpkg.log")
+    local cmd = o.positional[1]
     local publicRoots = o.ports and util.split(o.ports, ":") or port.default_roots()
     -- Inside a project, its private ports are searched first; the user-wide
     -- registry comes before engine/public registries. Outside a project this
-    -- is just the old default roots plus ~/.gcpkg/ports.
+    -- is just the old default roots plus ~/.gcpkg/ports.  `gcpkg inject` also
+    -- accepts a directory containing only gcpkg.yaml/gcpkg.lock (no gcpkg.lua).
     local projDir = workspace.find_root(o.dir or fs.cwd())
+    if not projDir and (cmd == "inject" or cmd == "build" or cmd == "compdb") then
+        local candidate = project_dir(o)
+        if fs.isfile(util.join(candidate, "gcpkg.yaml")) or
+           fs.isfile(util.join(candidate, "gcpkg.lock")) then
+            projDir = candidate
+        end
+    end
     local py = projDir and workspace.read_yaml(util.join(projDir, "gcpkg.yaml")) or {}
     local roots = util.map(workspace.roots(projDir, publicRoots, py),
                           function(r) return util.abs(r) end)
@@ -206,10 +418,37 @@ function M.main(args)
     local cfg = {
         store = st, ports = roots, requests = o.requests, jobs = o.jobs,
         no_cache = o.no_cache, share = o.share or gcpkg.sys.share(),
+        system = o.system, systems = o.systems, cmd = o.cmd,
+        commands = o.commands, out = o.out, install_prefix = o.install_prefix,
+        build_dir = o.build_dir, compdb = o.compdb,
+        workspace_root = o.workspace_root, project_name = o.project_name,
+        dry_run = o.dry_run, update = o.update, force = o.force,
     }
 
-    local cmd = o.positional[1]
-    if cmd == "proxy" then
+    if cmd == "workspace" then
+        return workspaceCli(o, cfg)
+    elseif cmd == "sync" or cmd == "update" then
+        meta.sync(managedRoot(o), cfg,
+                  util.merge(o, { update = (cmd == "update" or o.update == true) }))
+        return 0
+    elseif cmd == "status" then
+        return meta.status(managedRoot(o), cfg, o)
+    elseif cmd == "tree" then
+        return meta.graph(managedRoot(o), cfg, o)
+    elseif cmd == "inject" then
+        local injection = require("gcpkg.inject").from_lock(project_dir(o), cfg, {
+            out = o.out, install = o.install, system = o.system,
+            systems = o.systems, build_dir = o.build_dir,
+            install_prefix = o.install_prefix, compdb = o.compdb,
+            workspace_root = o.workspace_root, project_name = o.project_name,
+        })
+        log.step("dependency injection written to " .. injection.dir)
+        log.info("  CMake toolchain : " .. injection.files.toolchain)
+        log.info("  CMake cache     : " .. injection.files.cache)
+        log.info("  env script      : " .. injection.files.env)
+        log.info("  canon manifest  : " .. injection.files.canon)
+        return 0
+    elseif cmd == "proxy" then
         local value = o.positional[2]
         if o.local_port and not projDir then
             error("--local needs a gcpkg project (run `gcpkg new DIR` first)")
@@ -274,10 +513,16 @@ function M.main(args)
         workspace.describe_versions(name, roots)
         return 0
     elseif cmd == "build" then
-        require("gcpkg.project").build(o.positional[2] or fs.cwd(), cfg, {})
+        require("gcpkg.project").build(project_dir(o), cfg, {
+            system = o.system, systems = o.systems, cmd = o.cmd,
+            dry_run = o.dry_run,
+        })
         return 0
     elseif cmd == "compdb" then
-        require("gcpkg.project").build(o.positional[2] or fs.cwd(), cfg, { skip_build = true })
+        require("gcpkg.project").build(project_dir(o), cfg, {
+            skip_build = true, system = o.system, systems = o.systems,
+            cmd = o.cmd,
+        })
         return 0
     elseif cmd == "install" then
         if not o.positional[2] then

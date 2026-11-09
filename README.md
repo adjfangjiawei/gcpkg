@@ -33,13 +33,24 @@
 依赖 `zlib`、`taglib:zlib` 条件依赖），注册表 249 → **277**。详见
 [docs/GN.md](docs/GN.md) 与
 [docs/ROUND12_LIBRARIES.md](docs/ROUND12_LIBRARIES.md)。
+第十三轮把 gcpkg 定位成**外层多项目 / 多仓库维护器**：`workspace.yaml` /
+`workspace.lock` 管 Git clone/fetch/checkout、递归 submodule、固定 commit、
+跨项目依赖树与拓扑构建顺序；项目内部继续保留 CMake、GN、Meson、`canon`
+包管理器、Makefile / Ninja。依赖注入类似 vcpkg，生成 CMake toolchain/cache、
+Meson native、GN `.gni`、Makefile flags、pkg-config、env、`canon` 清单与统一
+compdb，不改写上游源码。`canon` 保持用户原词，四问 skipped 不当作批准。
+干净 local-Git 动态回归 **6/6 仓库构建、16 条 compile commands**，详见
+[docs/MANAGED_WORKSPACES.md](docs/MANAGED_WORKSPACES.md)、
+[docs/DEPENDENCY_INJECTION.md](docs/DEPENDENCY_INJECTION.md)、
+[docs/CANON.md](docs/CANON.md) 与
+[docs/ROUND13_MANAGED_WORKSPACES.md](docs/ROUND13_MANAGED_WORKSPACES.md)。
 
 ## 三个核心要求如何落地
 
 | 要求 | 实现 |
 | --- | --- |
 | 一个库 = 一个 Lua 构建配置 + 一个 YAML 特性配置 | `ports/<name>/build.lua`（声明 source、依赖、build 钩子；可 `require("gcpkg.build.cmake")` 获得 cmake 构建函数，也可 `gcpkg.import("其它库")` 复用其配置）和 `ports/<name>/features.yaml`（args / env / defines / requires / conflicts / provides）。YAML 改构建参数，Lua 完全不用动。 |
-| 直接管理项目 + 跨依赖跳转 | 项目目录里写 `gcpkg.lua` + `gcpkg.yaml`，`gcpkg build .` 直接编译项目，并在项目根生成 `compile_commands.json`（项目 + 所有传递依赖）和 `.clangd`。依赖源码目录长期保留在 store 中，路径稳定，所以 clangd 能一路跳转进依赖的头文件和源文件，再跳回来。 |
+| 直接管理项目 + 跨依赖跳转 | 项目目录里写 `gcpkg.lua` + `gcpkg.yaml`，或只写 `gcpkg.yaml` 让 gcpkg 驱动内层系统；`gcpkg build .` 生成项目根 `compile_commands.json`（项目 + 所有传递依赖）和 `.clangd`。依赖源码目录长期保留在 store 中，路径稳定，所以 clangd 能一路跳转进依赖的头文件和源文件，再跳回来。 |
 | 能管理几乎所有库 | C++ 运行时只提供 进程执行 / 文件 / YAML / Lua 沙箱；构建逻辑全是 Lua 模块（`cmake` / `make` / `autotools` / `meson` / `cargo` / `cc` / `auto`），加新构建系统 = 加一个 Lua 文件；接外部包管理器 = 注册一个 adapter（已内置 `pkgconfig`、`vcpkg`、`system`、`call`）。编译器拦截层（`gcpkg-intercept`）让上游构建系统一行不改也能产出编译数据库。 |
 
 ## 快速开始
@@ -140,6 +151,19 @@ GCPKG_R11_DYNAMIC=1 ./tests/r11.sh                   # 24/24 真编译，1353 �
 ./build/bin/gcpkg graph taglib --feature=taglib:zlib --ports ./ports
 ./tests/r12.sh                                       # 静态：28 两文件 / GN adapter / 图
 GCPKG_R12_DYNAMIC=1 ./tests/r12.sh                   # 干净 store 真编译 28 个新 port
+
+# 第十三轮：托管工作区 + 依赖注入（详见 docs/MANAGED_WORKSPACES.md）
+./build/bin/gcpkg workspace new ws --name=my-workspace
+./build/bin/gcpkg workspace add -C ws --name=core --url=https://example/core.git \
+                    --ref=main --submodules=recursive --system=cmake
+./build/bin/gcpkg workspace sync -C ws                 # Git 全部由 gcpkg 代管
+./build/bin/gcpkg workspace graph -C ws
+./build/bin/gcpkg workspace build -C ws --dry-run
+./build/bin/gcpkg workspace build -C ws               # 按依赖顺序构建所有仓库
+./build/bin/gcpkg inject apps/demo --install          # vcpkg 风格 toolchain/env
+./build/bin/gcpkg build apps/demo --system=canon,cmake # 无 gcpkg.lua 也可自动串联
+./tests/r13.sh                                        # 静态：拓扑 / 环 / 注入 / canon 名称
+GCPKG_R13_DYNAMIC=1 ./tests/r13.sh                    # 6 仓库真编译 + 统一 16 条 compdb
 ```
 
 > store 请放在真实磁盘（如 `~/.cache/...`）：本沙箱 `/tmp` 是 992M 的 tmpfs，
@@ -221,7 +245,10 @@ clangd 打开项目根目录即可工作；跳转到 `openssl/sha.h`、`crypto/s
 三层工具链同样并入统一 compdb：项目模式 `gcpkg compdb` 实测 718 条，
 `GCPKG_R12_DYNAMIC=1 ./tests/r12.sh` 从干净 store 真编译
 **28 PASS / 0 FAIL、4527 条编译命令**，并实跑最小 GN fixture、GN/Ninja
-可执行文件、Crashpad 静态库与条件 zlib 依赖。
+可执行文件、Crashpad 静态库与条件 zlib 依赖。第十三轮的
+`GCPKG_R13_DYNAMIC=1 ./tests/r13.sh` 则从全新 local-Git 工作区真跑 6 个仓库、
+递归 submodule、5 种内层系统组合，合并 **16 条 compile commands**，并逐个执行
+生成的二进制。
 
 ## 目录
 
@@ -233,8 +260,8 @@ lua/gcpkg/build/   各构建系统的 Lua 适配模块
 ports/             277 个库，每个 build.lua + features.yaml（L0 → L4，含工具链 port）
 examples/hello/    OpenSSL 项目：gcpkg.lua + gcpkg.yaml + src/main.c
 examples/web/      curl 全链顶端项目
-tests/             13 个回归（含 r10 / proxy / r11 / r12）
-docs/              架构与扩展文档
+tests/             14 个回归（含 r10 / proxy / r11 / r12 / r13）
+docs/              16 篇架构与扩展文档
 Source/MainProcess/  旧 TOML 原型，保留但不参与构建
 ```
 
@@ -243,7 +270,12 @@ Source/MainProcess/  旧 TOML 原型，保留但不参与构建
 [docs/DISK_INFO.md](docs/DISK_INFO.md)、[docs/EXTRA_LIBRARIES.md](docs/EXTRA_LIBRARIES.md)、
 [docs/ROUND10_LIBRARIES.md](docs/ROUND10_LIBRARIES.md)、
 [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md)（工具链与多语言 adapter）、
-[docs/ROUND11_LIBRARIES.md](docs/ROUND11_LIBRARIES.md)
-与 [docs/EXTERNAL_SDKS.md](docs/EXTERNAL_SDKS.md)。
+[docs/ROUND11_LIBRARIES.md](docs/ROUND11_LIBRARIES.md)、
+[docs/EXTERNAL_SDKS.md](docs/EXTERNAL_SDKS.md)、
+[docs/GN.md](docs/GN.md)、[docs/ROUND12_LIBRARIES.md](docs/ROUND12_LIBRARIES.md)、
+[docs/MANAGED_WORKSPACES.md](docs/MANAGED_WORKSPACES.md)、
+[docs/DEPENDENCY_INJECTION.md](docs/DEPENDENCY_INJECTION.md)、
+[docs/CANON.md](docs/CANON.md)
+与 [docs/ROUND13_MANAGED_WORKSPACES.md](docs/ROUND13_MANAGED_WORKSPACES.md)。
 
 许可证：BSD-3-Clause（见 LICENSE）。

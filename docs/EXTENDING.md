@@ -529,3 +529,23 @@ elseif kind == "gn" then
 目录（Crashpad 的 mini_chromium/LSS、TagLib 的 utfcpp），无需修改上游。
 最小 GN 工程、统一 compdb 与固定源说明见 `docs/GN.md`，28 个新 port 见
 `docs/ROUND12_LIBRARIES.md`。
+
+## 15. 托管工作区与内层系统链（第十三轮）
+
+R13 的扩展点不再是「只给一个库加 adapter」，而是分清外层与内层：
+
+```lua
+local managed = require("gcpkg.managed")   -- workspace.yaml/lock、拓扑、环检测
+local meta    = require("gcpkg.meta")      -- sync/update/pin/build/inject 编排
+local git     = require("gcpkg.git")       -- 所有 git/submodule 子进程
+local inject  = require("gcpkg.inject")    -- 生成 toolchain/env/native/gni/flags/json
+local inner   = require("gcpkg.inner")     -- 串联项目自己的内层系统
+```
+
+新增一个**外层 Git 操作**：在 `git.lua` 里用 `M.capture` / `M.run` 包 argv（不要拼 shell），再在 `meta.submodule` 或 `meta.sync` 加子命令，最后由 `cli.lua` 的 workspace dispatch 暴露。`workspace.lock` 的 schema 由 `managed.encode_lock` 统一写，别让各命令各自拼 YAML。
+
+新增一个**内层系统**：优先在 `inner.lua` 加 `runX()` 分支，并通过 `ctx.inject.files` 读取已生成的注入文件；`detect.lua` 只在项目没有显式 `systems:` 时做 marker 探测。`commands.<system>` / `--cmd` 支持任意自定义命令，`@build@` / `@prefix@` / `@toolchain@` / `@canon@` 等 token 由 `inner.tokens()` 展开。若系统能原生导出 compdb，把路径加入 `result.compdb_files`，`meta.mergeCompdb` 会与 `gcpkg-intercept` JSONL 和依赖 port compdb 去重合并。
+
+新增一个**注入目标**：在 `inject.generate` 里调用 `collect()` 得到的 flags / `files` 生成文件，并把它加入 `files` 表、`gcpkg-deps.json` 元数据、`gcpkg-env.sh` 和 `gcpkg-canon.json` 的 environment。`gcpkg-flags.mk` 必须是 GNU make 原始赋值；Meson machine file 必须用单引号数组；CMake 的 `-l...` 必须走 `CMAKE_*_STANDARD_LIBRARIES*` 而不能塞进 linker flags，否则静态链接顺序会回到 R13 曾经修掉的失败状态。
+
+`tests/r13.sh` 与 `tests/fixtures/r13-workspace/dynamic.sh` 是完整模板：前者做静态契约，后者从零创建本地 Git origin、递归 submodule、私有 port、假 `canon` CLI 和 6 个仓库，再真编译所有内层系统。完整字段、变量与动态结果见 `docs/MANAGED_WORKSPACES.md`、`docs/DEPENDENCY_INJECTION.md`、`docs/CANON.md` 与 `docs/ROUND13_MANAGED_WORKSPACES.md`。
