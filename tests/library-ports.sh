@@ -38,14 +38,20 @@ python3 - "$ROOT" <<'PY'
 import pathlib, subprocess, sys
 root = pathlib.Path(sys.argv[1])
 home = str(pathlib.Path.home())
-skip = {'.git', 'build', '.cache', '.arena', '__pycache__', 'Unselected files'}
+skip_parts = {'.git', 'build', '.cache', '.arena', '__pycache__', '.gcpkg',
+              'Unselected files'}
+skip_names = {'compile_commands.json', '.clangd', 'gcpkg.lock'}
+skip_suffixes = {'.log', '.pyc'}
 if (root / '.git').exists():
     files = subprocess.check_output(
         ['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
         cwd=root).decode().split('\0')
 else:
     files = [str(p.relative_to(root)) for p in root.rglob('*')
-             if p.is_file() and not any(part in skip for part in p.relative_to(root).parts)]
+             if p.is_file()
+             and not any(part in skip_parts for part in p.relative_to(root).parts)
+             and p.name not in skip_names
+             and p.suffix not in skip_suffixes]
 for rel in files:
     if not rel:
         continue
