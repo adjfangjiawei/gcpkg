@@ -209,7 +209,7 @@ echo "  injected CMake flags + wrapper + cross env OK"
 
 echo "== registry / LLVM external port / official installer wiring =="
 "$BIN" check --ports "$ROOT/ports" > "$T/check.out" 2>&1
-has '302 ports OK' "$T/check.out"
+has '316 ports OK' "$T/check.out"
 "$BIN" externals --ports "$ROOT/ports" > "$T/externals.out" 2>&1
 grep -E '^\[gcpkg:info\] +llvm +GCPKG_LLVM_HOME' "$T/externals.out" >/dev/null ||
     fail "llvm is not listed as an external SDK"
@@ -254,7 +254,7 @@ has '# keep me' "$T/preserve.yaml"
 has 'store: ' "$T/preserve.yaml"
 has 'proxy: ' "$T/preserve.yaml"
 has '/old/clang' "$T/preserve.yaml"
-echo "  302 ports, LLVM port + installer + use/unset OK"
+echo "  316 ports, LLVM port + installer + use/unset OK"
 
 echo "== real LLVM external port install =="
 if [ -d /usr/lib/llvm-22 ]; then

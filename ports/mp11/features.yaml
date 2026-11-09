@@ -1,0 +1,13 @@
+schema: 1
+port: mp11
+
+# Boost.Mp11 C++11 metaprogramming headers; README carries the BSL-1.0 notice.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  header-only:
+    default: true
+    description: Install headers and compile a probe translation unit
+    args: []

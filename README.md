@@ -2,7 +2,7 @@
 
 gcpkg 是一个**元包管理器**：上层维护项目、工作区、依赖与编译数据库，下层把 CMake、Meson、GN、Autotools、Makefile、Python、Cargo、Conan 等构建方式接入同一个 store。每个库由 `build.lua` 描述构建过程，由 `features.yaml` 描述特性与版本；上游源码无需修改。
 
-当前注册表提供 **302 个 port**，覆盖网络、加密、压缩、媒体、Linux 系统栈、工具链、图形、数据结构和常用 C/C++ 库。构建结果会合并为 `compile_commands.json`，配合 `.clangd` 可以从项目代码直接跳转到依赖源码。
+当前注册表提供 **316 个 port**，覆盖网络、加密、压缩、媒体、Linux 系统栈、工具链、图形、数据结构和常用 C/C++ 库。构建结果会合并为 `compile_commands.json`，配合 `.clangd` 可以从项目代码直接跳转到依赖源码。
 
 ## 安装
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Library ports: catalog, registry, global store, Conan surface and optional
-# real installation of all 24 libraries into one store.
+# real installation of all catalog libraries into one store.
 set -euo pipefail
 
 : "${HOME:?HOME must be set}"
@@ -18,7 +18,7 @@ N="$(echo "$NAMES" | wc -w)"
 
 [ -x "$BIN" ] || { echo "build gcpkg first: cmake -S . -B build && cmake --build build -j"; exit 1; }
 [ -x "$ROOT/setup-gcpkg-toolchain.sh" ] || { echo "missing setup-gcpkg-toolchain.sh"; exit 1; }
-[ "$N" -eq 24 ] || { echo "catalog must have 24 ports, got $N"; exit 1; }
+[ "$N" -eq "$(tail -n +2 "$CATALOG" | wc -l)" ] || { echo "catalog row count mismatch: $N"; exit 1; }
 command -v luac >/dev/null 2>&1 || command -v luac5.4 >/dev/null 2>&1 || {
     echo "luac or luac5.4 is required"; exit 1; }
 LUAC=luac; command -v luac >/dev/null 2>&1 || LUAC=luac5.4
@@ -64,6 +64,19 @@ for rel in files:
 print(' ', len(files), 'tracked files contain no machine-specific home path')
 PY
 echo "  $N library ports x (build.lua + features.yaml), real URL/SHA256"
+python3 - "$ROOT/lua/gcpkg/net.lua" "$CATALOG" <<'PY'
+import csv, pathlib, sys
+net = pathlib.Path(sys.argv[1]).read_text()
+assert 'util.basename(srcDir)' in net and '"-" .. name' in net, \
+    'download cache keys must be scoped per port'
+assert 'download failed (exit' in net and 'retrying ' in net, \
+    'transient download failures must be retried'
+with open(sys.argv[2], newline='') as f:
+    rows = list(csv.DictReader(f, delimiter='\t'))
+bases = [r['url'].split('?', 1)[0].rstrip('/').rsplit('/', 1)[-1] for r in rows]
+print('  %d catalog URLs, %d distinct basenames; download cache keys scoped per port'
+      % (len(rows), len(set(bases))))
+PY
 
 echo "== generator is reproducible =="
 HASH1=$(for name in $NAMES; do cat "$PORTS/$name/build.lua" "$PORTS/$name/features.yaml"; done | sha256sum | cut -d' ' -f1)
@@ -105,7 +118,7 @@ if [ "${GCPKG_LIBRARY_PORTS_DYNAMIC:-0}" != "1" ]; then
     exit 0
 fi
 
-echo "== install all 24 libraries from the catalog =="
+echo "== install all $N libraries from the catalog =="
 STORE="${GCPKG_LIBRARY_PORTS_STORE:-$T/store}"
 LOGS="$T/logs"
 PROJECT="$T/project"
@@ -117,9 +130,11 @@ mkdir -p "$STORE" "$LOGS" "$PROJECT"
     echo 'dependencies:'
     for name in $NAMES; do echo "  - $name"; done
 } > "$PROJECT/gcpkg.yaml"
-timeout 1500 env GCPKG_CONFIG="$GCPKG_CONFIG" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+TIMEOUT=$((N * 180))
+JOBS="${GCPKG_LIBRARY_PORTS_JOBS:-4}"
+timeout "$TIMEOUT" env GCPKG_CONFIG="$GCPKG_CONFIG" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
     GCPKG_HOME="$GCPKG_HOME" "$BIN" install -C "$PROJECT" \
-    --store "$STORE" --ports "$PORTS" -j 2 > "$LOGS/install.log" 2>&1 || {
+    --store "$STORE" --ports "$PORTS" -j "$JOBS" > "$LOGS/install.log" 2>&1 || {
         echo "project dependency install failed"; tail -40 "$LOGS/install.log"; exit 1; }
 
 python3 - "$STORE" "$CATALOG" <<'PY'

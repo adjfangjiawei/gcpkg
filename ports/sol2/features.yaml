@@ -1,0 +1,13 @@
+schema: 1
+port: sol2
+
+# Header-only C++ Lua bindings; depends on the lua port.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  header-only:
+    default: true
+    description: Install headers and compile a probe translation unit
+    args: []

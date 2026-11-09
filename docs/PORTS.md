@@ -1,6 +1,6 @@
 # Port 目录
 
-注册表当前提供 **302 个 port**。每个 port 对应一个真实上游来源，由 `build.lua` 描述构建，由 `features.yaml` 描述特性与可选版本。
+注册表当前提供 **316 个 port**。每个 port 对应一个真实上游来源，由 `build.lua` 描述构建，由 `features.yaml` 描述特性与可选版本。
 
 ```bash
 gcpkg ports --ports ./ports
@@ -70,7 +70,7 @@ gcpkg versions zlib --ports ./ports
 ## 完整目录
 
 <details>
-<summary>展开全部 302 个 port</summary>
+<summary>展开全部 316 个 port</summary>
 
 ### L0
 
@@ -398,5 +398,25 @@ gcpkg versions zlib --ports ./ports
 | --- | --- | --- |
 | `proxygen` | 2026.10.26.00 | folly,fizz,wangle,mvfst,cmake |
 | `xserver` | 21.1.16 | xorgproto,libX11,libxcb,libXau,libXdmcp,pixman,libdrm,libpciaccess,dbus,openssl,libxkbcommon,fontutil |
+
+
+### 新增常用库（R18 扩展）
+
+| port | 版本 | 直接依赖 |
+| --- | --- | --- |
+| `nameof` | 0.11.0 | — |
+| `stb` | 4e9b368 | — |
+| `simde` | 0.8.2 | — |
+| `bitsery` | 5.2.5 | — |
+| `cista` | 0.16 | — |
+| `spirv-headers` | vulkan-sdk-1.4.363.0 | — |
+| `pfr` | 1.92.0 | — |
+| `hana` | 1.7.0 | — |
+| `mp11` | 1.92.0 | — |
+| `describe` | 1.92.0 | mp11 |
+| `ut` | 2.3.1 | — |
+| `sol2` | 3.5.0 | lua |
+| `csv2` | 0.2 | — |
+| `inja` | 3.5.0 | nlohmann-json |
 
 </details>

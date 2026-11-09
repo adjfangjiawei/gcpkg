@@ -102,7 +102,27 @@ function M.download(url, dest, expected, opts)
                          "-o", dest, url }) do
         cmd[#cmd + 1] = a
     end
-    gcpkg.exec(cmd, { log = opts.log, env = env })
+    -- A proxy can drop a codeload response mid-stream (curl exit 18). Curl's
+    -- own --retry does not cover every partial-transfer case, so retry the
+    -- whole download from a clean destination a bounded number of times.
+    local attempts, code = 8, nil
+    for attempt = 1, attempts do
+        code = gcpkg.exec(cmd, { log = opts.log, env = env, check = false })
+        if code == 0 then
+            break
+        end
+        if fs.isfile(dest) then
+            fs.rm(dest)
+        end
+        if attempt < attempts then
+            phase(opts, "warn", "download failed (exit " .. tostring(code) ..
+                  "), retrying " .. attempt .. "/" .. attempts .. " " .. url)
+        end
+    end
+    if code ~= 0 then
+        error("download failed after " .. attempts .. " attempts (exit " ..
+              tostring(code) .. "): " .. url)
+    end
     local elapsed = math.max(now() - started, 0)
     local size = fileSize(dest)
     local rate = ""
@@ -239,7 +259,12 @@ function M.prepare(source, srcDir, opts)
         srcDir = util.join(source.dir)
     elseif source.url then
         local name = util.basename(source.url):gsub("%?.*$", "")
-        local cache = util.join(opts.cache_dir or util.join(srcDir, "..", "cache"), name)
+        -- Scope the download cache by the port's stable srcDir key. Several
+        -- ports (e.g. Boost mp11/describe and ut/sol2) share the same upstream
+        -- tag basename; without this prefix their tarballs overwrite one
+        -- another and trigger bogus "checksum mismatch, re-downloading" warnings.
+        local cache = util.join(opts.cache_dir or util.join(srcDir, "..", "cache"),
+                                util.basename(srcDir) .. "-" .. name)
         M.download(source.url, cache, source.sha256, opts)
         M.extract(cache, srcDir, source.strip or 1, opts)
     else

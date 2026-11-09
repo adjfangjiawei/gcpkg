@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate 24 library ports from the catalog.
+"""Generate library ports from the catalog.
 
-Source of truth: tools/library-catalog.tsv (24 pinned codeload tarballs with
+Source of truth: tools/library-catalog.tsv (pinned codeload tarballs with
 measured SHA256, upstream repo/tag, build-system kind and metadata) plus META
 below (installed headers, probe headers, CMake switches and exported libraries).
 The engine only reads ports/<name>/build.lua + features.yaml at runtime; every
@@ -172,6 +172,76 @@ META = {
 }
 
 
+META.update({
+    "nameof": dict(kind="header", include="nameof.hpp",
+        headers=H(("include/nameof.hpp", "nameof.hpp")),
+        flags=["-std=c++17"], license_files=["LICENSE"],
+        n="Header-only compile-time name reflection for enums, variables and types."),
+    "stb": dict(kind="header", include="stb_image.h", cxx=False,
+        headers=H(("stb_image.h", "stb_image.h"),
+                  ("stb_image_write.h", "stb_image_write.h"),
+                  ("stb_truetype.h", "stb_truetype.h"),
+                  ("stb_rect_pack.h", "stb_rect_pack.h"),
+                  ("stb_textedit.h", "stb_textedit.h"),
+                  ("stb_ds.h", "stb_ds.h"),
+                  ("stb_perlin.h", "stb_perlin.h")),
+        flags=["-std=c11"], license_files=["LICENSE"],
+        n="Selected stb single-file C headers; probe is compiled as C11."),
+    "simde": dict(kind="header", include="simde/x86/sse2.h",
+        headers=H(("simde", "simde")), flags=["-std=c++17"],
+        license_files=["COPYING"],
+        n="Portable SIMD intrinsics; whole simde/ header tree installed."),
+    "bitsery": dict(kind="header", include="bitsery/bitsery.h",
+        headers=H(("include/bitsery", "bitsery")), flags=["-std=c++17"],
+        license_files=["LICENSE"],
+        n="Header-only binary serialization; whole bitsery/ tree installed."),
+    "cista": dict(kind="header", include="cista/containers.h",
+        headers=H(("include/cista", "cista")), flags=["-std=c++20"],
+        license_files=["LICENSE"],
+        n="Zero-copy serialization containers; whole cista/ tree installed."),
+    "spirv-headers": dict(kind="header", include="spirv/unified1/spirv.hpp11",
+        headers=H(("include/spirv", "spirv")), flags=["-std=c++17"],
+        license_files=["LICENSE"],
+        n="Khronos SPIR-V headers; include/spirv becomes the installed include/spirv."),
+    "pfr": dict(kind="header", include="boost/pfr.hpp",
+        headers=H(("include/boost/pfr.hpp", "boost/pfr.hpp"),
+                  ("include/boost/pfr", "boost/pfr")),
+        flags=["-std=c++17"], license_files=["LICENSE_1_0.txt"],
+        n="Boost.PFR standalone reflection headers installed under boost/pfr."),
+    "hana": dict(kind="header", include="boost/hana.hpp",
+        headers=H(("include/boost/hana.hpp", "boost/hana.hpp"),
+                  ("include/boost/hana", "boost/hana")),
+        flags=["-std=c++17"], license_files=["LICENSE.md"],
+        n="Boost.Hana metaprogramming headers installed under boost/hana."),
+    "mp11": dict(kind="header", include="boost/mp11.hpp",
+        headers=H(("include/boost/mp11.hpp", "boost/mp11.hpp"),
+                  ("include/boost/mp11", "boost/mp11")),
+        flags=["-std=c++17"], license_files=["README.md"],
+        n="Boost.Mp11 C++11 metaprogramming headers; README carries the BSL-1.0 notice."),
+    "describe": dict(kind="header", include="boost/describe.hpp",
+        headers=H(("include/boost/describe.hpp", "boost/describe.hpp"),
+                  ("include/boost/describe", "boost/describe")),
+        flags=["-std=c++17"], license_files=["README.md"],
+        n="Boost.Describe reflection headers; depends on mp11."),
+    "ut": dict(kind="header", include="boost/ut.hpp",
+        headers=H(("include/boost/ut.hpp", "boost/ut.hpp")),
+        flags=["-std=c++20"], license_files=["LICENSE.md"],
+        n="Boost-ext UT single-header C++20 unit testing framework."),
+    "sol2": dict(kind="header", include="sol/sol.hpp",
+        headers=H(("include/sol", "sol")), flags=["-std=c++17"],
+        license_files=["LICENSE.txt"],
+        n="Header-only C++ Lua bindings; depends on the lua port."),
+    "csv2": dict(kind="header", include="csv2/csv2.hpp",
+        headers=H(("single_include/csv2/csv2.hpp", "csv2/csv2.hpp")),
+        flags=["-std=c++17"], license_files=["LICENSE", "LICENSE.mio"],
+        n="Amalgamated header-only CSV reader/writer plus bundled mio license."),
+    "inja": dict(kind="header", include="inja/inja.hpp",
+        headers=H(("single_include/inja/inja.hpp", "inja/inja.hpp")),
+        flags=["-std=c++17"], license_files=["LICENSE"],
+        n="Amalgamated Jinja-style template engine; depends on nlohmann-json."),
+})
+
+
 def L(s):
     return json.dumps(str(s), ensure_ascii=False)
 
@@ -268,12 +338,15 @@ def build_lua(row):
             h["flags"] = meta["flags"]
         if meta.get("license_files"):
             h["license_files"] = meta["license_files"]
+        if "cxx" in meta:
+            h["cxx"] = meta["cxx"]
         out += ["    header = {",
                 "        headers = %s," % HEADERS(h["headers"], 12),
                 "        include = %s," % L(h["include"])]
-        for key in ("prelude", "flags", "license_files"):
+        for key in ("prelude", "flags", "license_files", "cxx"):
             if key in h:
-                out.append("        %s = %s," % (key, ARR(h[key], 12)))
+                value = ("true" if h[key] else "false") if key == "cxx" else ARR(h[key], 12)
+                out.append("        %s = %s," % (key, value))
         out += ["    },",
                 "    exports = {",
                 '      includes = { "@PREFIX@/include" },',
@@ -336,8 +409,7 @@ def features_yaml(row):
 def main():
     with open(TSV, newline="") as f:
         rows = list(csv.DictReader(f, delimiter="\t"))
-    assert len(rows) == 24, len(rows)
-    assert len(rows) == len(META)
+    assert len(rows) == len(META), (len(rows), len(META))
     for row in rows:
         assert row["name"] in META, row["name"]
         d = os.path.join(ROOT, row["name"])
