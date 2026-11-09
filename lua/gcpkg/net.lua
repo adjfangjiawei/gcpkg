@@ -24,6 +24,9 @@ function M.download(url, dest, expected, opts)
         gcpkg.log.warn("checksum mismatch, re-downloading " .. url)
         fs.rm(dest)
     end
+    -- A configured but unreachable proxy must not turn into a silent direct
+    -- download or a 20-second connect stall. The probe uses host:port only.
+    proxy.assert_reachable("download " .. url)
     gcpkg.log.step("downloading " .. url)
     -- Proxy credentials stay in the child environment, never in argv: build
     -- logs and --verbose output cannot leak them. curl/git read *_proxy env.
@@ -60,6 +63,7 @@ function M.git_clone(url, ref, dest, opts)
     end
     cmd[#cmd + 1] = url
     cmd[#cmd + 1] = dest
+    proxy.assert_reachable("clone " .. url)
     gcpkg.exec(cmd, { log = opts.log, env = proxy.env() })
 end
 

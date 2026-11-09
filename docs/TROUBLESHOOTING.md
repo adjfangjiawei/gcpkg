@@ -2,13 +2,14 @@
 
 ```bash
 gcpkg doctor
+gcpkg proxy --check
 gcpkg store show
 gcpkg check --ports ./ports
 gcpkg graph PORT --ports ./ports
 gcpkg ports --ports ./ports
 ```
 
-`doctor` 会显示二进制、编译器、拦截层、store 来源、port roots、代理与工具链状态。`check` 验证所有 port 的两个文件、依赖可解析性与 YAML / Lua 格式。
+`doctor` 会显示二进制、编译器、拦截层、store 来源、port roots、代理、代理监听状态与工具链状态。`check` 验证所有 port 的两个文件、依赖可解析性与 YAML / Lua 格式。
 
 ## 常见问题
 
@@ -22,7 +23,24 @@ gcpkg ports --ports ./ports
 
 ### 下载失败
 
-先用 `gcpkg proxy` 查看生效代理，必要时用 `--proxy`、`--no-proxy` 或 `GCPKG_PROXY` 覆盖。凭据不会打印到日志；网络问题可结合 `gcpkg --verbose` 与 store 中的日志目录定位。
+先用 `gcpkg proxy` 查看生效代理，再用 `gcpkg proxy --check` 验证代理软件是否可连接；必要时用 `--proxy`、`--no-proxy` 或 `GCPKG_PROXY` 覆盖。凭据不会打印到日志；网络问题可结合 `gcpkg --verbose` 与 store 中的日志目录定位。gcpkg 会在下载和 `git clone` 前做一次快速代理预检，无法连接时直接给出宿主地址与 Allow LAN 等提示。
+
+### WSL 代理连不上 Windows 宿主软件
+
+WSL 的 `127.0.0.1` 是 Linux 子系统自身的回环地址。若 `gcpkg proxy http://127.0.0.1:7890 -g` 后 `gcpkg proxy --check` 报连接失败，请确认：
+
+1. Windows 代理软件已开启 **Allow LAN** 或绑定到 `0.0.0.0`，而不是只监听 Windows 的 `127.0.0.1`；
+2. `gcpkg proxy` 输出的 host hint 与 WSL 默认网关一致；必要时用 `GCPKG_WSL_HOST=<windows-host-ip>` 指定；
+3. 防火墙允许 WSL 虚拟网卡访问代理端口；
+4. `GCPKG_WSL_HOST=off` 可用于确认代理确实运行在 WSL 内部。
+
+gcpkg 会保留配置文件中的原始 URL，只把运行时 `*_proxy` 改写到检测到的宿主网关；`gcpkg doctor` 也会显示当前代理监听状态。完整说明见 [PROXY.md](PROXY.md)。
+
+### `Compatibility with CMake < 3.5 has been removed`
+
+CMake 4 移除了对 `cmake_minimum_required(VERSION < 3.5)` 的兼容，老版本上游库（例如旧 zlib）会在 configure 阶段失败。gcpkg 会检测 `cmake --version`：当主版本大于等于 4 时，统一为所有 CMake port 与内层构建传入 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`，并在注入环境与构建子进程中设置同名环境变量。无需为单个 port 改 `CMakeLists.txt`。
+
+如果调用了自定义 CMake 脚本或手工执行 `cmake`，请 source 生成的 `gcpkg-env.sh`，或自行设置 `CMAKE_POLICY_VERSION_MINIMUM=3.5`。用户显式提供的同名 `-D` / 环境变量优先。CMake adapter 还会对重复的 `-DNAME=VALUE` 去重（最后一个生效），因此特性参数可以覆盖 port 的默认值，不会在命令行里重复出现。
 
 ### 端口构建失败但源码已下载
 

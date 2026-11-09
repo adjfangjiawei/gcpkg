@@ -14,12 +14,20 @@
 --   5. $GCPKG_HOME/gcpkg.yaml `proxy:` (user-wide / public)
 --   6. HTTPS_PROXY / HTTP_PROXY / ALL_PROXY (standard environment)
 --   7. no proxy (direct)
--- `no_proxy` comes from --noproxy / GCPKG_NO_PROXY / either config file /
--- NO_PROXY, in that order. Project config outranks the user-wide config,
--- matching the scope rules of gcpkg.workspace.
+--
+-- A proxy selected by gcpkg does not inherit standard NO_PROXY: an inherited
+-- `NO_PROXY=*` must not silently bypass an explicitly configured proxy.
+-- Exclusions can still be set with --noproxy, GCPKG_NO_PROXY or a config key.
+--
+-- On WSL, 127.0.0.1 is the Linux subsystem's own loopback, not the Windows
+-- host. When a loopback proxy has no local listener, gcpkg maps it to the
+-- Windows host gateway (ip route / resolv.conf / host.docker.internal). The
+-- stored URL remains unchanged; only the effective child environment changes.
+-- GCPKG_WSL_HOST=<ip> forces a host, and `off`/`loopback` disables mapping.
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local yaml = require("gcpkg.yaml")
+local exec = require("gcpkg.exec")
 local M = { current = nil }
 
 M.BLOCK_START = "# --- gcpkg managed proxy (use `gcpkg proxy`) ---"
@@ -28,6 +36,27 @@ M.BLOCK_END = "# --- end gcpkg managed proxy ---"
 local PROXY_KEYS = { "http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY",
                      "all_proxy", "ALL_PROXY" }
 local NOPROXY_KEYS = { "no_proxy", "NO_PROXY" }
+local EXPLICIT_SOURCES = {
+    ["--proxy"] = true,
+    ["GCPKG_PROXY"] = true,
+    ["project gcpkg.yaml"] = true,
+    ["$GCPKG_HOME/gcpkg.yaml"] = true,
+}
+local UNREACHABLE_CURL = {
+    [2] = "curl failed to initialize",
+    [3] = "malformed probe URL",
+    [5] = "could not resolve proxy",
+    [6] = "could not resolve proxy host",
+    [7] = "connection refused (no proxy listener)",
+    [28] = "connection timed out",
+    [125] = "probe process could not start",
+    [126] = "probe process could not start",
+    [127] = "curl is not available",
+}
+local DEFAULT_PORT = {
+    http = 80, https = 443, socks4 = 1080, socks4a = 1080,
+    socks5 = 1080, socks5h = 1080,
+}
 
 local function getenv(k)
     return gcpkg.sys.getenv(k)
@@ -88,6 +117,208 @@ local function first(list)
     return nil
 end
 
+-- Split just enough of a proxy URL to find the listener. Credentials are
+-- never passed to a probe command.
+local function split_url(url)
+    local scheme, rest = tostring(url):match("^([%w+%.%-]+)://(.*)$")
+    if not scheme or not rest then
+        return nil
+    end
+    local auth, authority = "", rest
+    local at = rest:find("@", 1, true)
+    if at then
+        auth, authority = rest:sub(1, at), rest:sub(at + 1)
+    end
+    local host, tail
+    if authority:sub(1, 1) == "[" then
+        host, tail = authority:match("^(%[[^%]]+%])(.*)$")
+    else
+        host, tail = authority:match("^([^:/]+)(.*)$")
+    end
+    if not host then
+        return nil
+    end
+    tail = tail or ""
+    local port = tonumber(tail:match("^:(%d+)") or "") or DEFAULT_PORT[scheme]
+    return scheme, auth, host, port, tail
+end
+
+local function host_of(url)
+    local _, _, host = split_url(url)
+    return host
+end
+
+local function loopback(host)
+    return host == "127.0.0.1" or host == "localhost" or
+           host == "::1" or host == "[::1]"
+end
+
+local function is_wsl()
+    return getenv("WSL_DISTRO_NAME") ~= nil or getenv("WSLENV") ~= nil or
+           getenv("WSL_INTEROP") ~= nil
+end
+
+local reachCache = {}
+local decisionCache = {}
+local checkCache = {}
+local function reachable(url, timeout)
+    local key = tostring(url) .. "|" .. tostring(timeout)
+    local hit = reachCache[key]
+    if hit then
+        return hit.ok, hit.reason
+    end
+    local scheme, _, host, port = split_url(url)
+    if not scheme or not host or not port then
+        return false, "invalid proxy URL"
+    end
+    local targetHost = host
+    if host:sub(1, 1) ~= "[" and host:find(":", 1, true) then
+        targetHost = "[" .. host .. "]"
+    end
+    local probeEnv = {}
+    for _, k in ipairs(PROXY_KEYS) do
+        probeEnv[k] = ""
+    end
+    for _, k in ipairs(NOPROXY_KEYS) do
+        probeEnv[k] = "*"
+    end
+    -- A local HTTP probe is enough to distinguish "no listener" from "proxy
+    -- app accepted a TCP connection". SOCKS/TLS proxies may close it with a
+    -- curl 35/52/56 code; those still prove the listener is reachable.
+    local cmd = { "curl", "--noproxy", "*", "--connect-timeout", tostring(timeout),
+                  "--max-time", tostring(timeout + 1), "-sS", "-o", "/dev/null",
+                  "http://" .. targetHost .. ":" .. tostring(port) .. "/" }
+    local ok, _, code = pcall(exec.capture, cmd, { env = probeEnv })
+    local result = { ok = false, reason = "proxy listener probe failed" }
+    if not ok then
+        result.reason = "proxy listener probe could not be started"
+    else
+        code = tonumber(code) or -1
+        if code == 0 then
+            result.ok = true
+            result.reason = "proxy listener accepted an HTTP probe"
+        elseif UNREACHABLE_CURL[code] then
+            result.reason = UNREACHABLE_CURL[code] .. " (curl exit " .. code .. ")"
+        else
+            result.ok = true
+            result.reason = "TCP listener reachable (curl exit " .. code .. ")"
+        end
+    end
+    reachCache[key] = result
+    return result.ok, result.reason
+end
+
+M.reachable = reachable
+
+local function wsl_host()
+    local explicit = getenv("GCPKG_WSL_HOST")
+    if explicit == "off" or explicit == "none" or explicit == "loopback" then
+        return nil
+    end
+    if explicit and explicit ~= "" and explicit ~= "auto" then
+        return explicit
+    end
+    local ok, out, code = pcall(exec.capture,
+        { "sh", "-c", "ip route show default 2>/dev/null | awk '{print $3; exit}'" })
+    if ok and code == 0 then
+        local host = util.trim(out or "")
+        if host:match("^%d+%.%d+%.%d+%.%d+$") and not loopback(host) then
+            return host
+        end
+    end
+    local resolv = fs.read("/etc/resolv.conf")
+    for _, line in ipairs(util.lines(resolv or "")) do
+        local host = util.trim(line):match("^nameserver%s+(%d+%.%d+%.%d+%.%d+)")
+        if host and not loopback(host) then
+            return host
+        end
+    end
+    ok, out, code = pcall(exec.capture,
+        { "getent", "ahostsv4", "host.docker.internal" })
+    if ok and code == 0 then
+        local host = util.trim(out or ""):match("^(%S+)")
+        if host and host:match("^%d+%.%d+%.%d+%.%d+$") and not loopback(host) then
+            return host
+        end
+    end
+    return nil
+end
+
+local function rewrite_loopback(url, replacement)
+    local scheme, auth, host, _, tail = split_url(url)
+    if not scheme or not host or not loopback(host) then
+        return url
+    end
+    return scheme .. "://" .. auth .. replacement .. (tail or "")
+end
+
+local function wsl_decision(url)
+    local hit = decisionCache[url]
+    if hit then
+        return hit.url, hit.info
+    end
+    local result = { url = url, info = nil }
+    local _, _, host = split_url(url)
+    if is_wsl() and loopback(host) then
+        local explicit = getenv("GCPKG_WSL_HOST")
+        local disabled = explicit == "off" or explicit == "none" or
+                         explicit == "loopback"
+        if disabled then
+            result.info = { loopback = true, keep = true, explicit = true }
+        else
+            local replacement = wsl_host()
+            if replacement and replacement ~= host then
+                local localOk = false
+                if not (explicit and explicit ~= "" and explicit ~= "auto") then
+                    localOk = reachable(url, 1)
+                end
+                if localOk and not (explicit and explicit ~= "" and explicit ~= "auto") then
+                    result.info = { loopback = true, host = replacement,
+                                    keep = true, reachable = true }
+                else
+                    result.url = rewrite_loopback(url, replacement)
+                    result.info = { loopback = true, host = replacement,
+                                    rewritten = true,
+                                    explicit = explicit ~= nil and explicit ~= "" and
+                                               explicit ~= "auto" }
+                end
+            else
+                result.info = { loopback = true, host = replacement, keep = true }
+            end
+        end
+    end
+    decisionCache[url] = result
+    return result.url, result.info
+end
+
+function M.wsl_hint(p)
+    p = p or M.active()
+    local w = p and p.wsl
+    if not w or not w.loopback then
+        return nil
+    end
+    local _, _, _, port = split_url(p.url or "")
+    local listener = tostring(w.host or "the Windows host") ..
+                     (port and (":" .. tostring(port)) or "")
+    if w.rewritten then
+        return "proxy host hint: WSL loopback proxy rewritten to " .. tostring(w.host) ..
+               "; make sure the Windows proxy app accepts LAN connections on " ..
+               listener .. " (Allow LAN / bind to 0.0.0.0), or set " ..
+               "GCPKG_WSL_HOST=<windows-host-ip>."
+    end
+    if w.keep and w.reachable then
+        return nil
+    end
+    if not w.host then
+        return "proxy host hint: WSL loopback proxy cannot reach a Windows proxy app " ..
+               "and no host gateway was found; set GCPKG_WSL_HOST=<windows-host-ip> " ..
+               "or use the host IP in the proxy URL, and enable Allow LAN."
+    end
+    return "proxy host hint: WSL loopback proxy may not reach a Windows proxy app; " ..
+           "set GCPKG_WSL_HOST=<windows-host-ip> or use the host IP in the proxy URL, " ..
+           "and enable Allow LAN in the proxy app (listener " .. listener .. ")."
+end
+
 function M.sources(o)
     o = o or {}
     local proj = o.project_dir and util.join(o.project_dir, "gcpkg.yaml") or nil
@@ -106,8 +337,12 @@ function M.sources(o)
     }
 end
 
-local function no_proxy_list(o, projectDir)
+local function no_proxy_list(o, projectDir, inheritStandard)
     local proj = projectDir and util.join(projectDir, "gcpkg.yaml") or nil
+    local standard = ""
+    if inheritStandard then
+        standard = getenv("NO_PROXY") or getenv("no_proxy") or ""
+    end
     -- Use "" rather than nil: Lua's ipairs stops at the first nil element,
     -- which would make every later (lower-priority) candidate unreachable.
     return first({
@@ -115,7 +350,7 @@ local function no_proxy_list(o, projectDir)
         getenv("GCPKG_NO_PROXY") or "",
         proj and config(proj, "no_proxy") or "",
         config(M.global_yaml(), "no_proxy") or "",
-        getenv("NO_PROXY") or getenv("no_proxy") or "",
+        standard,
     }) or ""
 end
 
@@ -124,7 +359,7 @@ function M.resolve(o)
     for _, s in ipairs(M.sources(o)) do
         if s.value == "__disabled__" then
             return { disabled = true, source = "--no-proxy",
-                     no_proxy = no_proxy_list(o, o.project_dir) }
+                     no_proxy = no_proxy_list(o, o.project_dir, false) }
         end
         if s.value and s.value ~= "" then
             if not valid(s.value) then
@@ -132,11 +367,13 @@ function M.resolve(o)
                       " (expected scheme://host:port, got '" ..
                       M.redact(s.value) .. "')")
             end
-            return { url = s.value, source = s.name,
-                     no_proxy = no_proxy_list(o, o.project_dir) }
+            local url, wsl = wsl_decision(s.value)
+            return { url = url, origin = s.value, source = s.name, wsl = wsl,
+                     no_proxy = no_proxy_list(o, o.project_dir,
+                                              not EXPLICIT_SOURCES[s.name]) }
         end
     end
-    return { no_proxy = no_proxy_list(o, o.project_dir) }
+    return { no_proxy = no_proxy_list(o, o.project_dir, true) }
 end
 
 function M.configure(o)
@@ -146,6 +383,13 @@ end
 
 function M.active()
     return M.current or M.resolve({})
+end
+
+function M.reset()
+    M.current = nil
+    reachCache = {}
+    decisionCache = {}
+    checkCache = {}
 end
 
 -- Environment passed to curl/git and to every build hook. Returning an empty
@@ -174,10 +418,6 @@ function M.env(o)
     return out
 end
 
-local function host_of(url)
-    return (tostring(url):match("^[%w][%w+%.%-]*://([^/:]+)"))
-end
-
 function M.bypass(url, list)
     if not list or list == "" then
         return false
@@ -202,8 +442,8 @@ function M.bypass(url, list)
     return false
 end
 
-function M.summary()
-    local p = M.active()
+function M.summary(p)
+    p = p or M.active()
     if p.disabled then
         return "disabled (--no-proxy / direct)"
     end
@@ -213,6 +453,54 @@ function M.summary()
     return M.redact(p.url) .. " [" .. p.source .. "]" ..
            (p.no_proxy and p.no_proxy ~= "" and
             (" no_proxy=" .. p.no_proxy) or "")
+end
+
+function M.check(p)
+    p = p or M.active()
+    if getenv("GCPKG_PROXY_CHECK") == "0" then
+        return true, "proxy check disabled (GCPKG_PROXY_CHECK=0)"
+    end
+    if p.disabled or not p.url then
+        return true, "direct (no proxy configured)"
+    end
+    if p.no_proxy and M.bypass("https://gcpkg.invalid", p.no_proxy) then
+        return true, "all destinations bypass the proxy (no_proxy=*)"
+    end
+    local key = tostring(p.url) .. "|" .. tostring(p.no_proxy or "")
+    local hit = checkCache[key]
+    if hit then
+        return hit.ok, hit.reason
+    end
+    local ok, reason = reachable(p.url, 2)
+    local result = { ok = ok, reason = reason }
+    if ok then
+        result.reason = "proxy listener reachable at " .. M.redact(p.url) ..
+                        " (" .. reason .. ")"
+    else
+        local parts = {
+            "cannot connect to effective proxy " .. M.redact(p.url),
+            "configured as " .. M.redact(p.origin or p.url) ..
+                " from " .. tostring(p.source or "configuration"),
+            reason,
+        }
+        local hint = M.wsl_hint(p)
+        if hint then
+            parts[#parts + 1] = hint
+        end
+        parts[#parts + 1] = "check that the proxy app is running and listening on " ..
+                            "this host:port; use `gcpkg proxy --check` to retest"
+        result.reason = table.concat(parts, "; ")
+    end
+    checkCache[key] = result
+    return result.ok, result.reason
+end
+
+function M.assert_reachable(operation, p)
+    local ok, reason = M.check(p)
+    if not ok then
+        error("cannot " .. tostring(operation or "use network") .. ": " .. reason)
+    end
+    return true
 end
 
 function M.describe(o)
@@ -232,10 +520,18 @@ function M.describe(o)
     end
     log.info("  noproxy candidates        : " ..
              (p.no_proxy and p.no_proxy ~= "" and p.no_proxy or "(none)"))
-    log.step("effective: " .. M.summary())
+    log.step("effective: " .. M.summary(p))
+    if p.origin and p.url and p.origin ~= p.url then
+        log.info("  WSL host mapping      : " .. M.redact(p.origin) ..
+                 " -> " .. M.redact(p.url))
+    end
     if p.url and not p.disabled then
         log.info("  sample https://github.com : " ..
                  (M.bypass("https://github.com", p.no_proxy) and "bypassed" or "via proxy"))
+    end
+    local hint = M.wsl_hint(p)
+    if hint then
+        log.info("  " .. hint)
     end
     return p
 end
@@ -304,6 +600,10 @@ function M.target(o)
 end
 
 function M.set(o)
+    if o.url and o.url ~= "" and not valid(o.url) then
+        error("invalid proxy URL (expected scheme://host:port, got '" ..
+              M.redact(o.url) .. "')")
+    end
     local path = M.target(o)
     M.set_block(path, o.url, o.no_proxy_list)
     return path

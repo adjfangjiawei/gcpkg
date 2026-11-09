@@ -21,6 +21,7 @@ Project workflow (pnpm-style):
   gcpkg list [DIR]                  show project deps, scopes, versions and lock
   gcpkg versions PORT               list versions declared for a port
   gcpkg proxy [URL|--unset]         show / set / clear the proxy configuration
+  gcpkg proxy --check               verify the proxy listener / WSL host mapping
   gcpkg store show                show the effective package store
   gcpkg store set DIR              persist a user-wide store directory
   gcpkg store unset                remove the persisted store directory
@@ -62,6 +63,7 @@ Options:
   --proxy=URL                      one-shot proxy (http/https/socks5, user:pass@host)
   --no-proxy                       force a direct connection for this run
   --noproxy=LIST                   comma-separated hosts that bypass the proxy
+  --check                          (proxy) check the effective proxy listener
   --store=DIR                      package store (default $GCPKG_STORE,
                                    $GCPKG_HOME, user config, or ~/.gcpkg)
   --ports=DIR[:DIR...]             public port registry roots
@@ -278,6 +280,17 @@ local function doctor(cfg, o)
     log.info("store source        : " .. (cfg.store.source or "default"))
     log.info("store config        : " .. config.path())
     log.info("proxy               : " .. proxy.summary())
+    local activeProxy = proxy.active()
+    local proxyHint = proxy.wsl_hint(activeProxy)
+    if proxyHint then
+        log.info("proxy host hint    : " .. proxyHint)
+    end
+    local listenerOk, listenerReason = proxy.check(activeProxy)
+    if listenerOk then
+        log.info("proxy listener     : " .. listenerReason)
+    else
+        log.warn("proxy listener     : " .. listenerReason)
+    end
     log.info("ports roots         : " .. table.concat(cfg.ports, " : "))
     local wrapper = gcpkg.sys.wrapper_bin()
     log.info("compiler interceptor: " .. wrapper ..
@@ -487,7 +500,18 @@ function M.main(args)
         if o.local_port and not projDir then
             error("--local needs a gcpkg project (run `gcpkg new DIR` first)")
         end
-        if value == "--unset" then
+        if value == "--check" or value == "check" then
+            local p = proxy.describe({ project_dir = projDir, proxy = o.proxy,
+                                       no_proxy = o.no_proxy,
+                                       no_proxy_list = o.no_proxy_list })
+            local ok, reason = proxy.check(p)
+            if ok then
+                log.step("proxy listener     : " .. reason)
+                return 0
+            end
+            log.error("proxy listener     : " .. reason)
+            return 1
+        elseif value == "--unset" then
             local path = proxy.unset({ project_dir = projDir, global = o.global })
             log.step("cleared proxy from " .. path)
         elseif value and not value:match("^%-") then

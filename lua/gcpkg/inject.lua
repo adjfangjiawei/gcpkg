@@ -22,6 +22,7 @@ local compdb = require("gcpkg.compdb")
 local port = require("gcpkg.port")
 local workspace = require("gcpkg.workspace")
 local storeMod = require("gcpkg.store")
+local cmake_version = require("gcpkg.cmake_version")
 
 local M = {}
 
@@ -405,6 +406,10 @@ local function makeEnv(path, f, files, env)
     out[#out + 1] = "export CMAKE_FIND_ROOT_PATH=" .. shquote(semicolon(f.prefixes)) .. "${CMAKE_FIND_ROOT_PATH:+;$CMAKE_FIND_ROOT_PATH}"
     out[#out + 1] = "export CMAKE_INSTALL_PREFIX=" .. shquote(files.install_prefix)
     out[#out + 1] = "export CMAKE_EXPORT_COMPILE_COMMANDS=ON"
+    if env.CMAKE_POLICY_VERSION_MINIMUM then
+        out[#out + 1] = "export CMAKE_POLICY_VERSION_MINIMUM=" ..
+                        shquote(env.CMAKE_POLICY_VERSION_MINIMUM)
+    end
     local bins = colon(f.binaries)
     if bins ~= "" then
         out[#out + 1] = "export PATH=" .. shquote(bins) .. "${PATH:+:$PATH}"
@@ -539,6 +544,13 @@ local function environment(f, files, ordered)
     set("CMAKE_FIND_ROOT_PATH", appendVar("CMAKE_FIND_ROOT_PATH", semicolon(f.prefixes), ";"))
     set("CMAKE_INSTALL_PREFIX", files.install_prefix)
     set("CMAKE_EXPORT_COMPILE_COMMANDS", "ON")
+    local policyBase = {
+        CMAKE_POLICY_VERSION_MINIMUM = getenv("CMAKE_POLICY_VERSION_MINIMUM") ~= "" and
+            getenv("CMAKE_POLICY_VERSION_MINIMUM") or base.CMAKE_POLICY_VERSION_MINIMUM,
+    }
+    for k, v in pairs(cmake_version.policy_env(policyBase)) do
+        set(k, v)
+    end
     set("CMAKE_TOOLCHAIN_FILE", files.toolchain)
     set("MESON_NATIVE_FILE", files.meson)
     set("GN_GNI_FILE", files.gn_gni)

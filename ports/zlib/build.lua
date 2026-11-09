@@ -15,11 +15,9 @@ return recipe.cmake {
         strip = 1,
     },
     dependencies = {},
-    cmake = {
-        defines = {
-            ZLIB_BUILD_EXAMPLES = "OFF",
-        },
-    },
+    -- examples/no-examples are data-driven feature switches; the CMake
+    -- adapter de-duplicates any repeated -DNAME=VALUE arguments.
+    cmake = {},
     exports = {
         includes = { "@PREFIX@/include" },
         libdirs = { "@LIBDIR@" },

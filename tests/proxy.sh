@@ -90,7 +90,10 @@ echo "== doctor / help / invalid URL / engine integration =="
 has "$T/doctor.log" "proxy               :"
 "${GP[@]}" --help > "$T/help.log" 2>&1
 has "$T/help.log" "gcpkg proxy [URL|--unset]"
+has "$T/help.log" "gcpkg proxy --check"
 has "$T/help.log" "--no-proxy"
+"${GP[@]}" proxy --check > "$T/check-direct.log" 2>&1
+has "$T/check-direct.log" "proxy listener"
 if "${GP[@]}" --proxy='not-a-url' check > "$T/invalid.log" 2>&1; then
     fail "invalid proxy URL was accepted"
 fi
@@ -98,6 +101,10 @@ has "$T/invalid.log" "invalid proxy URL"
 grep -Fq 'env = proxy.env()' "$ROOT/lua/gcpkg/net.lua" || fail "curl download lost proxy env"
 [ "$(grep -c 'env = proxy.env()' "$ROOT/lua/gcpkg/net.lua")" -ge 2 ] ||
     fail "git clone lost proxy env"
+grep -Fq 'proxy.assert_reachable' "$ROOT/lua/gcpkg/net.lua" ||
+    fail "downloads lost proxy preflight"
+grep -Fq 'GCPKG_WSL_HOST' "$ROOT/lua/gcpkg/proxy.lua" ||
+    fail "WSL loopback proxy host handling is missing"
 grep -Fq 'proxy.env()' "$ROOT/lua/gcpkg/port.lua" || fail "build hooks lost proxy env"
 grep -Fq 'proxy.env()' "$ROOT/lua/gcpkg/project.lua" || fail "project builds lost proxy env"
 ok "CLI surface, validation, engine wiring"
@@ -177,4 +184,10 @@ GCPKG_TEST_GIT_ENV="$T/git.env" PATH="$T/fakebin:$PATH" \
 has "$T/git.env" "http://127.0.0.1:$PORT"
 ok "git clone inherited https_proxy"
 
-echo "proxy test OK (dynamic: curl proxy, bypass, project config, git env, no leaks)"
+# 5. --check must verify the proxy listener without external network traffic.
+"${GP[@]}" proxy --proxy="http://127.0.0.1:$PORT" --check > "$T/check-proxy.log" 2>&1 ||
+    fail "proxy --check failed: $(tail -4 "$T/check-proxy.log" | tr '\n' ' ')"
+has "$T/check-proxy.log" "proxy listener reachable"
+ok "proxy --check verified the listener"
+
+echo "proxy test OK (dynamic: curl proxy, bypass, project config, git env, check, no leaks)"
