@@ -1,0 +1,2 @@
+# Minimal gcpkg GN fixture. This is our own project, not an upstream library.
+buildconfig = "//build/BUILDCONFIG.gn"

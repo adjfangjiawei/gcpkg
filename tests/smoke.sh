@@ -15,6 +15,12 @@ fi
 mkdir -p "$HOME/.cache"
 
 "$BIN" doctor
+# Fresh snapshots have no OpenSSL store; `gcpkg doctor` above still validates
+# the engine/toolchain. Rebuild explicitly when the artifacts are wanted.
+if [[ "${GCPKG_FORCE_DYNAMIC:-0}" != "1" && ! -f "$STORE/manifest/openssl-3.4.1.json" ]]; then
+    echo "SKIP cached OpenSSL smoke build: no openssl manifest in $STORE (set GCPKG_FORCE_DYNAMIC=1 to rebuild)"
+    exit 0
+fi
 "$BIN" build "$PROJECT" --store "$STORE" --ports "$ROOT/ports" -j "$(nproc)"
 
 python3 - "$PROJECT" <<'PY'

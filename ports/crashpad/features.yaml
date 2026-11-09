@@ -1,0 +1,19 @@
+schema: 1
+port: crashpad
+
+# GN-native Crashpad; pinned mini_chromium and Linux-syscall-support tarballs fill empty submodules.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

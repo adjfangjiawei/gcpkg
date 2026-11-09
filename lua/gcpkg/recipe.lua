@@ -10,7 +10,7 @@
 -- compiler interception and compdb import. Anything unusual can still provide
 -- its own build(ctx) function -- the recipe layer never takes that away.
 --
--- Supported kinds: cmake, meson, autotools, make. Meson matters for the Linux
+-- Supported kinds: cmake, meson, autotools, make, gn, python, cargo. Meson matters for the Linux
 -- plumbing stack (wayland / X11 / systemd / libinput / libdrm / ...).
 local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
@@ -181,6 +181,30 @@ function M.define(spec)
                     targets = { cfg.install_target },
                 }
             end
+        elseif kind == "gn" then
+            -- GN meta-build system: gn gen (Ninja files) + ninja build.
+            -- args may be a list of GN assignments or a function(ctx) for
+            -- values that depend on the installed tree / host toolchain.
+            local gn = require("gcpkg.build.gn")
+            local cfg = spec.gn or {}
+            local a = cfg.args
+            if type(a) == "function" then a = a(ctx) end
+            if type(a) == "string" then a = { a } end
+            local args = util.concat(util.deepcopy(a or {}), featureArgs)
+            result = gn.all {
+                src = cfg.source and util.join(ctx.src, cfg.source) or ctx.src,
+                build_dir = ctx.build_dir,
+                prefix = ctx.prefix,
+                exec = ctx.exec,
+                log = ctx.log,
+                jobs = cfg.jobs or ctx.jobs,
+                env = ctx.env,
+                args = args,
+                targets = cfg.targets or {},
+                gn = cfg.gn or "gn",
+                ninja = cfg.ninja or "ninja",
+            }
+
         elseif kind == "python" then
             -- setup.py / pip based Python packages. PYTHONPATH for dependents
             -- comes from <prefix>/lib/python3/site-packages (dependency_env).
@@ -247,6 +271,11 @@ end
 
 function M.make(spec)
     spec.kind = "make"
+    return M.define(spec)
+end
+
+function M.gn(spec)
+    spec.kind = "gn"
     return M.define(spec)
 end
 

@@ -38,6 +38,13 @@ PY
 echo "--- conditional feature dependency still resolves ---"
 "$BIN" graph openssl --ports "$PORTS" --feature=openssl:zlib | grep -q 'zlib'
 
+# Registry/graph/feature checks above are pure static checks. The artifact,
+# compdb and clangd checks below need the old prebuilt Linux store, which is
+# not part of a fresh workspace snapshot.
+if [[ "${GCPKG_FORCE_DYNAMIC:-0}" != "1" && ! -f "$STORE/manifest/libnuma-2.0.19.json" ]]; then
+    echo "SKIP cached Linux artifacts: no libnuma manifest in $STORE (set GCPKG_FORCE_DYNAMIC=1 to require them)"
+    exit 0
+fi
 echo "--- 36 compiled ports: manifests, compdb, artifacts ---"
 python3 - "$STORE" <<'PY'
 import glob, json, os, sys

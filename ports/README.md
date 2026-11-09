@@ -1,7 +1,7 @@
 # Port 注册表
 
 每个库恰好两个文件：`build.lua`（构建描述）+ `features.yaml`（特性描述）。
-当前共 **226 个 port**（第四轮 +36，第五轮 +23，第六轮 +37，第七轮 +34 个
+当前共 **277 个 port**（第四轮 +36，第五轮 +23，第六轮 +37，第七轮 +34 个
 内核/磁盘库，第九轮 +43 个基础库，第十轮 +38 个库与代理支持）。`gcpkg ports` 按依赖层级列出，`gcpkg graph <port>` 打印
 自底向上的构建顺序，`gcpkg check` 校验文件齐全、Lua 可加载、依赖可解析；
 三者都接受 `--feature=...`，会把特性 `requires:` 引入的条件依赖算进图里。
@@ -358,3 +358,10 @@ libidn2 → zlib → gnutls）、`graph libbpf` 5 步（zlib / zstd / xz → elf
 `tokenizers-cpp` / `toml` / `ryu`），总计 **249** 个；其中 `libvpx`
 由纯 C 目标改为经 `nasm` 工具 port 编 SIMD。完整清单见
 `docs/ROUND11_LIBRARIES.md` 与 `docs/TOOLCHAINS.md`。
+
+第十二轮新增 28 个 port（25 个常见库 + `ninja` / `gn` 两个源码工具 port +
+真实 GN 库 `crashpad`），总计 **277** 个。新 `recipe.gn` /
+`gcpkg.build.gn` adapter 把 `gn gen --export-compile-commands` 与 `ninja`
+接入统一 compdb；`crashpad` 的依赖图是 `ninja → gn → crashpad`，
+`libgit2` 真依赖 `zlib`，`taglib:zlib` 是条件依赖。完整清单见
+`docs/GN.md`、`docs/ROUND12_LIBRARIES.md` 与 `tools/r12-catalog.tsv`。

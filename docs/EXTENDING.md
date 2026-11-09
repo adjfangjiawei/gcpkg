@@ -505,3 +505,27 @@ elseif kind == "python" then
 才能继承；工具链缺失时宁可做成 external port 静态声明，也不要假编译。
 完整设计、pinned tarball 与踩坑见 `docs/TOOLCHAINS.md`，23 个新 port 的
 清单在 `docs/ROUND11_LIBRARIES.md`。
+
+## 14. 第十个构建系统 adapter：GN（第十二轮）
+
+`recipe.gn` 和 `lua/gcpkg/build/gn.lua` 把 GN 当成元构建系统处理：
+`gn gen --export-compile-commands` 生成 Ninja 图，随后 `ninja -C <out>`
+执行编译。关键点是**返回 GN 原生 `compile_commands.json`**，让
+`port.lua` 的 compdb union 把 GN 目标与所有依赖一起给 clangd：
+
+```lua
+elseif kind == "gn" then
+    local gn = require("gcpkg.build.gn")
+    result = gn.all {
+        src = ctx.src, build_dir = ctx.build_dir,
+        exec = ctx.exec, jobs = cfg.jobs or ctx.jobs,
+        args = cfg.args, targets = cfg.targets,
+    }
+```
+
+`gn` / `ninja` 本身也是源码工具 port；`gn.args` 支持 `function(ctx)`，
+可以从 `ctx.dep("gn").prefix` 推导 `clang_path`，适配 GN 没有默认编译器
+配置这一点。自定义 `source()` 可以用多个 pinned tarball 补齐空 submodule
+目录（Crashpad 的 mini_chromium/LSS、TagLib 的 utfcpp），无需修改上游。
+最小 GN 工程、统一 compdb 与固定源说明见 `docs/GN.md`，28 个新 port 见
+`docs/ROUND12_LIBRARIES.md`。

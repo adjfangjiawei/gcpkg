@@ -671,7 +671,7 @@ config）、`graph glog` = 2 步（`gflags → glog`）、`graph libbsd` = 2 步
 
 ### 第十一轮：工具链也是 port，包管理器也是 adapter
 
-注册表 226 → **249**。三种形态：`nasm` 2.16.03 与 `python` 3.12.8
+注册表 226 → **249**（第十二轮已到 277）。三种形态：`nasm` 2.16.03 与 `python` 3.12.8
 是从真实 tarball 编译的**源码工具 port**（`exports.binaries` 进 `PATH`）；
 `rust` 用 `gcpkg.build.external.declare` 声明 `GCPKG_RUST_HOME`，
 `gcpkg externals` 离线列出；`tokenizers-cpp` 固定到上游 main commit
@@ -690,6 +690,25 @@ rust-analyzer），但 C++ 侧仍经 `compdb_files` 并入统一编译数据库�
 `tests/r11.sh` 断言 `generic-gnu` 已消失、构建日志含 `[AS]`。
 新增 `tests/r11.sh`（静态 + `GCPKG_R11_DYNAMIC=1` 全量真编译）与
 `docs/TOOLCHAINS.md` / `docs/ROUND11_LIBRARIES.md`。
+
+### 第十二轮：GN 元构建系统作为 Lua adapter
+
+注册表 249 → **277**。`ninja` 与 `gn` 都是从真实 tarball 编译的源码工具 port，
+`gn` 依赖 `ninja`；`lua/gcpkg/build/gn.lua` 只做两件事：
+`gn gen <out> --export-compile-commands` 和 `ninja -C <out> -j N`。
+`recipe.gn` 把 GN 原生 `<out>/compile_commands.json` 放进 `compdb_files`，
+由 `port.lua` 与 intercept 日志 union 后写入统一 compdb。GN 没有默认编译器
+配置，`gn` 工具 port 因此导出一个链接到宿主 Clang 的 shim 目录；
+`crashpad` 的 `gn.args = function(ctx)` 从 `ctx.dep("gn").prefix` 计算
+`clang_path`。GitHub archive 的空 submodule 仍用固定 tarball 补齐：
+Crashpad 补 mini_chromium / LSS，TagLib 补 utfcpp，均不修改上游。
+
+另新增 25 个常见库，覆盖 CMake / autotools / 单文件 CC / header-only CXX
+四种形态；`libgit2 → zlib` 与 `taglib:zlib` 覆盖普通依赖与条件依赖。
+`tests/r12.sh` 同时静态校验两个生成器的字节级幂等、GN fixture、依赖图，
+并在 `GCPKG_R12_DYNAMIC=1` 时从干净 store 真编译 28 个新 port：
+**28 PASS / 0 FAIL、4527 条 compile commands**；项目模式合并 compdb 718 条。
+详见 `docs/GN.md` 与 `docs/ROUND12_LIBRARIES.md`。
 
 ## 16. 构建 gcpkg 本体
 

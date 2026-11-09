@@ -2,7 +2,7 @@
 
 一个**元包管理器**：用 Lua 描述「怎么构建一个库」，用 YAML 描述「这个库有哪些特性」，把任意构建系统、乃至其它包管理器（vcpkg / conan / pkg-config / apt / …）接进来，**不改它们本身**，并且让项目自身也能被它管理、生成可跨依赖跳转的 clangd 编译数据库。
 
-> 当前分支 `feat/lua-yaml-compdb-openssl`：Lua 引擎 + YAML 特性 + 项目模式 + 统一编译数据库 + **249 个真实 port**（L0 → L4，含工具链 port）。按依赖层次自底向上扩展：`openssl` 起步，L0 十个基础库，再到 `libssh2` / `nghttp2` / `curl` 全链与 `libarchive`（一次挂 8 个 L0 依赖）。第四轮继续覆盖 Linux 底层库栈：NUMA / 权限与沙箱 / netfilter / X11 / **Xserver** / **Wayland** / libinput / D-Bus / kmod / util-linux / **systemd** / ipvs / iptables —— 36 个新 port 全部真实编译（6718 条编译命令），`xserver` 依赖图 16 步、`systemd` 单包 3272 条。特性开关也能引入真实的传递依赖（`openssl:zlib` → 先构建 `zlib`）。第五轮再覆盖 CMake / Lua / ALSA / libpsl / libfuse / live555 / librtsp / UCX / Vulkan / folly / proxygen / Redpanda 以及 NVIDIA（CUDA、DCGM、Video Codec SDK、nvImageCodec、CV-CUDA）、华为 CANN、大华播放库 —— 共 23 个新 port；其中 4 个需登录或专有的 SDK 做成 `gcpkg.build.external` 声明式 port，`gcpkg externals` 静态列出所需环境变量，你在本地设好即可真构建。第六轮继续补 Linux 基础库：GNU 数值/加密栈（GMP → GnuTLS）、终端/数据（ncurses → readline、SQLite、Jansson）、图像字体（libpng → freetype → fontconfig / HarfBuzz）与内核接口（libattr → libacl、elfutils → libbpf），共 37 个新 port，其中 14 个在这里真编译出 884 条编译命令。第七轮专攻**内核接口与磁盘/存储信息查询**（NVMe/SMART/分区/文件系统/RAID/DMI/PCI、ftrace、keyring、GPIO、IIO 等），新增 34 个 port；`liburing` 早就在栈里，这一轮重新从干净源码复核（14 条 compdb）并让它成为 `libnvme → udisks2` 磁盘信息链的一环，另有 21 个新 port 真编译（合计 1061 条）。第八轮补上 pnpm 式项目工作流：
+> 当前分支 `feat/lua-yaml-compdb-openssl`：Lua 引擎 + YAML 特性 + 项目模式 + 统一编译数据库 + **277 个真实 port**（L0 → L4，含工具链 port）。按依赖层次自底向上扩展：`openssl` 起步，L0 十个基础库，再到 `libssh2` / `nghttp2` / `curl` 全链与 `libarchive`（一次挂 8 个 L0 依赖）。第四轮继续覆盖 Linux 底层库栈：NUMA / 权限与沙箱 / netfilter / X11 / **Xserver** / **Wayland** / libinput / D-Bus / kmod / util-linux / **systemd** / ipvs / iptables —— 36 个新 port 全部真实编译（6718 条编译命令），`xserver` 依赖图 16 步、`systemd` 单包 3272 条。特性开关也能引入真实的传递依赖（`openssl:zlib` → 先构建 `zlib`）。第五轮再覆盖 CMake / Lua / ALSA / libpsl / libfuse / live555 / librtsp / UCX / Vulkan / folly / proxygen / Redpanda 以及 NVIDIA（CUDA、DCGM、Video Codec SDK、nvImageCodec、CV-CUDA）、华为 CANN、大华播放库 —— 共 23 个新 port；其中 4 个需登录或专有的 SDK 做成 `gcpkg.build.external` 声明式 port，`gcpkg externals` 静态列出所需环境变量，你在本地设好即可真构建。第六轮继续补 Linux 基础库：GNU 数值/加密栈（GMP → GnuTLS）、终端/数据（ncurses → readline、SQLite、Jansson）、图像字体（libpng → freetype → fontconfig / HarfBuzz）与内核接口（libattr → libacl、elfutils → libbpf），共 37 个新 port，其中 14 个在这里真编译出 884 条编译命令。第七轮专攻**内核接口与磁盘/存储信息查询**（NVMe/SMART/分区/文件系统/RAID/DMI/PCI、ftrace、keyring、GPIO、IIO 等），新增 34 个 port；`liburing` 早就在栈里，这一轮重新从干净源码复核（14 条 compdb）并让它成为 `libnvme → udisks2` 磁盘信息链的一环，另有 21 个新 port 真编译（合计 1061 条）。第八轮补上 pnpm 式项目工作流：
 `gcpkg new` / `add` / `remove` / `list` / `versions` / `install`（无参），
 区分**项目私有 port / 用户级 / 公有 registry** 三种作用域与**项目特有 / 公有**
 两种依赖清单，并让不同项目锁定同库的不同版本（`zlib@1.2.13` 与
@@ -26,6 +26,13 @@
 经 `nasm` 编 SIMD（不再用纯 C 回退），注册表 226 → **249**。详见
 [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) 与
 [docs/ROUND11_LIBRARIES.md](docs/ROUND11_LIBRARIES.md)。
+第十二轮支持 **GN 构建系统**：`ninja` / `gn` 为源码工具 port，新增
+`recipe.gn` + `gcpkg.build.gn` adapter，把 `gn gen --export-compile-commands`
+与 `ninja` 产出的原生 compdb 并入统一数据库；`crashpad` 是首个真实 GN
+库（`ninja → gn → crashpad`）。另补 25 个常见 C/C++ 库（含 `libgit2` 真
+依赖 `zlib`、`taglib:zlib` 条件依赖），注册表 249 → **277**。详见
+[docs/GN.md](docs/GN.md) 与
+[docs/ROUND12_LIBRARIES.md](docs/ROUND12_LIBRARIES.md)。
 
 ## 三个核心要求如何落地
 
@@ -103,7 +110,7 @@ GCPKG_KERNEL_DYNAMIC=1 ./tests/linux-kernel.sh     # 真编译 22 个（含 libu
 GCPKG_PROJECT_DYNAMIC=1 ./tests/projects.sh           # 两个项目各编译不同 zlib
 
 # 第九轮：43 个新库（详见 docs/EXTRA_LIBRARIES.md）
-./build/bin/gcpkg check --ports ./ports               # 249 ports OK
+./build/bin/gcpkg check --ports ./ports               # 277 ports OK
 ./build/bin/gcpkg graph libsndfile --ports ./ports    # 5 步：ogg/vorbis/opus/flac -> sndfile
 ./build/bin/gcpkg graph libzip --feature=libzip:openssl --ports ./ports
 ./tests/extra.sh                                      # 静态：43 两文件 / SHA / 图 / 生成器幂等
@@ -127,6 +134,12 @@ GCPKG_PROXY_DYNAMIC=1 ./tests/proxy.sh               # 端到端：本地 CONNEC
 ./build/bin/gcpkg externals --ports ./ports          # rust: GCPKG_RUST_HOME
 ./tests/r11.sh                                       # 静态：23 两文件 / 生成器幂等 / 依赖链
 GCPKG_R11_DYNAMIC=1 ./tests/r11.sh                   # 24/24 真编译，1353 条 compdb
+
+# 第十二轮：GN 构建系统 + 25 个常见库（详见 docs/GN.md）
+./build/bin/gcpkg graph crashpad --ports ./ports      # ninja -> gn -> crashpad
+./build/bin/gcpkg graph taglib --feature=taglib:zlib --ports ./ports
+./tests/r12.sh                                       # 静态：28 两文件 / GN adapter / 图
+GCPKG_R12_DYNAMIC=1 ./tests/r12.sh                   # 干净 store 真编译 28 个新 port
 ```
 
 > store 请放在真实磁盘（如 `~/.cache/...`）：本沙箱 `/tmp` 是 992M 的 tmpfs，
@@ -204,7 +217,11 @@ clangd 打开项目根目录即可工作；跳转到 `openssl/sha.h`、`crypto/s
 （`python` 263 条、`libvpx` SIMD 构建 211 条、`tokenizers-cpp` 153 条、
 `nasm` 85 条），Rust crate 本身按惯例交给 rust-analyzer 而非 clangd。
 `GCPKG_R11_DYNAMIC=1 ./tests/r11.sh` 从全新 store 复现为
-**24 PASS / 0 FAIL、1353 条编译命令**。
+**24 PASS / 0 FAIL、1353 条编译命令**。第十二轮的 GN / Ninja / Crashpad
+三层工具链同样并入统一 compdb：项目模式 `gcpkg compdb` 实测 718 条，
+`GCPKG_R12_DYNAMIC=1 ./tests/r12.sh` 从干净 store 真编译
+**28 PASS / 0 FAIL、4527 条编译命令**，并实跑最小 GN fixture、GN/Ninja
+可执行文件、Crashpad 静态库与条件 zlib 依赖。
 
 ## 目录
 
@@ -213,10 +230,10 @@ Source/Core/       C++ 运行时（Lua 沙箱、进程、YAML 桥、CLI 引导�
 Source/Intercept/  gcpkg-intercept：透明 CC/CXX 编译器包装器
 lua/gcpkg/         Lua 引擎（特性、port、project、workspace、proxy、编译数据库、adapter、CLI）
 lua/gcpkg/build/   各构建系统的 Lua 适配模块
-ports/             249 个库，每个 build.lua + features.yaml（L0 → L4，含工具链 port）
+ports/             277 个库，每个 build.lua + features.yaml（L0 → L4，含工具链 port）
 examples/hello/    OpenSSL 项目：gcpkg.lua + gcpkg.yaml + src/main.c
 examples/web/      curl 全链顶端项目
-tests/             12 个回归（含 r10 / proxy / r11）
+tests/             13 个回归（含 r10 / proxy / r11 / r12）
 docs/              架构与扩展文档
 Source/MainProcess/  旧 TOML 原型，保留但不参与构建
 ```

@@ -15,6 +15,12 @@ fi
 mkdir -p "$HOME/.cache"
 
 "$BIN" graph curl --ports "$ROOT/ports"
+# The sandbox snapshot does not persist ~/.cache stores. Keep the graph check
+# above, but do not pretend the old prebuilt artifacts are still there.
+if [[ "${GCPKG_FORCE_DYNAMIC:-0}" != "1" && ! -f "$STORE/manifest/curl-8.13.0.json" ]]; then
+    echo "SKIP cached curl chain artifacts: no curl manifest in $STORE (set GCPKG_FORCE_DYNAMIC=1 to rebuild)"
+    exit 0
+fi
 "$BIN" install curl --store "$STORE" --ports "$ROOT/ports" -j "$(nproc)"
 "$BIN" build "$PROJECT" --store "$STORE" --ports "$ROOT/ports" -j "$(nproc)"
 

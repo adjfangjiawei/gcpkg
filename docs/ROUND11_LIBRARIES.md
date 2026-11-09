@@ -88,7 +88,7 @@
 ## 验证与边界
 
 ```bash
-./build/bin/gcpkg check --ports ./ports                 # 249 ports OK
+./build/bin/gcpkg check --ports ./ports                 # 当前 277 ports OK（本轮当时 249）
 ./tests/r11.sh                                         # 静态（默认）
 GCPKG_R11_DYNAMIC=1 ./tests/r11.sh                     # 无 Rust 时 21 个真编译 + 3 个静态
 CARGO_HOME=$HOME/.cargo RUSTUP_HOME=$HOME/.rustup \

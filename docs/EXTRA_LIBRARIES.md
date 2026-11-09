@@ -126,7 +126,7 @@ gcpkg graph ngtcp2 --feature=ngtcp2:tls
 ## 验证
 
 ```bash
-./build/bin/gcpkg check --ports ./ports              # 当时 188 ports OK，当前 249
+./build/bin/gcpkg check --ports ./ports              # 当时 188 ports OK，当前 277
 ./tests/extra.sh                                    # 静态：两文件 / SHA / 图 / 条件依赖 / 生成器幂等
 GCPKG_EXTRA_DYNAMIC=1 ./tests/extra.sh              # 干净 store 全量真编译 43 个
 ```

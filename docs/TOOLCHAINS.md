@@ -3,7 +3,7 @@
 用户原话：「支持 nasm，Python rust，tokenize-cpp，以及其它可能的常见库」。
 
 这一轮把**工具链本身**也变成 port，并把两种「其它包管理器」接入 Lua adapter：
-注册表 **226 → 249**（新增 23 个 port）。所有 port 仍然是一库
+注册表 **226 → 249**（新增 23 个 port；第十二轮已继续到 277）。所有 port 仍然是一库
 `build.lua` + `features.yaml`，上游源码零修改，URL 与 SHA256 全部实测。
 
 ## 1. `tokenize-cpp` 是什么
@@ -160,7 +160,7 @@ g++ -std=c++17 link.cpp -I<prefix>/include -L<prefix>/lib \
 | 需要登录 / 专有 SDK / GPU / 多 GB `.run` 的旧 port | 仍只做静态声明，不谎报动态通过 |
 
 ```bash
-./build/bin/gcpkg check --ports ./ports            # 249 ports OK
+./build/bin/gcpkg check --ports ./ports            # 当前 277 ports OK（本轮当时 249）
 ./tests/r11.sh                                     # 静态
 CARGO_HOME=$HOME/.cargo RUSTUP_HOME=$HOME/.rustup \
   GCPKG_R11_DYNAMIC=1 ./tests/r11.sh               # 全量真编译（有 Rust 时 24/24）
@@ -178,3 +178,15 @@ warning，其余 21 个照常真编译；静态断言（依赖链、external 声
 其余 17 个库的清单、版本与条件 feature 见
 [docs/ROUND11_LIBRARIES.md](ROUND11_LIBRARIES.md)；代理优先级见
 [docs/PROXY.md](PROXY.md)。
+
+## 8. 第十二轮补记：`ninja` / `gn` / GN adapter
+
+第十二轮把同样的方法用于 GN：`ninja` 1.12.1 与 `gn`（固定
+`timniederhausen/gn` commit `3dff66e`）都是从源码真编译的工具 port，
+`gn` 依赖 `ninja`；`recipe.gn` / `lua/gcpkg/build/gn.lua` 调
+`gn gen --export-compile-commands` + `ninja`，把 GN 原生 compdb 合进
+统一编译数据库。`crashpad` 是首个真正用 GN 编出的库，
+`gcpkg graph crashpad` = `ninja → gn → crashpad`。
+完整设计与最小项目 smoke 见 [docs/GN.md](GN.md)，28 个新 port 清单见
+[docs/ROUND12_LIBRARIES.md](ROUND12_LIBRARIES.md)。干净 store 的最终动态回归为
+`28 PASS / 0 FAIL, 4527 compile commands`。
