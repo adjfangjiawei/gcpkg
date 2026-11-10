@@ -139,6 +139,9 @@ function M.define(spec)
             local autotools = require("gcpkg.build.autotools")
             local cfg = spec.autotools or {}
             local args = util.concat(util.deepcopy(cfg.args or {}), featureArgs)
+            -- Shared triplet facts short-circuit AC_CHECK_* for EVERY
+            -- autotools port; appended last so user global facts win.
+            args = util.concat(args, require("gcpkg.triplet").autotools_args())
             result = autotools.all {
                 src = ctx.src,
                 configure = cfg.configure and util.join(ctx.src, cfg.configure) or nil,

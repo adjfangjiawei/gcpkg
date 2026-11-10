@@ -142,6 +142,10 @@ local function parse(args)
             o.verbose = true
         elseif a == "--no-cache" then
             o.no_cache = true
+        elseif a:match("^--triplet=") then
+            o.triplet = a:match("^--triplet=(.*)$")
+        elseif a == "--triplet" then
+            o.triplet = nextval()
         elseif a:match("^--proxy=") then
             o.proxy = a:match("^--proxy=(.*)$")
         elseif a == "--proxy" then
@@ -716,6 +720,9 @@ function M.main(args)
         })
         return 0
     elseif cmd == "install" then
+        -- ONE platform probe for the whole install task.  Every port in this
+        -- process shares the same triplet fact table; no library probes.
+        require("gcpkg.triplet").ensure(o)
         if not o.positional[2] then
             -- pnpm-style: install every dependency of the current project.
             local root = workspace.find_root(o.dir or fs.cwd())
@@ -727,6 +734,28 @@ function M.main(args)
         end
         local m = port.install(o.positional[2], cfg)
         log.info("manifest: " .. storeMod.manifest_path(st, m.key))
+        return 0
+    elseif cmd == "triplet" then
+        local triplet = require("gcpkg.triplet")
+        local sub = o.positional[2] or "show"
+        if sub == "list" then
+            for _, n in ipairs(triplet.list()) do
+                print(string.format("  %-24s %s", n, triplet.spec(n).description or ""))
+            end
+        elseif sub == "use" then
+            local n = o.positional[3]
+            if not n then error("triplet use needs a name") end
+            triplet.set_active(n)
+            log.step("triplet set to " .. n .. " (config: " .. config.path() .. ")")
+        elseif sub == "new" then
+            local n = o.positional[3]
+            if not n then error("triplet new needs a name") end
+            log.step("triplet file: " .. triplet.create(n))
+        else
+            local n = o.positional[3] or triplet.active(o)
+            triplet.ensure({ triplet = n })
+            print(triplet.describe(n))
+        end
         return 0
     elseif cmd == "features" then
         if not o.positional[2] then

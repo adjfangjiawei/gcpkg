@@ -4,6 +4,7 @@ local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local cmake_version = require("gcpkg.cmake_version")
 local toolchain = require("gcpkg.toolchain")
+local triplet = require("gcpkg.triplet")
 local M = {}
 
 local function define_key(arg)
@@ -58,7 +59,10 @@ function M.configure(o)
     local exec = o.exec or gcpkg.exec
     local build = util.abs(o.build_dir or util.join(o.src, "build"), o.src)
     fs.mkdirs(build)
-    local defines = type(o.defines) == "table" and o.defines or {}
+    -- Shared triplet facts win over any hardcoded port define: the user
+    -- global config and the one gcpkg probe describe the ACTUAL platform.
+    local defines = util.merge(type(o.defines) == "table" and o.defines or {},
+                              triplet.cmake_defines())
     -- R20: no port runs feature-detection probes.  try_compile is replaced
     -- by a result table; find_package is overridden so imported targets are
     -- supplied directly instead of being discovered through probes.
@@ -81,7 +85,9 @@ function M.configure(o)
         for _, k in ipairs(trueResults) do
             includeText = includeText .. "  " .. k .. "\n"
         end
-        includeText = includeText .. ")\n" .. [==[
+        includeText = includeText .. ")\n"
+        includeText = includeText .. table.concat(triplet.cmake_fact_lines(), "\n") .. "\n"
+        includeText = includeText .. [==[
 # COMPILER_FORCED skips the compiler test that normally fills these tables.
 # Supply the results explicitly; no probe is run.
 set(CMAKE_C_COMPILE_FEATURES
@@ -147,17 +153,32 @@ macro(gcpkg_probe_result _gcpkg_varname)
   endif()
 endmacro()
 
+# Shared triplet facts: look a check up by its SEMANTICS (header/function/type)
+# instead of by the port-specific variable name.  The table is produced once
+# per install task by gcpkg's own probe; user facts override it.  Ports no
+# longer hardcode endianness/sizes/HAVE_* per platform.
+macro(gcpkg_fact_lookup _gcpkg_kind _gcpkg_name _gcpkg_outvar)
+  string(TOLOWER "${_gcpkg_kind}_${_gcpkg_name}" _gcpkg_fkey)
+  string(REGEX REPLACE "[^a-z0-9]" "_" _gcpkg_fkey "${_gcpkg_fkey}")
+  string(TOUPPER "${_gcpkg_fkey}" _gcpkg_fkey)
+  if(DEFINED GCPKG_FACT_${_gcpkg_fkey})
+    set(${_gcpkg_outvar} "${GCPKG_FACT_${_gcpkg_fkey}}")
+  else()
+    gcpkg_probe_result(${_gcpkg_outvar})
+  endif()
+endmacro()
+
 macro(check_include_file _gcpkg_a0 _gcpkg_a1)
-  gcpkg_probe_result(${_gcpkg_a1})
+  gcpkg_fact_lookup(header "${_gcpkg_a0}" ${_gcpkg_a1})
 endmacro()
 macro(check_include_file_cxx _gcpkg_a0 _gcpkg_a1)
-  gcpkg_probe_result(${_gcpkg_a1})
+  gcpkg_fact_lookup(header "${_gcpkg_a0}" ${_gcpkg_a1})
 endmacro()
 macro(check_function_exists _gcpkg_a0 _gcpkg_a1)
-  gcpkg_probe_result(${_gcpkg_a1})
+  gcpkg_fact_lookup(func "${_gcpkg_a0}" ${_gcpkg_a1})
 endmacro()
 macro(check_variable_exists _gcpkg_a0 _gcpkg_a1)
-  gcpkg_probe_result(${_gcpkg_a1})
+  gcpkg_fact_lookup(symbol "${_gcpkg_a0}" ${_gcpkg_a1})
 endmacro()
 macro(check_c_source_compiles _gcpkg_a0 _gcpkg_a1)
   gcpkg_probe_result(${_gcpkg_a1})
@@ -187,10 +208,10 @@ macro(check_fortran_function_exists _gcpkg_a0 _gcpkg_a1)
   gcpkg_probe_result(${_gcpkg_a1})
 endmacro()
 macro(check_symbol_exists _gcpkg_a0 _gcpkg_a1 _gcpkg_a2)
-  gcpkg_probe_result(${_gcpkg_a2})
+  gcpkg_fact_lookup(symbol "${_gcpkg_a0}" ${_gcpkg_a2})
 endmacro()
 macro(check_cxx_symbol_exists _gcpkg_a0 _gcpkg_a1 _gcpkg_a2)
-  gcpkg_probe_result(${_gcpkg_a2})
+  gcpkg_fact_lookup(symbol "${_gcpkg_a0}" ${_gcpkg_a2})
 endmacro()
 macro(check_source_compiles _gcpkg_a0 _gcpkg_a1 _gcpkg_a2)
   gcpkg_probe_result(${_gcpkg_a2})
@@ -211,7 +232,7 @@ macro(check_struct_has_member _gcpkg_a0 _gcpkg_a1 _gcpkg_a2 _gcpkg_a3)
   gcpkg_probe_result(${_gcpkg_a3})
 endmacro()
 macro(check_type_size _gcpkg_a0 _gcpkg_a1)
-  gcpkg_probe_result(${_gcpkg_a1})
+  gcpkg_fact_lookup(type "${_gcpkg_a0}" ${_gcpkg_a1})
   set(HAVE_${_gcpkg_a1} ${${_gcpkg_a1}})
 endmacro()
 macro(check_include_files)
