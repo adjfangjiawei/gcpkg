@@ -41,7 +41,7 @@ local HEADERS = {
     "linux/hw_breakpoint.h", "linux/fsverity.h", "linux/fiemap.h",
     "linux/blkzoned.h", "ext2fs/ext2_fs.h", "linux/types.h",
     "linux/ioctl.h", "sys/mount.h", "sys/vfs.h", "linux/magic.h",
-    "execinfo.h",
+    "execinfo.h", "minix/config.h", "vfork.h",
 }
 
 local FUNCTIONS = {
@@ -119,6 +119,20 @@ local PROLOG = [==[
 #include <sys/types.h>
 #include <wchar.h>
 #include <dlfcn.h>
+#if defined(__linux__) && defined(__has_include)
+#if __has_include(<features.h>)
+#include <features.h>
+#endif
+#if __has_include(<linux/fiemap.h>)
+#include <linux/fiemap.h>
+#endif
+#if __has_include(<linux/blkzoned.h>)
+#include <linux/blkzoned.h>
+#endif
+#if __has_include(<ext2fs/ext2_fs.h>)
+#include <ext2fs/ext2_fs.h>
+#endif
+#endif
 static const char *gcpkg_funcs[] = {]==]
 
 local EPILOG = [==[
@@ -166,6 +180,26 @@ int main(void) {
   for (i = 0; gcpkg_funcs[i]; i++)
     printf("func:%s=%d\n", gcpkg_funcs[i],
            dlsym(RTLD_DEFAULT, gcpkg_funcs[i]) != NULL ? 1 : 0);
+#ifdef FIEMAP_EXTENT_SHARED
+  printf("defined:FIEMAP_EXTENT_SHARED_linux_fiemap_h=1\n");
+#else
+  printf("defined:FIEMAP_EXTENT_SHARED_linux_fiemap_h=0\n");
+#endif
+#ifdef EXT4_EPOCH_MASK
+  printf("defined:EXT4_EPOCH_MASK_ext2fs_ext2_fs_h=1\n");
+#else
+  printf("defined:EXT4_EPOCH_MASK_ext2fs_ext2_fs_h=0\n");
+#endif
+#ifdef BLKGETZONESZ
+  printf("defined:BLKGETZONESZ_linux_blkzoned_h=1\n");
+#else
+  printf("defined:BLKGETZONESZ_linux_blkzoned_h=0\n");
+#endif
+#ifdef __GLIBC__
+  printf("defined:__GLIBC___features_h=1\n");
+#else
+  printf("defined:__GLIBC___features_h=0\n");
+#endif
 ]==]
 
 local cached, cachedName, cliName = nil, nil, nil
@@ -190,6 +224,10 @@ end
 local function ackey(s)
     s = tostring(s):lower():gsub("%s*%*", "_p")
     return (s:gsub("[^a-z0-9]", "_"))
+end
+
+local function acname(s)
+    return (tostring(s):gsub("[^A-Za-z0-9]", "_"))
 end
 
 function M.probe_source()
@@ -266,8 +304,17 @@ local function probeCompiler(spec)
     return first(c, getenv("GCPKG_CC_REAL"), getenv("CC_REAL"), "cc")
 end
 
+local function probeCxxStandard()
+    local cxx = first(getenv("GCPKG_CXX_REAL"), getenv("CXX_REAL"), "c++")
+    local ok, out = pcall(function()
+        return gcpkg.capture({ cxx, "-dM", "-E", "-x", "c++", "/dev/null" }, {})
+    end)
+    if not ok or type(out) ~= "string" then return 0 end
+    return tonumber(out:match("__cplusplus%s+(%d+)")) or 0
+end
+
 local function parseProbe(text)
-    local f = { sizes = {}, headers = {}, functions = {} }
+    local f = { sizes = {}, headers = {}, functions = {}, defined = {} }
     for line in tostring(text):gmatch("[^\n]+") do
         local k, v = line:match("^([^=]+)=(.*)$")
         if k then
@@ -280,6 +327,8 @@ local function parseProbe(text)
                 f.headers[k:sub(8)] = tonumber(v) or 0
             elseif k:sub(1, 5) == "func:" then
                 f.functions[k:sub(6)] = tonumber(v) or 0
+            elseif k:sub(1, 8) == "defined:" then
+                f.defined[k:sub(9)] = tonumber(v) or 0
             end
         end
     end
@@ -289,7 +338,7 @@ end
 local function applyOverrides(f, ov)
     if type(ov) ~= "table" then return f end
     for k, v in pairs(ov) do
-        if k == "headers" or k == "functions" or k == "sizes" then
+        if k == "headers" or k == "functions" or k == "sizes" or k == "defined" then
             if type(v) == "table" then
                 for n, x in pairs(v) do f[k][n] = x end
             end
@@ -336,6 +385,9 @@ local function writeFacts(name, f)
         "arch: " .. tostring(f.arch or "unknown"),
         "os: " .. tostring(f.os or "unknown"),
         "compiler_id: " .. tostring(f.compiler_id or "unknown"),
+        "cxx_standard: " .. scalar(f.cxx_standard),
+        "cxx17_capable: " .. scalar(f.cxx17_capable),
+        "cxx20_capable: " .. scalar(f.cxx20_capable),
         "byte_order: " .. tostring(f.byte_order or "unknown"),
         "pointer_size: " .. scalar(f.pointer_size),
         "headers:",
@@ -352,6 +404,13 @@ local function writeFacts(name, f)
     table.sort(names)
     for _, n in ipairs(names) do
         l[#l + 1] = "  " .. n .. ": " .. scalar(f.functions[n])
+    end
+    l[#l + 1] = "defined:"
+    names = {}
+    for n in pairs(f.defined or {}) do names[#names + 1] = n end
+    table.sort(names)
+    for _, n in ipairs(names) do
+        l[#l + 1] = "  " .. n .. ": " .. scalar(f.defined[n])
     end
     l[#l + 1] = "sizes:"
     names = {}
@@ -390,6 +449,11 @@ function M.ensure(opts)
               .. "); set explicit facts in " .. M.file(name))
     end
     local f = parseProbe(out)
+    -- Compiler language capability is a platform/toolchain fact too: gcpkg
+    -- determines it once, ports must never hardcode TRUE/FALSE for it.
+    f.cxx_standard = probeCxxStandard()
+    f.cxx17_capable = f.cxx_standard >= 201703
+    f.cxx20_capable = f.cxx_standard >= 202002
     applyOverrides(f, spec.facts)
     applyOverrides(f, (require("gcpkg.config").read() or {}).facts)
     f.compiler = cc
@@ -453,6 +517,9 @@ function M.autotools_args(opts)
     end
     for n, v in pairs(f.functions or {}) do
         a[#a + 1] = "ac_cv_func_" .. ackey(n) .. "=" .. yesno(v)
+    end
+    for n, v in pairs(f.defined or {}) do
+        a[#a + 1] = "ac_cv_defined_" .. acname(n) .. "=" .. yesno(v)
     end
     for n, v in pairs(f.sizes or {}) do
         if tonumber(v) then
@@ -520,6 +587,9 @@ function M.describe(name)
         "  compiler      : " .. tostring(f.compiler or ""),
         "  os / arch     : " .. tostring(f.os) .. " / " .. tostring(f.arch),
         "  compiler_id   : " .. tostring(f.compiler_id),
+        "  cxx_standard  : " .. tostring(f.cxx_standard) ..
+            " (C++17=" .. tostring(f.cxx17_capable) ..
+            ", C++20=" .. tostring(f.cxx20_capable) .. ")",
         "  byte_order    : " .. tostring(f.byte_order),
         "  pointer_size  : " .. tostring(f.pointer_size),
         "  facts file    : " .. M.dir() .. "/" .. name .. ".facts.yaml",
