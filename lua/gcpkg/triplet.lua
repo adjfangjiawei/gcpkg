@@ -36,6 +36,12 @@ local HEADERS = {
     "fnmatch.h", "regex.h", "termios.h", "grp.h", "pwd.h", "byteswap.h",
     "endian.h", "features.h", "stdatomic.h", "complex.h", "locale.h",
     "math.h", "iconv.h", "sys/epoll.h", "sys/eventfd.h", "sys/inotify.h",
+    "mntent.h", "sys/file.h", "sys/param.h", "sys/statfs.h",
+    "sys/statvfs.h", "printf.h", "linux/perf_event.h",
+    "linux/hw_breakpoint.h", "linux/fsverity.h", "linux/fiemap.h",
+    "linux/blkzoned.h", "ext2fs/ext2_fs.h", "linux/types.h",
+    "linux/ioctl.h", "sys/mount.h", "sys/vfs.h", "linux/magic.h",
+    "execinfo.h",
 }
 
 local FUNCTIONS = {
@@ -59,6 +65,14 @@ local FUNCTIONS = {
     "strlcpy", "strlcat", "strcasestr", "strsignal", "sigaction",
     "sigprocmask", "nanosleep", "sched_yield", "basename", "dirname",
     "strsep", "syncfs", "clock_nanosleep", "pthread_setname_np",
+    "fchdir", "fdatasync", "ftruncate", "getcwd", "getmntent", "lchown",
+    "localtime_r", "memchr", "mkfifo", "regcomp", "select", "strndup",
+    "strtol", "strtoul", "strtoull", "sysinfo", "uname",
+    "fsync", "fstat", "fstatfs", "fstatvfs", "lseek", "pread", "pwrite",
+    "read", "write", "close", "open", "opendir", "readdir", "stat",
+    "strnlen", "strtol_l", "strtoull_l", "getrlimit", "setrlimit",
+    "sched_getaffinity", "posix_fadvise", "fallocate", "flock",
+    "backtrace_symbols_fd",
 }
 
 local TYPES = {
@@ -68,7 +82,7 @@ local TYPES = {
     "mode_t", "off_t", "ssize_t", "time_t", "char", "wchar_t",
     "unsigned int", "unsigned long", "unsigned long long", "int8_t",
     "int16_t", "int32_t", "int64_t", "uint8_t", "uint16_t", "uint32_t",
-    "uint64_t",
+    "uint64_t", "pid_t", "uid_t", "gid_t",
 }
 
 local HEADER_TMPL = [==[
@@ -442,7 +456,12 @@ function M.autotools_args(opts)
     end
     for n, v in pairs(f.sizes or {}) do
         if tonumber(v) then
-            a[#a + 1] = "ac_cv_sizeof_" .. ackey(n) .. "=" .. scalar(v)
+            local k = ackey(n)
+            a[#a + 1] = "ac_cv_sizeof_" .. k .. "=" .. scalar(v)
+            -- AC_TYPE_* / AC_CHECK_TYPES: a successful sizeof() from the
+            -- single gcpkg probe is proof the type exists on this platform.
+            a[#a + 1] = "ac_cv_c_" .. k .. "=yes"
+            a[#a + 1] = "ac_cv_type_" .. k .. "=yes"
         end
     end
     table.sort(a)

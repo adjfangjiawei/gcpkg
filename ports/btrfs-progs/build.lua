@@ -26,75 +26,29 @@ return recipe.autotools {
         "lzo",
       },
     autotools = {
-        -- Explicit results, like ports/sdl3/build.lua.  Every required
-        -- AC_CHECK_FUNCS has an AC_MSG_ERROR on failure, so all 34 are stated
-        -- here.  Only OS facts certain for Linux/glibc are given; linux/*.h
-        -- headers are left to configure rather than guessed.
+        -- Platform facts (headers / functions / sizeof / endianness) are NOT
+        -- hardcoded per port: recipe.lua injects the active triplet's shared
+        -- ac_cv_* results for EVERY autotools port.  Only dependency and
+        -- struct-member facts stay here.  User global facts win over probes.
         args = {
-          -- R20: AC_CHECK_LIB([lzo2],[lzo_version]) is short-circuited with
-          -- the exact result.  ports/lzo installs the real liblzo2.a and
-          -- <lzo/lzo1x.h>, and inject.lua passes CPPFLAGS/LDFLAGS/LDLIBS,
-          -- so COMPRESSION_LZO=1 compiles and links for real (not faked).
+          -- R20: AC_CHECK_LIB([lzo2],[lzo_version]) is a DEPENDENCY fact, not
+          -- a platform fact, so it stays here.  ports/lzo installs the real
+          -- liblzo2.a and <lzo/lzo1x.h>; pre_build exposes them via CPATH and
+          -- the shared LDFLAGS/LIBS_COMP link -llzo2 for real (not faked).
           "ac_cv_lib_lzo2_lzo_version=yes",
+          -- Semantic exception (not a platform fact): dlsym() sees glibc's
+          -- register_printf_* symbols, but no header declares them, so the
+          -- upstream compile+link checks are "no".  Stated here, not guessed
+          -- by the shared probe, otherwise configure would define HAVE_* and
+          -- the source would fail to compile.
+          "ac_cv_func_register_printf_specifier=no",
+          "ac_cv_func_register_printf_modifier=no",
           "--disable-shared",
           "--enable-static",
           "--disable-documentation",
           "--disable-convert",
-          "--disable-backtrace",
-          "ac_cv_func_fchdir=yes",
-          "ac_cv_func_fdatasync=yes",
-          "ac_cv_func_ftruncate=yes",
-          "ac_cv_func_getcwd=yes",
-          "ac_cv_func_getmntent=yes",
-          "ac_cv_func_getpagesize=yes",
-          "ac_cv_func_gettimeofday=yes",
-          "ac_cv_func_lchown=yes",
-          "ac_cv_func_localtime_r=yes",
-          "ac_cv_func_memchr=yes",
-          "ac_cv_func_memmove=yes",
-          "ac_cv_func_memset=yes",
-          "ac_cv_func_mkdir=yes",
-          "ac_cv_func_mkfifo=yes",
-          "ac_cv_func_munmap=yes",
-          "ac_cv_func_openat=yes",
-          "ac_cv_func_realpath=yes",
-          "ac_cv_func_regcomp=yes",
-          "ac_cv_func_rmdir=yes",
-          "ac_cv_func_select=yes",
-          "ac_cv_func_socket=yes",
-          "ac_cv_func_strcasecmp=yes",
-          "ac_cv_func_strchr=yes",
-          "ac_cv_func_strdup=yes",
-          "ac_cv_func_strerror=yes",
-          "ac_cv_func_strncasecmp=yes",
-          "ac_cv_func_strndup=yes",
-          "ac_cv_func_strrchr=yes",
-          "ac_cv_func_strstr=yes",
-          "ac_cv_func_strtol=yes",
-          "ac_cv_func_strtoul=yes",
-          "ac_cv_func_strtoull=yes",
-          "ac_cv_func_sysinfo=yes",
-          "ac_cv_func_uname=yes",
-          "ac_cv_header_fcntl_h=yes",
-          "ac_cv_header_inttypes_h=yes",
-          "ac_cv_header_malloc_h=yes",
-          "ac_cv_header_mntent_h=yes",
-          "ac_cv_header_stdint_h=yes",
-          "ac_cv_header_strings_h=yes",
-          "ac_cv_header_sys_file_h=yes",
-          "ac_cv_header_sys_ioctl_h=yes",
-          "ac_cv_header_sys_param_h=yes",
-          "ac_cv_header_sys_socket_h=yes",
-          "ac_cv_header_sys_statfs_h=yes",
-          "ac_cv_header_sys_statvfs_h=yes",
-          "ac_cv_header_sys_time_h=yes",
-          "ac_cv_header_unistd_h=yes",
-          "ac_cv_header_stdbool_h=yes",
           "ac_cv_member_struct_stat_st_blksize=yes",
           "ac_cv_member_struct_stat_st_rdev=yes",
-          "ac_cv_func_clock_gettime=yes",
-          "ac_cv_func_register_printf_specifier=no",
-          "ac_cv_func_register_printf_modifier=no",
         },
         -- R20: configure.ac derives udevdir from the SYSTEM pkg-config
         -- ("pkg-config udev --variable=udevdir" -> /usr/lib/udev), so the
