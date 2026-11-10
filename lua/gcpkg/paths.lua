@@ -1,7 +1,7 @@
 -- R20 hard write boundary.
 --
--- gcpkg may only CREATE files inside the package store or the directory that
--- holds the gcpkg program.  Every implicit runtime state file (curl proxy
+-- gcpkg may only CREATE files inside the package store or the directory
+-- that holds the gcpkg BINARY (dirname(gcpkg.exe)).  Every implicit state
 -- config, user config, toolchain state, proxy yaml) lives under the store.
 -- There are NO exceptions: not even directories named by the user on the
 -- command line.  The check is fail-closed: a write before the boundary is
@@ -16,6 +16,13 @@ local function norm(p)
 end
 
 local function program_root()
+    -- C++ registers gcpkg.exe as the absolute, canonicalized binary path
+    -- (argv[0] or /proc/self/exe).  Its directory is the ONLY second root.
+    local e = gcpkg and gcpkg.exe
+    if type(e) == "string" and e ~= "" and util.isabs(e) then
+        return norm(util.dirname(e))
+    end
+    -- Fallback for standalone Lua tooling (no embedded engine).
     for entry in tostring(package.path or ""):gmatch("([^;]+)") do
         local d = entry:match("^(.*)/lua/%?/init%.lua$")
                or entry:match("^(.*)/lua/%?%.lua$")
