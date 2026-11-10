@@ -1,19 +1,47 @@
 schema: 1
 port: ada
 
-# WHATWG URL parser (C++20).
+# R20: every supported capability is ON by default.  `requires:` is the
+# feature gate: the dependency is installed bottom-up ONLY when the feature
+# is enabled, so a user disabling a feature does not build its library.
 features:
-  no-tests:
+  tests:
     default: true
-    description: Skip the upstream test suite
+    description: Build ada's own C++ test suite (source-built googletest + simdjson)
+    requires: ["googletest", "simdjson"]
+    args: ["-DBUILD_TESTING=ON", "-DADA_TESTING=ON"]
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
     args: []
+    conflicts: ["tests"]
+  tools:
+    default: true
+    description: Build the adaparse CLI (source-built fmt + cxxopts)
+    requires: ["fmt", "cxxopts"]
+    args: ["-DADA_TOOLS=ON"]
+  no-tools:
+    default: false
+    description: Opt out of the adaparse CLI
+    args: []
+    conflicts: ["tools"]
+  amalgamation:
+    default: true
+    description: Generate the single-header amalgamation using source-built Python
+    requires: ["python"]
+    args: []
+  no-amalgamation:
+    default: false
+    description: Opt out of the single-header amalgamation
+    args: []
+    conflicts: ["amalgamation"]
   static:
     default: true
     description: Build static libraries
-    args: []
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
     conflicts: ["shared"]
   shared:
     default: false
     description: Build shared libraries
-    args: []
+    args: ["-DBUILD_SHARED_LIBS=ON"]
     conflicts: ["static"]

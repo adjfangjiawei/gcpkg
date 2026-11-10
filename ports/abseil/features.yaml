@@ -2,23 +2,26 @@ schema: 1
 port: abseil
 
 # R20: every feature supported on the active triplet is ON by default.
-# The testing feature needs the source-built googletest port (bottom-up).
+# `requires` makes the dependency dynamic: tests on -> googletest source port
+# installed bottom-up; tests off -> no googletest dependency at all.
 features:
   tests:
     default: true
     description: Build Abseil's own test suite (googletest source port)
+    requires: ["googletest"]
     args: []
   no-tests:
     default: false
     description: Opt out of the upstream test suite
     args: []
+    conflicts: ["tests"]
   static:
     default: true
     description: Build static libraries
-    args: []
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
     conflicts: ["shared"]
   shared:
     default: false
     description: Build shared libraries
-    args: []
+    args: ["-DBUILD_SHARED_LIBS=ON"]
     conflicts: ["static"]

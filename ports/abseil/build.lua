@@ -3,9 +3,9 @@
 --
 -- R20 new standard: every feature SUPPORTED on the active triplet is enabled
 -- by default.  Platform/toolchain facts come from the single shared gcpkg
--- probe (triplet), never hardcoded per port.  GoogleTest is a source-built
--- gcpkg port installed bottom-up first; find_package(GTest) is pointed
--- straight at its installed CONFIG package, so no search / no probe runs.
+-- probe (triplet), never hardcoded per port.  GoogleTest is NOT a hardcoded
+-- dependency: features.yaml `tests.requires` installs the source-built
+-- googletest port bottom-up only when the tests feature is enabled.
 --
 -- NOT enabled here (not "disabled features"):
 --   * static/shared are mutually exclusive build shapes;
@@ -33,25 +33,26 @@ return recipe.cmake {
         sha256 = "f50e5ac311a81382da7fa75b97310e4b9006474f9560ac46f54a9967f07d4ae3",
         strip = 1,
     },
-    -- Bottom-up: the testing feature is ON by default, so its library is a
-    -- source-built port that must be installed before this one.
-    dependencies = { "googletest" },
+    -- Dynamic gate: see features.yaml tests.requires.
+    dependencies = {},
     cmake = {
         defines = function(ctx)
             local f = triplet.facts()
-            local gtest = assert(ctx.dep("googletest"),
-                                 "googletest must be installed bottom-up")
-            local libdir = assert((gtest.libdirs or {})[1],
-                                  "googletest manifest has no libdirs")
-            return {
-                -- All features supported on this triplet: ON.
-                BUILD_TESTING = "ON",
+            local gtest = ctx.dep("googletest")
+            local testing = gtest ~= nil
+            local libdir = gtest and (gtest.libdirs or {})[1] or ""
+            local d = {
+                -- Always supported on this triplet.
                 ABSL_ENABLE_INSTALL = "ON",
                 ABSL_PROPAGATE_CXX_STD = "ON",
-                ABSL_BUILD_TESTING = "ON",
-                ABSL_BUILD_TEST_HELPERS = "ON",
-                ABSL_USE_EXTERNAL_GOOGLETEST = "ON",
-                ABSL_FIND_GOOGLETEST = "ON",
+
+                -- Testing is a feature gate: ON only when its source-built
+                -- googletest dependency was installed bottom-up.
+                BUILD_TESTING = testing and "ON" or "OFF",
+                ABSL_BUILD_TESTING = testing and "ON" or "OFF",
+                ABSL_BUILD_TEST_HELPERS = testing and "ON" or "OFF",
+                ABSL_USE_EXTERNAL_GOOGLETEST = testing and "ON" or "OFF",
+                ABSL_FIND_GOOGLETEST = testing and "ON" or "OFF",
 
                 -- Compiler C++ capability: shared triplet facts, not hardcoded.
                 ABSL_INTERNAL_AT_LEAST_CXX17 = flag(f.cxx17_capable),
@@ -59,25 +60,23 @@ return recipe.cmake {
 
                 -- find_package(GTest REQUIRED): direct CONFIG, zero searches.
                 CMAKE_FIND_PACKAGE_PREFER_CONFIG = "ON",
-                GTest_DIR = libdir .. "/cmake/GTest",
 
                 -- Build shapes / unsupported / network-download switches.
-                BUILD_SHARED_LIBS = "OFF",
                 ABSL_BUILD_MONOLITHIC_SHARED_LIBS = "OFF",
                 ABSL_USE_GOOGLETEST_HEAD = "OFF",
                 ABSL_USE_SYSTEM_INCLUDES = "OFF",
                 ABSL_MSVC_STATIC_RUNTIME = "OFF",
             }
+            if testing and libdir ~= "" then
+                d.GTest_DIR = libdir .. "/cmake/GTest"
+            end
+            return d
         end,
         args = {},
     },
     exports = {
-      includes = {
-        "@PREFIX@/include",
-      },
-      libdirs = {
-        "@LIBDIR@",
-      },
+      includes = { "@PREFIX@/include" },
+      libdirs = { "@LIBDIR@" },
       libs = {},
       binaries = {},
     },
