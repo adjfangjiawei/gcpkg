@@ -1,0 +1,25 @@
+schema: 1
+port: url-dataset
+
+# WHATWG URL benchmark dataset pinned by ada 2.9.2's benchmarks/CMakeLists.txt.
+# Data-only port: no library to compile; one sanity TU records a real compile
+# command so the port has a compdb entry like any other gcpkg port.
+features:
+  data:
+    default: true
+    description: Install out.txt (WHATWG URL corpus) and README
+    args: []
+  no-data:
+    default: false
+    description: Opt out of the URL corpus
+    args: []
+    conflicts: ["data"]
+  license:
+    default: true
+    description: Install the MIT and Apache license texts
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license texts
+    args: []
+    conflicts: ["license"]

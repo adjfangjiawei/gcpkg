@@ -35,6 +35,17 @@ features:
     description: Opt out of the single-header amalgamation
     args: []
     conflicts: ["amalgamation"]
+  benchmarks:
+    default: true
+    description: Build all seven upstream benchmark executables (source-built benchmark + url-dataset)
+    requires: ["benchmark", "url-dataset"]
+    args: ["-DADA_BENCHMARKS=ON"]
+    conflicts: ["no-benchmarks"]
+  no-benchmarks:
+    default: false
+    description: Opt out of the upstream benchmark executables
+    args: []
+    conflicts: ["benchmarks"]
   static:
     default: true
     description: Build static libraries

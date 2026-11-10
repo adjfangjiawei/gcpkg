@@ -12,13 +12,18 @@
 --   * find_program(ccache) -> no compiler launcher probe;
 --   * find_package(Python3) -> source-built python port executable.
 --
--- Upstream-off developer benchmark/sanitizer/coverage/competition modes need
--- additional external dataset/competitor source ports that are not in this
--- gcpkg port set yet.  They are NOT disabled to dodge a real library feature;
--- they remain a separate bottom-up audit item and are explicitly reported.
+-- R20 P2: ADA_BENCHMARKS is now a default-ON feature backed by source-built
+-- ports (benchmark + url-dataset, plus simdjson from tests).  The comparison
+-- extras that upstream discovers through system find_package() or downloads
+-- at configure time (ICU/url_whatwg, CURL, Boost::url, ZURI, corrosion/Rust,
+-- and ADA_COMPETITION's uriparser/urlparser/httpparser) still need their own
+-- source ports.  They are explicitly patched out in pre_build (never searched
+-- on the host) and reported as remaining bottom-up audit items -- this port
+-- is NOT claimed as a full-feature final pass.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")
+local triplet = require("gcpkg.triplet")
 
 local CPM_SHIM = [==[
 # gcpkg local CPM shim.  Replaces the upstream network bootstrap
@@ -54,6 +59,12 @@ function(CPMAddPackage)
     find_package(cxxopts CONFIG REQUIRED)
   elseif(_gcpkg_lower STREQUAL "benchmark")
     find_package(benchmark CONFIG REQUIRED)
+  elseif(_gcpkg_lower STREQUAL "url-dataset")
+    # Data-only source port: CPM consumers only need its source directory.
+    set(url-dataset_SOURCE_DIR "${GCPKG_URL_DATASET_DIR}" PARENT_SCOPE)
+  elseif(_gcpkg_lower STREQUAL "corrosion")
+    # Configure-time network download; skipped by the patched benchmark file.
+    set(RUST_FOUND FALSE PARENT_SCOPE)
   else()
     message(FATAL_ERROR "gcpkg: no source port for CPM package '${_gcpkg_name}'")
   endif()
@@ -66,6 +77,15 @@ local function patch(path, old, new)
     s, n = s:gsub(old, new, 1)
     assert(n == 1, "gcpkg: expected one match for " .. old .. " in " .. path)
     fs.write(path, s)
+end
+
+-- Literal replacement (no Lua pattern escaping) for CMake snippets that
+-- contain ${...}, parentheses or brackets.
+local function patch_plain(path, old, new)
+    local s = assert(fs.read(path), "gcpkg: cannot read " .. path)
+    local a, b = s:find(old, 1, true)
+    assert(a, "gcpkg: expected literal match in " .. path .. ": " .. old)
+    fs.write(path, s:sub(1, a - 1) .. new .. s:sub(b + 1))
 end
 
 return recipe.cmake {
@@ -86,6 +106,12 @@ return recipe.cmake {
     cmake = {
         defines = function(ctx)
             local d = {
+                -- Pointer size comes from the ONE gcpkg triplet probe (and
+                -- any per-triplet user override), never from a library-side
+                -- CMake/try_compile probe.  Upstream uses it to gate the
+                -- Google Benchmark dependency on 32-bit systems.
+                GCPKG_POINTER_SIZE = triplet.scalar(triplet.facts().pointer_size),
+
                 -- Feature defaults are OFF here; enabled features append the
                 -- matching -D...=ON args last, so disabling a feature really
                 -- removes both its dependency and its build switch.
@@ -96,10 +122,14 @@ return recipe.cmake {
                 CMAKE_BUILD_TYPE = "Release",
                 CMAKE_CXX_STANDARD = "17",
 
-                -- Developer diagnostics / benchmark harness: upstream-off and
-                -- not yet backed by source ports for all competitors.
+                -- ADA_BENCHMARKS is feature-driven: features.yaml appends
+                -- -DADA_BENCHMARKS=ON last, so disabling the feature removes
+                -- both its build switch and its source-built dependencies.
                 ADA_BENCHMARKS = "OFF",
+                -- Comparison extras: no source ports yet.  Kept explicit and
+                -- patched out of the benchmark CMakeLists (no system search).
                 ADA_COMPETITION = "OFF",
+                ADA_BOOST_URL = "OFF",
                 ADA_LOGGING = "OFF",
                 ADA_DEVELOPMENT_CHECKS = "OFF",
                 ADA_SANITIZE = "OFF",
@@ -125,6 +155,10 @@ return recipe.cmake {
             cfgdir("benchmark", "benchmark")
             local py = ctx.dep("python")
             if py and py.prefix then d.GCPKG_PYTHON3 = py.prefix .. "/bin/python3" end
+            local dataset = ctx.dep("url-dataset")
+            if dataset and dataset.prefix then
+                d.GCPKG_URL_DATASET_DIR = dataset.prefix .. "/share/url-dataset"
+            end
             return d
         end,
         args = {},
@@ -132,7 +166,10 @@ return recipe.cmake {
     pre_build = function(ctx)
         -- 1. CPM's wrapper unconditionally downloads CPM.cmake from GitHub.
         --    Replace it with local source-built config packages.
-        fs.write(ctx.src .. "/cmake/CPM.cmake", CPM_SHIM)
+        local dataset = ctx.dep("url-dataset")
+        local datasetDir = dataset and (dataset.prefix .. "/share/url-dataset") or ""
+        fs.write(ctx.src .. "/cmake/CPM.cmake", CPM_SHIM ..
+                 '\nset(GCPKG_URL_DATASET_DIR "' .. datasetDir .. '")\n')
         -- 2. Git is only used to gate tests/tools; no tool probe needed.
         patch(ctx.src .. "/CMakeLists.txt",
               "find_package%(Git QUIET%)", "set(Git_FOUND TRUE)")
@@ -148,6 +185,26 @@ return recipe.cmake {
         patch(ctx.src .. "/singleheader/CMakeLists.txt",
               "find_package %(Python3 COMPONENTS Interpreter%)",
               (py and py.prefix) and pyOn or pyOff)
+        -- 5. Benchmarks: keep every upstream benchmark target, but route the
+        --    optional comparison-only discoveries to explicit "unavailable".
+        --    They are configure-time network downloads / system library
+        --    searches, not platform facts, and their source ports are still
+        --    pending.  Nothing here disables a library feature to dodge a
+        --    dependency; the benchmark targets themselves are all built.
+        -- 6. CMAKE_SIZEOF_VOID_P is produced by CMake's own compiler probe,
+        --    which gcpkg short-circuits.  Use the shared pointer-size fact.
+        patch_plain(ctx.src .. "/CMakeLists.txt",
+                    "CMAKE_SIZEOF_VOID_P EQUAL 8",
+                    "GCPKG_POINTER_SIZE EQUAL 8")
+        local b = ctx.src .. "/benchmarks/CMakeLists.txt"
+        patch_plain(b, "find_package(ICU COMPONENTS uc i18n)",
+                    "set(ICU_FOUND FALSE)  # gcpkg: ICU/url_whatwg source port pending")
+        patch_plain(b, "find_package(CURL)",
+                    "set(CURL_FOUND FALSE)  # gcpkg: source-built curl comparison pending")
+        patch_plain(b, "find_package(ZURI QUIET)",
+                    "set(ZURI_FOUND FALSE)  # gcpkg: ZURI source port pending")
+        patch_plain(b, "if(NOT WIN32)",
+                    "set(RUST_FOUND FALSE)  # gcpkg: corrosion/servo-url is a configure-time download\nif(FALSE)")
     end,
     exports = {
       includes = { "@PREFIX@/include" },
