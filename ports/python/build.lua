@@ -1,4 +1,6 @@
--- CPython 3.12.8 -- tool port: python3, libpython3.12.a and headers.
+-- CPython 3.12.8 -- tool port: python3, libpython3.12.so (and a PIC
+-- libpython3.12.a), and headers.  Shared + PIC is the default so every
+-- source-built loadable Python binding can link without a system Python.
 -- port.dependency_env() prepends <prefix>/bin to PATH and adds
 -- <prefix>/lib/python3/site-packages to PYTHONPATH for every dependent.
 -- The Python adapter (gcpkg.build.python / recipe.python) installs packages
@@ -19,13 +21,22 @@ return recipe.autotools {
     autotools = {
         args = { "--disable-test-modules" },
     },
-    -- Host pkg-config can point at a non-PIC static ncurses from another
-    -- store; linking that into a shared Python extension fails with
-    -- "relocation ... can not be used when making a shared object".
-    -- Isolate pkg-config so configure falls back to the system shared libs.
+    -- Isolate pkg-config from a non-PIC static ncurses in another store; with
+    -- --enable-shared the interpreter links the system shared runtime libs,
+    -- not those static archives.  Embed a store-local rpath so the installed
+    -- python3 finds libpython3.12.so without any LD_LIBRARY_PATH at runtime.
     pre_build = function(ctx)
         ctx.env.PKG_CONFIG_LIBDIR = "/nonexistent-gcpkg-pkgconfig"
         ctx.env.PKG_CONFIG_PATH = ""
+        local function add_flag(key, flag)
+            local prev = ctx.env[key]
+            if not prev or prev == "" then ctx.env[key] = flag; return end
+            for token in prev:gmatch("%S+") do
+                if token == flag then return end
+            end
+            ctx.env[key] = prev .. " " .. flag
+        end
+        add_flag("LDFLAGS", "-Wl,-rpath," .. ctx.prefix .. "/lib")
     end,
     exports = {
         includes = { "@PREFIX@/include/python3.12" },

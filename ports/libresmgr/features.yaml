@@ -1,0 +1,15 @@
+schema: 1
+port: libresmgr
+
+# Only the client library is built; the upstream daemon/PAM pieces would
+# require system service directories and are not an alsa-lib feature.
+features:
+  shared:
+    default: true
+    description: Build the shared libresmgr client library
+    args: []
+  static:
+    default: false
+    description: Static shape (upstream Makefile builds shared by default)
+    args: []
+    conflicts: ["shared"]

@@ -138,10 +138,18 @@ function M.define(spec)
         elseif kind == "autotools" then
             local autotools = require("gcpkg.build.autotools")
             local cfg = spec.autotools or {}
-            local args = util.concat(util.deepcopy(cfg.args or {}), featureArgs)
+            local cfgArgs = type(cfg.args) == "function" and cfg.args(ctx)
+                            or cfg.args or {}
+            local args = util.concat(util.deepcopy(cfgArgs), featureArgs)
             -- Shared triplet facts short-circuit AC_CHECK_* for EVERY
             -- autotools port; appended last so user global facts win.
-            args = util.concat(args, require("gcpkg.triplet").autotools_args())
+            -- Pass the PORT env wrappers explicitly: the CLI process env is
+            -- not the build env, and AC_PROG_CC/CPP must keep the wrapper.
+            args = util.concat(args, require("gcpkg.triplet").autotools_args({
+                cc = ctx.env.CC,
+                cxx = ctx.env.CXX,
+                cpp = ctx.env.CPP,
+            }))
             result = autotools.all {
                 src = ctx.src,
                 configure = cfg.configure and util.join(ctx.src, cfg.configure) or nil,

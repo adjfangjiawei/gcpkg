@@ -1,19 +1,109 @@
 schema: 1
 port: alsa-lib
 
-# Autotools. Host ALSA headers via pkgconfig backend; --disable-python avoids Python SWIG bindings.
+# R20: every capability supported on the active triplet is ON by default.
+# `requires` is the feature gate: disabling a feature removes BOTH its build
+# switch and its source-built dependency from the bottom-up install order.
 features:
-  no-tests:
+  wordexp:
     default: true
-    description: Skip the upstream test suite
-    args: []
-  static:
-    default: true
-    description: Build static libraries
-    args: []
-    conflicts: ["shared"]
-  shared:
+    description: Use wordexp when expanding configs (libc; header fact from shared probe)
+    args: ["--with-wordexp"]
+  no-wordexp:
     default: false
-    description: Build shared libraries
+    description: Opt out of wordexp config expansion
     args: []
+    conflicts: ["wordexp"]
+  resmgr:
+    default: true
+    description: resmgr device access support (source-built libresmgr port)
+    requires: ["libresmgr"]
+    args: ["--enable-resmgr"]
+  no-resmgr:
+    default: false
+    description: Opt out of resmgr support
+    args: []
+    conflicts: ["resmgr"]
+  python-bindings:
+    default: true
+    description: Python mixer binding + Python components (source-built python port)
+    requires: ["python"]
+    args: ["--enable-python", "--enable-mixer-pymods"]
+  no-python-bindings:
+    default: false
+    description: Opt out of Python components
+    args: []
+    conflicts: ["python-bindings"]
+  mixer-modules:
+    default: true
+    description: Additional mixer modules (experimental but supported by this source)
+    args: ["--enable-mixer-modules"]
+  no-mixer-modules:
+    default: false
+    description: Opt out of additional mixer modules
+    args: []
+    conflicts: ["mixer-modules"]
+  alisp:
+    default: true
+    description: ALISP interpreter component
+    args: ["--enable-alisp"]
+  no-alisp:
+    default: false
+    description: Opt out of ALISP
+    args: []
+    conflicts: ["alisp"]
+  lockless-dmix:
+    default: true
+    description: Lockless dmix default on x86/x86_64 (triplet-gated in build.lua)
+    args: []
+  no-lockless-dmix:
+    default: false
+    description: Opt out of lockless dmix default
+    args: []
+    conflicts: ["lockless-dmix"]
+  softfloat:
+    default: true
+    description: Soft-float code path (patched configure keeps alisp and all PCM plugins)
+    args: []
+  no-softfloat:
+    default: false
+    description: Opt out of the soft-float code path
+    args: []
+    conflicts: ["softfloat"]
+  symbolic-functions:
+    default: true
+    description: -Bsymbolic-functions size/speed optimization
+    args: ["--enable-symbolic-functions"]
+  no-symbolic-functions:
+    default: false
+    description: Opt out of symbolic-functions optimization
+    args: []
+    conflicts: ["symbolic-functions"]
+  debug-assert:
+    default: true
+    description: Assert in the default error message handler
+    args: ["--enable-debug-assert"]
+  no-debug-assert:
+    default: false
+    description: Opt out of debug asserts
+    args: []
+    conflicts: ["debug-assert"]
+  thread-safety:
+    default: true
+    description: Thread-safe API functions
+    args: ["--enable-thread-safety"]
+  no-thread-safety:
+    default: false
+    description: Opt out of thread-safe API functions
+    args: []
+    conflicts: ["thread-safety"]
+  shared:
+    default: true
+    description: Build shared libraries (mutually exclusive with static)
+    args: ["--enable-shared", "--disable-static"]
     conflicts: ["static"]
+  static:
+    default: false
+    description: Build static libraries (mutually exclusive with shared)
+    args: ["--enable-static", "--disable-shared"]
+    conflicts: ["shared"]

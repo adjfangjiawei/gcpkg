@@ -42,6 +42,7 @@ local HEADERS = {
     "linux/blkzoned.h", "ext2fs/ext2_fs.h", "linux/types.h",
     "linux/ioctl.h", "sys/mount.h", "sys/vfs.h", "linux/magic.h",
     "execinfo.h", "minix/config.h", "vfork.h",
+    "wordexp.h", "sys/endian.h", "sys/shm.h",
 }
 
 local FUNCTIONS = {
@@ -57,7 +58,9 @@ local FUNCTIONS = {
     "malloc", "calloc", "realloc", "free", "posix_memalign", "aligned_alloc",
     "dlopen", "dlsym", "dlclose", "backtrace", "backtrace_symbols",
     "asprintf", "vasprintf", "getline", "getopt_long", "mkdtemp", "realpath",
-    "setenv", "unsetenv", "strerror_r", "pthread_create", "socket", "poll",
+    "setenv", "unsetenv", "strerror_r", "pthread_create", "pthread_join",
+    "uselocale", "eaccess", "socket", "poll", "fork", "vfork", "getpgrp",
+    "setpgrp", "bcopy", "index", "rindex", "bzero", "vprintf", "doprnt",
     "epoll_create1", "eventfd", "inotify_init1", "fstatat", "openat",
     "readlink", "symlink", "getaddrinfo", "arc4random", "getrandom",
     "explicit_bzero", "memmem", "qsort_r", "reallocarray", "dup3", "pipe2",
@@ -110,6 +113,7 @@ local TYPE_MSVC_TMPL = [==[
 ]==]
 
 local PROLOG = [==[
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -119,6 +123,13 @@ local PROLOG = [==[
 #include <sys/types.h>
 #include <wchar.h>
 #include <dlfcn.h>
+#define GCPKG_STR2(x) #x
+#define GCPKG_STR(x) GCPKG_STR2(x)
+#if defined(__has_include)
+#if __has_include(<pthread.h>)
+#include <pthread.h>
+#endif
+#endif
 #if defined(__linux__) && defined(__has_include)
 #if __has_include(<features.h>)
 #include <features.h>
@@ -194,6 +205,18 @@ int main(void) {
   printf("defined:BLKGETZONESZ_linux_blkzoned_h=1\n");
 #else
   printf("defined:BLKGETZONESZ_linux_blkzoned_h=0\n");
+#endif
+/* PTHREAD_MUTEX_RECURSIVE is an enum constant in glibc, not a macro.
+   With _GNU_SOURCE the feature macros below prove the enum exists. */
+#if defined(__USE_UNIX98) || defined(__USE_XOPEN2K8) || defined(__USE_GNU)
+  printf("defined:PTHREAD_MUTEX_RECURSIVE=1\n");
+#else
+  printf("defined:PTHREAD_MUTEX_RECURSIVE=0\n");
+#endif
+#ifdef __USER_LABEL_PREFIX__
+  printf("symbol_prefix=%s\n", GCPKG_STR(__USER_LABEL_PREFIX__));
+#else
+  printf("symbol_prefix=\n");
 #endif
 #ifdef __GLIBC__
   printf("defined:__GLIBC___features_h=1\n");
@@ -355,7 +378,7 @@ local function parseProbe(text)
         local k, v = line:match("^([^=]+)=(.*)$")
         if k then
             if k == "byte_order" or k == "pointer_size" or k == "arch"
-               or k == "os" or k == "compiler_id" then
+               or k == "os" or k == "compiler_id" or k == "symbol_prefix" then
                 f[k] = (k == "pointer_size") and (tonumber(v) or v) or v
             elseif k:sub(1, 5) == "type:" then
                 f.sizes[k:sub(6)] = tonumber(v) or ""
@@ -430,6 +453,7 @@ local function writeFacts(name, f)
         "cxx20_capable: " .. scalar(f.cxx20_capable),
         "byte_order: " .. tostring(f.byte_order or "unknown"),
         "pointer_size: " .. scalar(f.pointer_size),
+        "symbol_prefix: " .. scalar(f.symbol_prefix),
         "headers:",
     }
     local names = {}
@@ -557,6 +581,7 @@ function M.cmake_defines(opts)
 end
 
 function M.autotools_args(opts)
+    opts = opts or {}
     local f = M.facts(opts)
     local a = {
         "ac_cv_c_bigendian=" .. ((tostring(f.byte_order) == "big") and "yes" or "no"),
@@ -568,7 +593,10 @@ function M.autotools_args(opts)
         a[#a + 1] = "ac_cv_func_" .. ackey(n) .. "=" .. yesno(v)
     end
     for n, v in pairs(f.defined or {}) do
-        a[#a + 1] = "ac_cv_defined_" .. acname(n) .. "=" .. yesno(v)
+        local yn = yesno(v)
+        a[#a + 1] = "ac_cv_defined_" .. acname(n) .. "=" .. yn
+        -- AC_CHECK_DECL uses ac_cv_have_decl_<NAME>, not ac_cv_defined_*.
+        a[#a + 1] = "ac_cv_have_decl_" .. acname(n) .. "=" .. yn
     end
     for n, v in pairs(f.sizes or {}) do
         if tonumber(v) then
@@ -580,6 +608,134 @@ function M.autotools_args(opts)
             a[#a + 1] = "ac_cv_type_" .. k .. "=yes"
         end
     end
+    -- Generic toolchain/framework results: derived from the SAME triplet
+    -- probe, never hardcoded in a port.  These stop AC_PROG_CC, libtool and
+    -- the autoconf framework from compiling trivial test programs.
+    local function truthy(v)
+        local s = scalar(v)
+        return s ~= "" and s ~= "0"
+    end
+    local tc = require("gcpkg.toolchain")
+    -- CC/CXX/CPP in the PORT build env are the gcpkg interceptor wrappers;
+    -- f.compiler is the real compiler used for the one triplet probe.
+    -- Autoconf's AC_PROG_* cache vars MUST keep those wrappers, otherwise
+    -- compile_commands.json loses every translation unit.  os.getenv() in the
+    -- CLI process is NOT the port env, so recipe passes ctx.env explicitly.
+    local ccWrap = first(opts.cc, getenv("CC"), getenv("GCPKG_CC_REAL"),
+                         tostring(f.compiler or "cc"))
+    local cxxWrap = first(opts.cxx, getenv("CXX"), getenv("GCPKG_CXX_REAL"),
+                          "c++")
+    local cppWrap = first(opts.cpp, getenv("CPP"), ccWrap .. " -E")
+    local gnu = (f.compiler_id == "clang" or f.compiler_id == "gcc") and "yes" or "no"
+    local objext = (f.compiler_id == "msvc") and "obj" or "o"
+    local exeext = (f.os == "windows") and ".exe" or ""
+    local x86 = (f.arch == "x86_64" or f.arch == "x86")
+    local build = tc.host_triple()
+    local host = tc.target_triplet()
+    a[#a + 1] = "ac_cv_build=" .. build
+    a[#a + 1] = "ac_cv_host=" .. host
+    a[#a + 1] = "ac_cv_target=" .. host
+    a[#a + 1] = "ac_cv_prog_CC=" .. ccWrap
+    a[#a + 1] = "ac_cv_prog_ac_ct_CC=" .. ccWrap
+    a[#a + 1] = "ac_cv_prog_CPP=" .. cppWrap
+    a[#a + 1] = "ac_cv_prog_CXX=" .. cxxWrap
+    a[#a + 1] = "ac_cv_prog_ac_ct_CXX=" .. cxxWrap
+    a[#a + 1] = "ac_cv_prog_CXXCPP=" .. cxxWrap .. " -E"
+    a[#a + 1] = "ac_cv_objext=" .. objext
+    a[#a + 1] = "ac_cv_exeext=" .. exeext
+    a[#a + 1] = "ac_cv_c_compiler_gnu=" .. gnu
+    a[#a + 1] = "ac_cv_prog_cc_g=yes"
+    a[#a + 1] = "ac_cv_prog_cc_c89="
+    a[#a + 1] = "ac_cv_prog_gcc_traditional=no"
+    a[#a + 1] = "ac_cv_c_const=yes"
+    a[#a + 1] = "ac_cv_c_inline=inline"
+    if truthy((f.headers or {})["stdlib.h"]) then
+        a[#a + 1] = "ac_cv_header_stdc=yes"
+    end
+    if truthy((f.headers or {})["time.h"]) then
+        a[#a + 1] = "ac_cv_header_time=yes"
+    end
+    if truthy((f.headers or {})["dlfcn.h"]) then
+        a[#a + 1] = "ac_cv_header_dlfcn_h=yes"
+    end
+    if truthy((f.functions or {})["dlsym"]) then
+        a[#a + 1] = "ac_cv_search_dlsym=" ..
+                    ((f.os == "linux") and "-ldl" or "none required")
+    end
+    for _, x in ipairs({ { "pthread", "pthread_join" },
+                         { "rt", "clock_gettime" },
+                         { "dl", "dlopen" } }) do
+        if truthy((f.functions or {})[x[2]]) then
+            a[#a + 1] = "ac_cv_lib_" .. x[1] .. "_" .. x[2] .. "=yes"
+        end
+    end
+    -- Autoconf/libtool framework tools.  Values come from the active
+    -- environment first; command names (not absolute paths) stay portable.
+    -- config.status prefixes a RELATIVE INSTALL value with the subdirectory
+    -- path (e.g. ../../../install -c).  On a case-insensitive 9p/WSL mount
+    -- that resolves to the tarball's INSTALL document instead of the system
+    -- install tool, and `make install` recurses forever.  Keep it absolute.
+    local installCmd = first(getenv("GCPKG_INSTALL"), getenv("INSTALL"),
+                             "/usr/bin/install -c")
+    if installCmd:sub(1, 1) ~= "/" and not installCmd:match("^%a:") then
+        installCmd = "/usr/bin/install -c"
+    end
+    local tools = {
+        { "ac_cv_path_install", "INSTALL", installCmd },
+        { "ac_cv_path_mkdir", "MKDIR", "mkdir" },
+        { "ac_cv_path_GREP", "GREP", "grep" },
+        { "ac_cv_path_EGREP", "EGREP", "grep -E" },
+        { "ac_cv_path_SED", "SED", "sed" },
+        { "ac_cv_prog_AWK", "AWK", "awk" },
+        { "ac_cv_prog_LN_S", "LN_S", "ln -s" },
+        { "ac_cv_prog_AR", "AR", "ar" },
+        { "ac_cv_prog_RANLIB", "RANLIB", "ranlib" },
+        { "ac_cv_prog_STRIP", "STRIP", "strip" },
+        { "ac_cv_prog_NM", "NM", "nm" },
+        { "ac_cv_prog_LD", "LD", "ld" },
+        { "ac_cv_prog_OBJDUMP", "OBJDUMP", "objdump" },
+        { "ac_cv_prog_AS", "AS", "as" },
+        { "ac_cv_prog_DLLTOOL", "DLLTOOL", "no" },
+        { "ac_cv_prog_WINDRES", "WINDRES", "no" },
+    }
+    for _, t in ipairs(tools) do
+        a[#a + 1] = t[1] .. "=" .. first(getenv(t[2]), t[3])
+    end
+    a[#a + 1] = "ac_cv_prog_make_make_set=yes"
+    if f.os ~= "macos" then
+        a[#a + 1] = "ac_cv_prog_DSYMUTIL=no"
+        a[#a + 1] = "ac_cv_prog_LIPO=no"
+        a[#a + 1] = "ac_cv_prog_OTOOL=no"
+        a[#a + 1] = "ac_cv_prog_OTOOL64=no"
+        a[#a + 1] = "ac_cv_prog_NMEDIT=no"
+    end
+    if f.os == "linux" then
+        -- HP-UX dlopen shims do not exist on Linux; short-circuit libtool's
+        -- fallback link tests instead of compiling them for every port.
+        a[#a + 1] = "ac_cv_lib_dld_shl_load=no"
+        a[#a + 1] = "ac_cv_lib_svld_dlopen=no"
+        a[#a + 1] = "ac_cv_lib_dld_dld_link=no"
+        a[#a + 1] = "ac_cv_func_shl_load=no"
+        a[#a + 1] = "ac_cv_func_dld_link=no"
+        if truthy((f.functions or {})["fork"]) then
+            a[#a + 1] = "ac_cv_func_fork_works=yes"
+        end
+        if truthy((f.functions or {})["vfork"]) then
+            a[#a + 1] = "ac_cv_func_vfork_works=yes"
+        end
+        if truthy((f.functions or {})["getpgrp"]) then
+            a[#a + 1] = "ac_cv_func_getpgrp_void=yes"
+        end
+        if truthy((f.functions or {})["setpgrp"]) then
+            a[#a + 1] = "ac_cv_func_setpgrp_void=yes"
+        end
+    end
+    -- Results consumed by alsa-lib's patched generated configure.
+    a[#a + 1] = "gcc_have_atomics=" .. ((gnu == "yes") and "yes" or "no")
+    a[#a + 1] = "gcpkg_have_lfs=" .. ((f.os == "linux") and "yes" or "no")
+    a[#a + 1] = "gcpkg_have___thread=" .. ((gnu == "yes") and "yes" or "no")
+    a[#a + 1] = "gcpkg_have_mmx=" .. ((x86 and gnu == "yes") and "yes" or "no")
+    a[#a + 1] = "gcpkg_symbol_prefix=" .. scalar(f.symbol_prefix or "")
     table.sort(a)
     return a
 end

@@ -6,13 +6,18 @@ features:
     default: true
     description: Skip the upstream test suite
     args: []
-  static:
+  pic:
     default: true
-    description: Build static libraries
-    args: []
-    conflicts: ["shared"]
+    description: Build position-independent objects so libpython can be linked into loadable modules
+    env:
+      - "CFLAGS=-fPIC"
   shared:
-    default: false
-    description: Build shared libraries
-    args: []
+    default: true
+    description: Build shared libpython (needed by source-built loadable Python bindings)
+    args: ["--enable-shared"]
     conflicts: ["static"]
+  static:
+    default: false
+    description: Build static libraries
+    args: ["--disable-shared"]
+    conflicts: ["shared"]
