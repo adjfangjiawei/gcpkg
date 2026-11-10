@@ -148,6 +148,9 @@ function M.define(spec)
                 jobs = ctx.jobs,
                 env = ctx.env,
                 args = args,
+                -- R20: make-variable overrides may depend on the install
+                -- prefix (e.g. redirect an upstream hardcoded system dir).
+                vars = type(cfg.vars) == "function" and cfg.vars(ctx) or cfg.vars,
                 install_target = cfg.install_target or "install",
             }
 

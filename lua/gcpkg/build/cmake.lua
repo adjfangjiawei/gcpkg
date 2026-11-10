@@ -136,7 +136,11 @@ include(CheckFortranFunctionExists OPTIONAL)
 macro(gcpkg_probe_result _gcpkg_varname)
   if("${_gcpkg_varname}" IN_LIST GCPKG_TRUE_RESULTS)
     set(${_gcpkg_varname} TRUE)
-  elseif(DEFINED ${_gcpkg_varname} AND NOT "${${_gcpkg_varname}}" STREQUAL "")
+  elseif(DEFINED ${_gcpkg_varname})
+    #  R20: an explicitly supplied empty result means "not available".
+    #  Upstream macros such as LZO's mfx_check_* treat ANY non-empty value
+    #  (including FALSE) as "found", so the exact value must be preserved.
+    #  No probe is run in any branch.
     set(${_gcpkg_varname} "${${_gcpkg_varname}}")
   else()
     set(${_gcpkg_varname} FALSE)
