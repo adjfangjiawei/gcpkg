@@ -1,13 +1,42 @@
 schema: 1
 port: any-lite
 
-# std::any backport for pre-C++17 compilers.
+# std::any backport.  The upstream tarball ships a bundled header-only test
+# framework (test/lest_cpp03.hpp); example 04 also needs the source-built
+# variant-lite header, declared as an examples-only feature dependency.
 features:
-  no-tests:
-    default: true
-    description: Skip the upstream test suite
-    args: []
   header-only:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: Install headers, CMake package config and compile the real build
     args: []
+  tests:
+    default: true
+    description: Build all upstream test binaries and run them with ctest
+    args: ["-DANY_LITE_OPT_BUILD_TESTS=ON"]
+    conflicts: ["no-tests"]
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    args: []
+    conflicts: ["tests"]
+  examples:
+    default: true
+    description: Build all five upstream example programs (requires variant-lite)
+    args: ["-DANY_LITE_OPT_BUILD_EXAMPLES=ON"]
+    requires: ["variant-lite"]
+    conflicts: ["no-examples"]
+  no-examples:
+    default: false
+    description: Opt out of the example programs
+    args: []
+    conflicts: ["examples"]
+  select-std:
+    default: false
+    description: Force std::any selection (mutually exclusive with select-nonstd)
+    args: ["-DANY_LITE_OPT_SELECT_STD=ON"]
+    conflicts: ["select-nonstd"]
+  select-nonstd:
+    default: false
+    description: Force nonstd::any selection (mutually exclusive with select-std)
+    args: ["-DANY_LITE_OPT_SELECT_NONSTD=ON"]
+    conflicts: ["select-std"]
