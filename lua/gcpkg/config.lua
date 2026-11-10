@@ -45,8 +45,10 @@ function M.path()
     local explicit = getenv("GCPKG_CONFIG")
     if explicit ~= "" then return util.abs(explicit) end
     local ok, state = pcall(paths.state_root)
-    if not ok or not state then return nil end
-    return util.join(state, "config.yaml")
+    if ok and state then return util.join(state, "config.yaml") end
+    local pr = paths.program_root()
+    if pr then return util.join(pr, ".gcpkg", "config.yaml") end
+    return "(gcpkg store not configured)"
 end
 
 function M.read()
@@ -199,7 +201,14 @@ function M.resolve(explicit)
     if configured then
         return util.abs(configured), M.path()
     end
-    return util.abs(M.home()), "default"
+    -- R20: the implicit default store must NOT live in $HOME.  Keep it inside
+    -- the gcpkg program directory, one of the two writable roots.
+    local pr = paths.program_root()
+    if pr then
+        return util.join(pr, "store"), "default"
+    end
+    error("gcpkg: cannot locate the program directory for a default store; "
+          .. "pass --store=DIR")
 end
 
 return M

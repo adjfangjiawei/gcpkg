@@ -3,10 +3,10 @@
 -- gcpkg may only CREATE files inside the package store or the directory that
 -- holds the gcpkg program.  Every implicit runtime state file (curl proxy
 -- config, user config, toolchain state, proxy yaml) lives under the store.
--- Directories explicitly named by the user on the command line (--out, --dir,
--- --install-prefix, ...) are registered by cli.lua before such a command runs.
--- The check is fail-closed: a write before the boundary is configured, or a
--- write outside the allowed roots, raises an error instead of creating a file.
+-- There are NO exceptions: not even directories named by the user on the
+-- command line.  The check is fail-closed: a write before the boundary is
+-- configured, or a write outside these two roots, raises an error instead
+-- of creating a file.
 local util = require("gcpkg.util")
 
 local M = { roots = {}, configured = false }
@@ -24,6 +24,11 @@ local function program_root()
         end
     end
     return nil
+end
+
+-- Directory that holds the gcpkg program/lua modules (writable root #2).
+function M.program_root()
+    return program_root()
 end
 
 function M.store_root()
