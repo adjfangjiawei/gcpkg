@@ -1,4 +1,5 @@
 local util = require("gcpkg.util")
+local paths = require("gcpkg.paths")
 local fs = require("gcpkg.fs")
 local features = require("gcpkg.features")
 local workspace = require("gcpkg.workspace")
@@ -505,6 +506,12 @@ end
 
 function M.main(args)
     local o = parse(args or gcpkg.args)
+    -- R20: establish the hard write boundary BEFORE proxy.configure() or any
+    -- other code can create a state file.  Exactly two roots are writable:
+    -- the resolved store and the gcpkg program directory.  NO exceptions.
+    -- The resolved store root is reused below so boundary and store agree.
+    local boundaryStore, boundarySource = config.resolve(o.store)
+    paths.configure(boundaryStore)
     if o.verbose then
         gcpkg.sys.set_verbose(true)
     end
@@ -566,7 +573,7 @@ function M.main(args)
     local roots = util.map(workspace.roots(projDir, publicRoots, py),
                           function(r) return util.abs(r) end)
     port.set_roots(roots)
-    local storeRoot, storeSource = config.resolve(o.store)
+    local storeRoot, storeSource = boundaryStore, boundarySource
     local st = storeMod.new(storeRoot)
     st.source = storeSource
     gcpkg.sys.add_root(util.join(st.root, "lua"))

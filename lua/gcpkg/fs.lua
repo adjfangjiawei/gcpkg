@@ -1,9 +1,11 @@
 local sys = gcpkg.sys
 local util = require("gcpkg.util")
+local paths = require("gcpkg.paths")
 local M = {}
 
 function M.mkdirs(p)
     if p and p ~= "" then
+        paths.assert_write(p)
         return sys.mkdir(p)
     end
 end
@@ -13,11 +15,13 @@ function M.read(p)
 end
 
 function M.write(p, data)
+    paths.assert_write(p)
     M.mkdirs(util.dirname(p))
     return sys.write(p, tostring(data))
 end
 
 function M.append(p, data)
+    paths.assert_write(p)
     M.mkdirs(util.dirname(p))
     return sys.append(p, tostring(data))
 end
@@ -55,6 +59,7 @@ function M.realpath(p)
 end
 
 function M.copy(src, dst)
+    paths.assert_write(dst)
     local data = sys.read(src)
     if not data then
         return false
@@ -64,10 +69,12 @@ function M.copy(src, dst)
 end
 
 function M.rm(p)
+    paths.assert_write(p)
     return sys.exec({ cmd = { "rm", "-rf", p }, quiet = true })
 end
 
 function M.symlink(target, link)
+    paths.assert_write(link)
     M.mkdirs(util.dirname(link))
     return sys.symlink(target, link)
 end

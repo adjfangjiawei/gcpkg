@@ -12,6 +12,7 @@
 -- cmake_args(), meson_args() etc. Configuration precedence is:
 --   CLI > project (gcpkg.yaml / workspace.yaml) > user config.yaml > env > auto.
 local util = require("gcpkg.util")
+local paths = require("gcpkg.paths")
 local fs = require("gcpkg.fs")
 local M = { current = nil, cache = {}, described = false }
 
@@ -135,8 +136,7 @@ end
 
 local function state_dir()
     local c = M.active()
-    return firstIn({ c.state_dir, getenv("GCPKG_HOME") }) or
-           util.join(getenv("HOME") ~= "" and getenv("HOME") or ".", ".gcpkg")
+    return firstIn({ c.state_dir, paths.state_root() })
 end
 
 function M.configure(o)

@@ -8,6 +8,7 @@ local util = require("gcpkg.util")
 local fs = require("gcpkg.fs")
 local yaml = require("gcpkg.yaml")
 local json = require("gcpkg.json")
+local paths = require("gcpkg.paths")
 local M = {}
 
 local TOOLCHAIN_KEYS = { "cc", "cxx", "target", "triple", "sysroot",
@@ -37,14 +38,23 @@ local function config_home()
     return util.join(home_dir(), ".config", "gcpkg")
 end
 
+-- The persistent config now lives INSIDE the store.  A legacy config in
+-- ~/.config/gcpkg is still READ (for backwards compatibility) but never
+-- written, so gcpkg never creates files outside the store boundary.
 function M.path()
     local explicit = getenv("GCPKG_CONFIG")
     if explicit ~= "" then return util.abs(explicit) end
-    return util.join(config_home(), "config.yaml")
+    local ok, state = pcall(paths.state_root)
+    if not ok or not state then return nil end
+    return util.join(state, "config.yaml")
 end
 
 function M.read()
-    return yaml.parse_file(M.path()) or {}
+    local p = M.path()
+    if p and fs.isfile(p) then return yaml.parse_file(p) or {} end
+    local legacy = util.join(config_home(), "config.yaml")
+    if fs.isfile(legacy) then return yaml.parse_file(legacy) or {} end
+    return {}
 end
 
 -- compiler:/toolchain: blocks are the canonical user/project toolchain config;
@@ -101,6 +111,7 @@ function M.set_store(path)
     if path == nil or path == "" then
         error("store set needs a directory")
     end
+    assert(M.path(), "gcpkg: store boundary not configured")
     local absolute = expand(path)
     local lines = without_store(fs.lines(M.path()))
     lines[#lines + 1] = "store: " .. json.encode(absolute)
@@ -109,6 +120,7 @@ function M.set_store(path)
 end
 
 function M.unset_store()
+    assert(M.path(), "gcpkg: store boundary not configured")
     local lines = without_store(fs.lines(M.path()))
     fs.write(M.path(), table.concat(lines, "\n") .. "\n")
 end
@@ -139,6 +151,7 @@ end
 -- user-level YAML. `value == nil` removes the key.
 function M.set_toolchain_value(key, value)
     assert(contains(TOOLCHAIN_KEYS, key), "unknown toolchain key: " .. tostring(key))
+    assert(M.path(), "gcpkg: store boundary not configured")
     local t = M.read_toolchain()
     if value == nil then
         t[key] = nil
