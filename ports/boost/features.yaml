@@ -1,0 +1,37 @@
+schema: 1
+port: boost
+
+# Boost 1.81.0 superproject.  This port installs the complete upstream
+# header tree (which already contains Boost.URL) and a local CONFIG package
+# exposing Boost::system.  All are header-only: no static/shared shape, no
+# library linking to discover.  Doxygen/b2-built compiled Boost libraries
+# are not a library capability of this port.
+features:
+  headers:
+    default: true
+    description: Install the full boost/ header tree
+  no-headers:
+    default: false
+    description: Opt out of the header tree
+    conflicts: ["headers"]
+  cmake-package:
+    default: true
+    description: Install BoostConfig.cmake / BoostConfigVersion.cmake with Boost::system
+  no-cmake-package:
+    default: false
+    description: Opt out of the local CMake CONFIG package
+    conflicts: ["cmake-package"]
+  sanity:
+    default: true
+    description: Compile a real translation unit including boost/system and boost/url headers
+  no-sanity:
+    default: false
+    description: Opt out of the compile sanity TU
+    conflicts: ["sanity"]
+  license:
+    default: true
+    description: Install LICENSE_1_0.txt
+  no-license:
+    default: false
+    description: Opt out of the license file
+    conflicts: ["license"]
