@@ -1,0 +1,45 @@
+schema: 1
+port: httpparser
+
+# nodejs/http-parser v2.9.4.  All capabilities this triplet supports are ON
+# by default; static/shared are mutually exclusive build shapes.
+features:
+  static:
+    default: true
+    description: Build libhttp_parser.a from the upstream C source
+  shared:
+    default: false
+    description: Build libhttp_parser.so (mutually exclusive build shape)
+    conflicts: ["static"]
+  tests:
+    default: true
+    description: Compile and RUN the upstream strict/fast test.c test binaries
+    conflicts: ["no-tests"]
+  no-tests:
+    default: false
+    description: Opt out of the upstream test binaries
+    conflicts: ["tests"]
+  tools:
+    default: true
+    description: Build the contrib/url_parser and contrib/parsertrace tools
+    conflicts: ["no-tools"]
+  no-tools:
+    default: false
+    description: Opt out of the contrib tools
+    conflicts: ["tools"]
+  sources:
+    default: true
+    description: Install http_parser.c/.h under share/httpparser/src for source-based consumers
+    conflicts: ["no-sources"]
+  no-sources:
+    default: false
+    description: Opt out of the exported source files
+    conflicts: ["sources"]
+  license:
+    default: true
+    description: Install LICENSE-MIT, AUTHORS and README.md
+    conflicts: ["no-license"]
+  no-license:
+    default: false
+    description: Opt out of the license and documentation files
+    conflicts: ["license"]

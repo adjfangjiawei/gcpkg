@@ -1,0 +1,45 @@
+schema: 1
+port: uriparser
+
+# uriparser pinned at 634b678 (the exact commit ada 2.9.2 benchmarks use).
+# Requires: gates the source-built googletest dependency for the test suite.
+features:
+  char:
+    default: true
+    description: Build the char* API
+    args: ["-DURIPARSER_BUILD_CHAR=ON"]
+  wchar:
+    default: true
+    description: Build the wchar_t* API
+    args: ["-DURIPARSER_BUILD_WCHAR_T=ON"]
+  tools:
+    default: true
+    description: Build the uriparse CLI
+    args: ["-DURIPARSER_BUILD_TOOLS=ON"]
+  no-tools:
+    default: false
+    description: Opt out of the uriparse CLI
+    conflicts: ["tools"]
+  tests:
+    default: true
+    description: Build and run the upstream testrunner (source-built googletest)
+    requires: ["googletest"]
+    args: ["-DURIPARSER_BUILD_TESTS=ON"]
+    conflicts: ["no-tests"]
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    conflicts: ["tests"]
+  docs:
+    default: false
+    description: Doxygen API docs (tool port pending; not a library capability)
+  static:
+    default: true
+    description: Build static libraries
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries (mutually exclusive build shape)
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+    conflicts: ["static"]

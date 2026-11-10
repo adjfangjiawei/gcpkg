@@ -1,0 +1,36 @@
+schema: 1
+port: urlparser
+
+# netmindms/urlparser pinned at 69c09ed.  Header + one C++ implementation TU.
+features:
+  static:
+    default: true
+    description: Build liburlparser.a from src/EdUrlParser.cpp
+  shared:
+    default: false
+    description: Build liburlparser.so (mutually exclusive build shape)
+    conflicts: ["static"]
+  example:
+    default: true
+    description: Build AND run the upstream src/exam.cpp example
+    conflicts: ["no-example"]
+  no-example:
+    default: false
+    description: Opt out of the example program
+    conflicts: ["example"]
+  sources:
+    default: true
+    description: Install the src/ tree under share/urlparser/src for source-based consumers
+    conflicts: ["no-sources"]
+  no-sources:
+    default: false
+    description: Opt out of the exported source tree
+    conflicts: ["sources"]
+  license:
+    default: true
+    description: Install LICENSE.md and README.md
+    conflicts: ["no-license"]
+  no-license:
+    default: false
+    description: Opt out of the license and README
+    conflicts: ["license"]
