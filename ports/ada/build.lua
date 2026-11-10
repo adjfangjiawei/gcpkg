@@ -16,11 +16,24 @@ return recipe.cmake {
     },
     dependencies = {},
     cmake = {
+        -- Explicit results, like ports/sdl3/build.lua.  ADA_TOOLS defaults to
+        -- ON upstream and would trigger find_package(Git) + CPM downloads;
+        -- every option is stated here so configure neither probes nor fetches.
         defines = {
           BUILD_TESTING = "OFF",
+          BUILD_SHARED_LIBS = "OFF",
+          CMAKE_CXX_STANDARD = "17",
           ADA_TESTING = "OFF",
           ADA_BENCHMARKS = "OFF",
-          BUILD_SHARED_LIBS = "OFF",
+          ADA_TOOLS = "OFF",
+          ADA_LOGGING = "OFF",
+          ADA_DEVELOPMENT_CHECKS = "OFF",
+          ADA_SANITIZE = "OFF",
+          ADA_SANITIZE_UNDEFINED = "OFF",
+          ADA_COVERAGE = "OFF",
+          CODE_COVERAGE_VERBOSE = "FALSE",
+          -- codecoverage.cmake check_cxx_compiler_flag result, stated directly.
+          HAVE_fprofile_abs_path = "FALSE",
         },
         args = {},
     },

@@ -17,11 +17,16 @@ return recipe.cmake {
     dependencies = {},
     cmake = {
         source = "c",
+        -- Explicit results, like ports/sdl3/build.lua: the only probes are two
+        -- check_cxx_symbol_exists calls; clang-23 uses libstdc++ here.
         defines = {
           BUILD_TESTING = "OFF",
+          BUILD_SHARED_LIBS = "OFF",
+          CMAKE_C_STANDARD = "99",
           BLAKE3_USE_TBB = "OFF",
           BLAKE3_FETCH_TBB = "OFF",
-          BUILD_SHARED_LIBS = "OFF",
+          BLAKE3_HAVE_GLIBCXX = "TRUE",
+          BLAKE3_HAVE_LIBCPP = "FALSE",
         },
         args = {},
     },

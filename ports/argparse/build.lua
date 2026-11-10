@@ -16,14 +16,17 @@ return recipe.cmake {
     },
     dependencies = {},
     cmake = {
+        -- Explicit results, like ports/sdl3/build.lua: upstream has only three
+        -- options and target_compile_features(cxx_std_17); no check_* probes.
         defines = {
           BUILD_TESTING = "OFF",
           CMAKE_BUILD_TYPE = "Release",
           CMAKE_INSTALL_LIBDIR = "lib",
           BUILD_SHARED_LIBS = "OFF",
+          CMAKE_CXX_STANDARD = "17",
+          ARGPARSE_INSTALL = "ON",
           ARGPARSE_BUILD_TESTS = "OFF",
           ARGPARSE_BUILD_SAMPLES = "OFF",
-          ARGPARSE_INSTALL = "ON",
         },
         args = {},
     },

@@ -16,9 +16,18 @@ return recipe.cmake {
     },
     dependencies = {},
     cmake = {
+        -- Explicit results, like ports/sdl3/build.lua: the only probes are
+        -- BROTLI_EMSCRIPTEN and two CHECK_FUNCTION_EXISTS(log2) calls; on
+        -- Linux log2 lives in libm.  BUILD_SHARED_LIBS defaults ON upstream.
         defines = {
+            BUILD_SHARED_LIBS = "OFF",
+            BUILD_TESTING = "OFF",
+            CMAKE_BUILD_TYPE = "Release",
             BROTLI_DISABLE_TESTS = "ON",
             BROTLI_BUILD_TOOLS = "OFF",
+            BROTLI_EMSCRIPTEN = "FALSE",
+            LOG2_RES = "FALSE",
+            LOG2_LIBM_RES = "TRUE",
         },
     },
     exports = {
