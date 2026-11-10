@@ -202,7 +202,11 @@ int main(void) {
 #endif
 ]==]
 
-local cached, cachedName, cliName = nil, nil, nil
+-- A single gcpkg process must support SEVERAL triplets at once.  Cache and
+-- probe artefacts are keyed by triplet name; no value is shared between them.
+local cache = {}
+local currentName = nil
+local cliName = nil
 
 local function getenv(k)
     local ok, v = pcall(function() return gcpkg.sys.getenv(k) end)
@@ -259,24 +263,51 @@ function M.file(name)
     return util.join(M.dir(), name .. ".yaml")
 end
 
+-- User settings in the GLOBAL config file are partitioned by triplet name:
+--   triplets:
+--     native:            { facts: {...}, compiler: {...}, target: {...} }
+--     arm64-linux-gcc:   { facts: {...}, compiler: {...} }
+-- A single flat `facts:` in config.yaml is intentionally NOT read: it would
+-- overwrite every triplet with one value, which is wrong for multi-triplet.
+function M.global_spec(name)
+    local y = require("gcpkg.config").read() or {}
+    local t = type(y.triplets) == "table" and y.triplets or {}
+    local s = t[name]
+    return type(s) == "table" and s or {}
+end
+
+function M.file_spec(name)
+    local fs = require("gcpkg.fs")
+    local yaml = require("gcpkg.yaml")
+    local p = M.file(name)
+    if fs.isfile(p) then return yaml.parse_file(p) or {} end
+    return {}
+end
+
 function M.active(opts)
-    local cli = (opts and opts.triplet) or cliName
-    if type(cli) == "string" and cli ~= "" then return cli end
-    local config = require("gcpkg.config")
-    local y = config.read() or {}
+    local req = opts and opts.triplet
+    if type(req) == "string" and req ~= "" then return req end
+    if type(cliName) == "string" and cliName ~= "" then return cliName end
+    if type(currentName) == "string" and currentName ~= "" then return currentName end
+    local y = require("gcpkg.config").read() or {}
     if type(y.triplet) == "string" and y.triplet ~= "" then return y.triplet end
     return "native"
 end
 
+-- CLI --triplet selects the ACTIVE triplet for this process.  It does NOT
+-- limit gcpkg to one triplet: ensure({triplet=...}) may switch to another
+-- within the same process and both keep their own facts.
+function M.set_cli(name)
+    cliName = name
+    currentName = nil
+    cache = {}
+end
+
 function M.spec(name)
     local util = require("gcpkg.util")
-    local fs = require("gcpkg.fs")
-    local yaml = require("gcpkg.yaml")
-    local spec = util.deepcopy(BUILTIN[name] or {})
-    local p = M.file(name)
-    if fs.isfile(p) then
-        spec = util.merge(spec, yaml.parse_file(p) or {})
-    end
+    local spec = util.merge(util.merge(util.deepcopy(BUILTIN[name] or {}),
+                                      M.file_spec(name)),
+                            M.global_spec(name))
     spec.name = name
     return spec
 end
@@ -294,6 +325,10 @@ function M.list()
             end
         end
     end
+    local y = require("gcpkg.config").read() or {}
+    if type(y.triplets) == "table" then
+        for k in pairs(y.triplets) do names[#names + 1] = k end
+    end
     names = util.uniq(names)
     table.sort(names)
     return names
@@ -304,8 +339,9 @@ local function probeCompiler(spec)
     return first(c, getenv("GCPKG_CC_REAL"), getenv("CC_REAL"), "cc")
 end
 
-local function probeCxxStandard()
-    local cxx = first(getenv("GCPKG_CXX_REAL"), getenv("CXX_REAL"), "c++")
+local function probeCxxStandard(spec)
+    local cxx = first((type(spec.compiler) == "table" and spec.compiler.cxx) or "",
+                      getenv("GCPKG_CXX_REAL"), getenv("CXX_REAL"), "c++")
     local ok, out = pcall(function()
         return gcpkg.capture({ cxx, "-dM", "-E", "-x", "c++", "/dev/null" }, {})
     end)
@@ -379,7 +415,11 @@ local function writeFacts(name, f)
         "schema: 1",
         "# gcpkg platform facts for triplet '" .. name .. "'",
         "# ONE gcpkg probe at install-task start; libraries never probe.",
-        "# Override in <store>/.gcpkg/config.yaml (facts:) -- user settings win.",
+        "# Override ONLY THIS TRIPLET in <store>/.gcpkg/config.yaml:",
+        "#   triplets:",
+        "#     " .. name .. ":",
+        "#       facts: { ... }",
+        "# or in <store>/.gcpkg/triplets/" .. name .. ".yaml (lower precedence).",
         "triplet: " .. name,
         "compiler: " .. tostring(f.compiler or ""),
         "arch: " .. tostring(f.arch or "unknown"),
@@ -425,14 +465,17 @@ end
 
 function M.ensure(opts)
     opts = opts or {}
-    if opts.triplet and opts.triplet ~= "" then cliName = opts.triplet end
-    local name = M.active()
-    if cached and cachedName == name then return cached end
+    local name = M.active(opts)
+    if cache[name] then currentName = name; return cache[name] end
     local util = require("gcpkg.util")
     local fs = require("gcpkg.fs")
     local spec = M.spec(name)
+    local fileSpec, globalSpec = M.file_spec(name), M.global_spec(name)
     local cc = probeCompiler(spec)
-    local probeDir = util.join(require("gcpkg.paths").state_root(), "probe")
+    -- Per-triplet probe artefacts: two triplets using different compilers
+    -- must never overwrite each other's generated source / binary.
+    local probeDir = util.join(util.join(require("gcpkg.paths").state_root(),
+                                        "probe"), key(name))
     fs.mkdirs(probeDir)
     local src = util.join(probeDir, "platform.c")
     local exe = util.join(probeDir, "platform")
@@ -446,20 +489,25 @@ function M.ensure(opts)
     local out = gcpkg.capture({ exe }, {})
     if type(out) ~= "string" or out == "" then
         error("gcpkg triplet probe produced no output (compiler " .. tostring(cc)
-              .. "); set explicit facts in " .. M.file(name))
+              .. "); set facts in config.yaml triplets." .. name .. ".facts"
+              .. " or in " .. M.file(name))
     end
     local f = parseProbe(out)
     -- Compiler language capability is a platform/toolchain fact too: gcpkg
     -- determines it once, ports must never hardcode TRUE/FALSE for it.
-    f.cxx_standard = probeCxxStandard()
+    f.cxx_standard = probeCxxStandard(spec)
     f.cxx17_capable = f.cxx_standard >= 201703
     f.cxx20_capable = f.cxx_standard >= 202002
-    applyOverrides(f, spec.facts)
-    applyOverrides(f, (require("gcpkg.config").read() or {}).facts)
+    -- Precedence INSIDE this triplet: matching config.yaml section wins over
+    -- the triplet file, which wins over the probe.  Nothing leaks to another
+    -- triplet; a flat config.yaml `facts:` is deliberately not consulted.
+    applyOverrides(f, fileSpec.facts)
+    applyOverrides(f, globalSpec.facts)
     f.compiler = cc
     f.triplet = name
     writeFacts(name, f)
-    cached, cachedName = f, name
+    cache[name] = f
+    currentName = name
     local log = require("gcpkg.log")
     log.info("  triplet " .. name .. ": one gcpkg probe ("
              .. tostring(f.byte_order) .. "-endian, " .. tostring(f.pointer_size)
@@ -469,7 +517,8 @@ function M.ensure(opts)
 end
 
 function M.facts(opts)
-    if cached then return cached end
+    local name = M.active(opts)
+    if cache[name] then return cache[name] end
     return M.ensure(opts)
 end
 
@@ -503,7 +552,7 @@ function M.cmake_defines(opts)
         CMAKE_C_BYTE_ORDER = big and "BIG_ENDIAN" or "LITTLE_ENDIAN",
         CMAKE_CXX_BYTE_ORDER = big and "BIG_ENDIAN" or "LITTLE_ENDIAN",
         big_endian = big and "1" or "0",
-        GCPKG_TRIPLET = M.active(),
+        GCPKG_TRIPLET = M.active(opts),
     }
 end
 
@@ -546,7 +595,8 @@ function M.set_active(name)
     end
     out[#out + 1] = "triplet: " .. tostring(name)
     fs.write(p, table.concat(out, "\n") .. "\n")
-    cached, cachedName = nil, nil
+    cache = {}
+    currentName = nil
     cliName = name
 end
 
@@ -564,7 +614,8 @@ function M.create(name)
         "# target:",
         "#   arch: aarch64",
         "#   os: linux",
-        "# facts:            # highest precedence for this triplet",
+        "# facts:            # overrides the probe for THIS triplet only;",
+        "#                  # config.yaml triplets." .. name .. ".facts wins over this",
         "#   byte_order: little",
         "#   pointer_size: 8",
         "#   headers:",
@@ -581,7 +632,7 @@ end
 
 function M.describe(name)
     name = name or M.active()
-    local f = M.facts()
+    local f = M.facts({ triplet = name })
     local l = {
         "triplet: " .. name,
         "  compiler      : " .. tostring(f.compiler or ""),
@@ -590,8 +641,8 @@ function M.describe(name)
         "  cxx_standard  : " .. tostring(f.cxx_standard) ..
             " (C++17=" .. tostring(f.cxx17_capable) ..
             ", C++20=" .. tostring(f.cxx20_capable) .. ")",
-        "  byte_order    : " .. tostring(f.byte_order),
-        "  pointer_size  : " .. tostring(f.pointer_size),
+        "  byte_order    : " .. scalar(f.byte_order),
+        "  pointer_size  : " .. scalar(f.pointer_size),
         "  facts file    : " .. M.dir() .. "/" .. name .. ".facts.yaml",
     }
     return table.concat(l, "\n")

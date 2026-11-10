@@ -516,6 +516,11 @@ function M.main(args)
     -- The resolved store root is reused below so boundary and store agree.
     local boundaryStore, boundarySource = config.resolve(o.store)
     paths.configure(boundaryStore)
+    -- --triplet selects the active triplet for this process.  Per-triplet
+    -- settings live in config.yaml `triplets:` and triplets/<name>.yaml.
+    if o.triplet and o.triplet ~= "" then
+        require("gcpkg.triplet").set_cli(o.triplet)
+    end
     if o.verbose then
         gcpkg.sys.set_verbose(true)
     end
