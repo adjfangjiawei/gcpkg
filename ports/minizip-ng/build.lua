@@ -45,7 +45,6 @@ return recipe.cmake {
             MZ_FILE32_API = "OFF",
           },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = { "@PREFIX@/include" },

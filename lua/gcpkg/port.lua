@@ -96,22 +96,29 @@ end
 -- Make lower-level libraries visible to higher-level builds *without* editing
 -- the upstream project: standard env vars understood by CMake, autotools,
 -- pkg-config and most hand-written Makefiles.
-function M.dependency_env(ordered)
+function M.dependency_env(ordered, opts)
+    -- Port builds pass include_flags=false and direct_keys. Dependency headers
+    -- and link directories are then scoped to direct dependencies; pkg-config
+    -- and CMAKE_PREFIX_PATH still expose the full transitive .pc graph.
+    opts = opts or {}
+    local includeFlags = opts.include_flags ~= false
+    local directKeys = opts.direct_keys
     if #ordered == 0 then
         return {}
     end
     local includes, libdirs, defines, prefixes = {}, {}, {}, {}
-    local pkgdirs, bins = {}, {}
+    local directLibdirs, directPrefixes, pkgdirs, bins = {}, {}, {}, {}
     for _, m in ipairs(ordered) do
         includes = util.concat(includes, m.includes or {})
         libdirs = util.concat(libdirs, m.libdirs or {})
         defines = util.concat(defines, m.defines or {})
-        -- Tool ports (cmake, code generators, SDK bin dirs) export a PATH
-        -- entry. Prepending it makes "gcpkg manages cmake" actually work:
-        -- a dependent port's CMake/Meson invocation sees our cmake first.
         bins = util.concat(bins, m.binaries or {})
         if m.prefix then
             prefixes[#prefixes + 1] = m.prefix
+        end
+        if not directKeys or (m.key and directKeys[m.key]) then
+            directLibdirs = util.concat(directLibdirs, m.libdirs or {})
+            if m.prefix then directPrefixes[#directPrefixes + 1] = m.prefix end
         end
     end
     local cpp, ld = {}, {}
@@ -121,16 +128,14 @@ function M.dependency_env(ordered)
     for _, d in ipairs(util.uniq(defines)) do
         cpp[#cpp + 1] = "-D" .. d
     end
-    for _, l in ipairs(util.uniq(libdirs)) do
+    for _, l in ipairs(util.uniq(directLibdirs)) do
         ld[#ld + 1] = "-L" .. l
+    end
+    for _, l in ipairs(util.uniq(libdirs)) do
         pkgdirs[#pkgdirs + 1] = util.join(l, "pkgconfig")
     end
     local acl, py = {}, {}
     for _, p in ipairs(util.uniq(prefixes)) do
-        -- X11 / Wayland "data" ports (xorgproto, xcb-proto,
-        -- wayland-protocols) install their .pc files under share/pkgconfig,
-        -- not lib/pkgconfig. Without this, meson's dependency() and
-        -- ./configure's PKG_CHECK_MODULES cannot see the lower layers.
         pkgdirs[#pkgdirs + 1] = util.join(p, "lib", "pkgconfig")
         pkgdirs[#pkgdirs + 1] = util.join(p, "lib64", "pkgconfig")
         pkgdirs[#pkgdirs + 1] = util.join(p, "share", "pkgconfig")
@@ -138,15 +143,13 @@ function M.dependency_env(ordered)
         py[#py + 1] = util.join(p, "lib", "python3", "site-packages")
     end
     local env = {}
-    if #cpp > 0 then
+    if includeFlags and #cpp > 0 then
         env.CPPFLAGS = table.concat(cpp, " ")
-        -- Some hand-written Makefiles / configure probes honour CPATH but not
-        -- CPPFLAGS; keep both in sync so headers are found either way.
         env.CPATH = table.concat(util.uniq(includes), ":")
     end
     if #ld > 0 then
         env.LDFLAGS = table.concat(ld, " ")
-        env.LIBRARY_PATH = table.concat(util.uniq(libdirs), ":")
+        env.LIBRARY_PATH = table.concat(util.uniq(directLibdirs), ":")
     end
     if #pkgdirs > 0 then
         env.PKG_CONFIG_PATH = table.concat(util.uniq(pkgdirs), ":")
@@ -157,14 +160,56 @@ function M.dependency_env(ordered)
     if #py > 0 then
         env.PYTHONPATH = table.concat(util.uniq(py), ":")
     end
-    if #prefixes > 0 then
-        env.CMAKE_PREFIX_PATH = table.concat(util.uniq(prefixes), ";")
+    -- The environment variable is split on the platform path separator
+    -- (colon on Unix).  Using semicolons here made CMake treat the whole
+    -- dependency list as one malformed prefix during find_program/library.
+    if #directPrefixes > 0 then
+        env.CMAKE_PREFIX_PATH = table.concat(util.uniq(directPrefixes), ":")
+    elseif #prefixes > 0 then
+        env.CMAKE_PREFIX_PATH = table.concat(util.uniq(prefixes), ":")
     end
     if #bins > 0 then
         env.PATH = table.concat(util.uniq(bins), ":") .. ":" ..
                    (os.getenv("PATH") or "/usr/bin:/bin")
     end
     return env
+end
+
+local function assertSaneCompilerFlags(env)
+    local keys = { "CFLAGS", "CXXFLAGS", "CPPFLAGS", "GCPKG_COMPILER_FLAGS", "LDFLAGS" }
+    for _, key in ipairs(keys) do
+        local seen, count = {}, 0
+        for token in tostring(env[key] or ""):gmatch("%S+") do
+            local prefix = token:sub(1, 2)
+            if prefix == "-I" or prefix == "-L" then
+                count = count + 1
+                if seen[token] then
+                    error("gcpkg: duplicate " .. prefix .. " flag " .. token .. " in " .. key)
+                end
+                seen[token] = true
+            end
+        end
+        if count > 24 then
+            error("gcpkg: refusing " .. count .. " -I/-L flags in " .. key ..
+                  "; dependency paths must be scoped and deduplicated")
+        end
+    end
+    for _, key in ipairs({ "CPATH", "LIBRARY_PATH" }) do
+        local value = tostring(env[key] or "")
+        if value ~= "" then
+            local seen, count = {}, 0
+            for path in value:gmatch("[^:]+") do
+                count = count + 1
+                if seen[path] then
+                    error("gcpkg: duplicate " .. key .. " entry " .. path)
+                end
+                seen[path] = true
+            end
+            if count > 24 then
+                error("gcpkg: refusing " .. count .. " " .. key .. " entries in a port build")
+            end
+        end
+    end
 end
 
 local function compilerValue(kind, fallback)
@@ -281,8 +326,8 @@ function M.install(spec_name, cfg)
     -- Port files are part of the build recipe: editing build.lua or
     -- features.yaml must invalidate the cached build (CMake defines live in
     -- build.lua, so a stale cache would silently keep old options).
-    local buildHash = net.sha256(util.join(dir, "build.lua")) or ""
-    local featureHash = net.sha256(util.join(dir, "features.yaml")) or ""
+    local buildHash = net.sha256_cached(util.join(dir, "build.lua")) or ""
+    local featureHash = net.sha256_cached(util.join(dir, "features.yaml")) or ""
     local fingerprint = store.fingerprint(util.concat({
         portName, version, f.hash,
         (type(spec.source) == "table" and (spec.source.url or spec.source.git or spec.source.dir)) or "custom",
@@ -334,7 +379,11 @@ function M.install(spec_name, cfg)
     fs.write(jsonl, "")
     local ccReal = compilerValue("cc", "cc")
     local cxxReal = compilerValue("cxx", "c++")
-    local baseEnv = util.merge(M.dependency_env(ordered), f.env, proxy.env())
+    local directKeys = {}
+    for _, m in ipairs(manifests) do
+        if m.key then directKeys[m.key] = true end
+    end
+    local baseEnv = util.merge(M.dependency_env(ordered, { include_flags = false, direct_keys = directKeys }), f.env, proxy.env())
     local env = util.merge(baseEnv, toolchain.env(baseEnv), {
         CC = ccLink,
         CXX = cxxLink,
@@ -365,7 +414,7 @@ function M.install(spec_name, cfg)
         includes = util.uniq(depIncludes),
         libdirs = util.uniq(depLibdirs),
         libs = util.uniq(depLibs),
-        defines = util.uniq(depDefines),
+        defines = util.uniq(util.concat(depDefines, f.defines or {})),
         link_flags = util.uniq(depLinkFlags),
         compiler = { cc = ccReal, cxx = cxxReal, wrapper_cc = ccLink, wrapper_cxx = cxxLink },
         intercept_log = jsonl,
@@ -375,8 +424,8 @@ function M.install(spec_name, cfg)
         feature_env = function()
             return util.deepcopy(f.env)
         end,
-        defines = function()
-            return util.deepcopy(f.defines)
+        feature_defines = function()
+            return util.deepcopy(f.defines or {})
         end,
         dep = function(depName)
             for _, m in ipairs(ordered) do
@@ -389,9 +438,11 @@ function M.install(spec_name, cfg)
     }
     ctx.exec = function(cmd, o)
         o = o or {}
+        local childEnv = util.merge(env, o.env or {})
+        assertSaneCompilerFlags(childEnv)
         return gcpkg.exec(cmd, {
             cwd = o.cwd or ctx.src,
-            env = util.merge(env, o.env or {}),
+            env = childEnv,
             log = o.log or logPath,
             quiet = o.quiet,
             check = o.check,

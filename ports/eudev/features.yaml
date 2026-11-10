@@ -1,0 +1,20 @@
+schema: 1
+port: eudev
+
+# eudev libudev static library, optional system features disabled
+# License files are installed under share/doc/eudev.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

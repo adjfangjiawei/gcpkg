@@ -1,7 +1,7 @@
 schema: 1
 port: harfbuzz
 
-# Text shaping engine; Meson, depends on freetype + glib.
+# Text shaping engine; static Meson build on source-built freetype + glib, no system utilities.
 # Feature switches for this port.
 features:
   no-tests:

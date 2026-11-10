@@ -2,7 +2,7 @@
 
 gcpkg 是一个**元包管理器**：上层维护项目、工作区、依赖与编译数据库，下层把 CMake、Meson、GN、Autotools、Makefile、Python、Cargo、Conan 等构建方式接入同一个 store。每个库由 `build.lua` 描述构建过程，由 `features.yaml` 描述特性与版本；上游源码无需修改。
 
-当前注册表提供 **330 个 port**，覆盖网络、加密、压缩、媒体、Linux 系统栈、工具链、图形、数据结构和常用 C/C++ 库。构建结果会合并为 `compile_commands.json`，配合 `.clangd` 可以从项目代码直接跳转到依赖源码。
+当前注册表提供 **346 个 port**，覆盖网络、加密、压缩、媒体、Linux 系统栈、工具链、图形、数据结构和常用 C/C++ 库。构建结果会合并为 `compile_commands.json`，配合 `.clangd` 可以从项目代码直接跳转到依赖源码。
 
 ## 安装
 
@@ -118,3 +118,26 @@ docs/                     使用文档
 ```
 
 `build/`、store 与缓存不属于版本库内容。仓库不会写入本机专用绝对路径；示例统一使用相对路径、`~`、`$HOME`、`$XDG_CONFIG_HOME` 或 `mktemp -d`。
+
+
+## R20：源码构建的多媒体 / 图形 / 系统库
+
+本批新增 `qt`、`opencv`、`ffmpeg`、`sdl3`、`dlib`、`opencl`、`openal`、`openvr`，并把已有 `glib` 原地升级到 2.90.1。`opengr` 已按用户纠正实现为 `ValveSoftware/openvr`；未实现 STORM-IRIT/OpenGR。
+
+| 用户库 | 版本 | 实现要点 |
+| --- | --- | --- |
+| `qt` | 6.12.0 | qtbase 静态 QtCore；`-force-bundled-libs`，GUI/Widgets/DBus/OpenGL/X11/系统库全关 |
+| `opencv` | 5.1.0 | `BUILD_LIST=core,imgproc,imgcodecs`，OpenCV 内置第三方源码编译，外部 `WITH_*` 全关 |
+| `ffmpeg` | 9.0.2 | `--disable-autodetect`，启用源码 port 的 x264/x265/LAME/libass/zlib |
+| `sdl3` | 3.4.20 | 静态 SDL3；Wayland/ALSA/udev/DBus 走源码 port，X11/EGL/Vulkan/PipeWire 等系统 SDK 关闭 |
+| `glib` | 2.90.1 | 现有 port 原地升级；libffi/zlib/pcre2 与源码 Meson 工具 port，静态构建 |
+| `dlib` | 20.0.1 | JPEG/PNG/zlib 使用源码 port，GUI/CUDA/BLAS/FFmpeg/SQLite 关闭 |
+| `opencl` | 2026.05.29 | `opencl-headers` + Khronos ICD Loader 两个源码 port |
+| `openal` | 1.25.2 | OpenAL Soft 静态库；SDL3/ALSA 后端使用源码 port，其他系统后端关闭 |
+| `openvr` | 2.15.6 | Valve OpenVR SDK 静态库 |
+
+系统级组件也做成源码 port：`x264`（最新快照）、`x265` 3.4、`lame` 3.100、`libass` 0.17.5、`libdecor` 0.2.5、`eudev` 3.3.0。Meson 1.12.1 也注册为源码工具 port（依赖源码 CPython/Ninja），所有 Meson port 使用它，不调用系统 meson。所有源码 URL/SHA256 均经真实代理实测并固定在 `tools/library-catalog.tsv`；没有使用 apt、系统 `-dev` 包或长期链接系统库。
+
+纯源码构建下，`libdecor` 只在存在对应源码 port 时启用 Cairo/Pango 装饰插件，并安装源码构建的 dummy plugin；不链接系统 Cairo/Pango `-dev` 包。
+
+SDL3 的 Wayland 后端使用源码 Wayland/libdecor/libxkbcommon ports；源码内将上游 `egl` pkg-config 检查替换为已有的 `wayland-egl`，不依赖系统 EGL `-dev` 包。

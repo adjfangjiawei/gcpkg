@@ -64,12 +64,30 @@ local function shellJoin(args)
     return table.concat(out, " ")
 end
 
+local hashCache = {}
+function M.clear_hash_cache()
+    hashCache = {}
+end
+
 function M.sha256(path)
-    local out, code = gcpkg.capture({ "sha256sum", path })
+    local real = "/usr/bin/sha256sum"
+    if not fs.isfile(real) then real = "sha256sum" end
+    local out, code = gcpkg.capture({ real, path })
     if code ~= 0 then
         return nil
     end
     return out:match("^(%x+)")
+end
+
+-- Port recipe hashes are immutable within one gcpkg invocation. A transitive
+-- DAG used to hash the same build.lua / features.yaml dozens of times, each
+-- with its own sha256sum process. Project builds may edit ports between
+-- commands, so the cache is explicitly cleared by main.lua at startup.
+function M.sha256_cached(path)
+    if hashCache[path] ~= nil then return hashCache[path] end
+    local h = M.sha256(path)
+    hashCache[path] = h
+    return h
 end
 
 function M.download(url, dest, expected, opts)
@@ -165,22 +183,13 @@ function M.extract(archive, dest, strip, opts)
             "--strip-components=" .. tostring(strip or 1),
             "-m", "--no-same-owner", "--no-same-permissions",
             "--no-acls", "--no-selinux", "--no-xattrs",
-            -- %T reports bytes read and the current rate; echo= writes to
-            -- stderr, which the pipeline below shows on the terminal too.
-            "--checkpoint=2000",
+            -- %T prints transferred tar-stream bytes and rate to the log.
+            "--checkpoint=4000",
             "--checkpoint-action=echo=  expanding source tree: %T",
         }
-        if opts.log and opts.log ~= "" then
-            fs.append(opts.log, "+ " .. table.concat(tarArgs, " ") .. "\n")
-            -- tee keeps tar's progress/errors on the terminal while also
-            -- appending them to the per-port log. pipefail preserves tar's RC.
-            local inner = shellJoin(tarArgs) .. " 2>&1"
-            local cmd = { "bash", "-o", "pipefail", "-c",
-                          inner .. " | tee -a " .. shellQuote(opts.log) }
-            gcpkg.exec(cmd, {})
-        else
-            gcpkg.exec(tarArgs, {})
-        end
+        -- exec.run records the command and redirects tar output directly to
+        -- the per-port log; no shell pipeline or progress tee is needed.
+        gcpkg.exec(tarArgs, { log = opts.log })
     end
     phase(opts, "info", string.format("extracted %s in %s",
           base, humanDuration(math.max(now() - started, 0))))

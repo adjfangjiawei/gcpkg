@@ -32,7 +32,6 @@ return recipe.cmake {
             CIVETWEB_ENABLE_THIRD_PARTY_OUTPUT = "OFF",
           },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = { "@PREFIX@/include" },

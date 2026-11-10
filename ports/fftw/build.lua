@@ -25,7 +25,6 @@ return recipe.cmake {
           ENABLE_OPENMP = "OFF",
         },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = {

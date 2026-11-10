@@ -7,10 +7,11 @@ below (installed headers, probe headers, CMake switches and exported libraries).
 The engine only reads ports/<name>/build.lua + features.yaml at runtime; every
 port stays exactly TWO files and upstream sources are never patched.
 
-Forty-five header-only libraries use recipe.header: copy upstream headers into
-<prefix>/include, copy license files into <prefix>/share/doc, and compile one
-generated probe translation unit so clangd gets a real compile command. Seven
-compiled libraries use recipe.cmake with upstream tests/examples/tools disabled.
+Fifty-three generated ports live here: forty-six header-only libraries use
+recipe.header and seven compiled libraries use recipe.cmake. The remaining
+fifteen catalog rows use hand-written CMake/Meson/Autotools/Makefile recipes
+(`generator=manual`) for heavy source-only libraries and system-component ports;
+this generator deliberately leaves those two-file ports byte-identical.
 
     python3 tools/gen-library-ports.py
     ./build/bin/gcpkg check --ports ./ports
@@ -378,6 +379,29 @@ def license_hook(meta, name):
 """ % (L(name), copies)
 
 
+META.update({
+    "opencl-headers": dict(kind="header", include="CL/cl.h",
+        headers=H(("CL", "CL")), flags=["-std=c11"], cxx=False,
+        license_files=["LICENSE"],
+        n="Khronos OpenCL API headers; C probe, no compiled runtime dependency."),
+    "qt": dict(kind="cmake", n="Qt 6 Base static core; bundled third-party sources, no system dev packages"),
+    "opencv": dict(kind="cmake", n="OpenCV core/imgproc/imgcodecs with bundled source-built codec libraries"),
+    "ffmpeg": dict(kind="make", n="FFmpeg static libraries with source-port x264/x265/LAME/libass codecs"),
+    "sdl3": dict(kind="cmake", n="SDL3 static library with source-built Wayland/ALSA/udev/dbus ports, no X11/EGL/Vulkan"),
+    "glib": dict(kind="meson", n="GLib 2.90.1 upgraded in place; static Meson build on source-built libffi/zlib/pcre2"),
+    "dlib": dict(kind="cmake", n="dlib static library using source-built JPEG/PNG/zlib ports, no GUI/CUDA/BLAS"),
+    "opencl": dict(kind="cmake", n="Khronos OpenCL ICD loader linked against source-built OpenCL headers"),
+    "openal": dict(kind="cmake", n="OpenAL Soft static library with source-built SDL3/ALSA backends and Wave/Null"),
+    "openvr": dict(kind="cmake", n="Valve OpenVR SDK static library and headers built from source"),
+    "x264": dict(kind="make", n="x264 static encoder pinned to latest upstream snapshot, source-built for FFmpeg"),
+    "x265": dict(kind="cmake", n="x265 3.4 static HEVC encoder source port for FFmpeg"),
+    "lame": dict(kind="autotools", n="LAME 3.100 static MP3 encoder source port for FFmpeg"),
+    "libass": dict(kind="meson", n="libass static subtitle renderer on source-built font/shaping ports"),
+    "libdecor": dict(kind="meson", n="libdecor static Wayland decoration library on source-built Wayland ports"),
+    "eudev": dict(kind="autotools", n="eudev libudev static library, optional system features disabled"),
+})
+
+
 def build_lua(row):
     name, kind = row["name"], row["kind"]
     meta = META[name]
@@ -430,7 +454,6 @@ def build_lua(row):
         out += ["    cmake = {",
                 "        defines = %s," % TBL(defs, 12),
                 "        args = {},",
-                "        jobs = 2,",
                 "    },"]
         out.append(exports_block(meta))
         hook = license_hook(meta, name)
@@ -480,15 +503,23 @@ def main():
     with open(TSV, newline="") as f:
         rows = list(csv.DictReader(f, delimiter="\t"))
     assert len(rows) == len(META), (len(rows), len(META))
+    generated = skipped = 0
     for row in rows:
         assert row["name"] in META, row["name"]
+        assert META[row["name"]]["kind"] == row["kind"], row["name"]
+        if row["generator"] == "manual":
+            skipped += 1
+            continue
+        assert row["generator"] in ("header", "cmake"), row["generator"]
         d = os.path.join(ROOT, row["name"])
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "build.lua"), "w") as o:
             o.write(build_lua(row))
         with open(os.path.join(d, "features.yaml"), "w") as o:
             o.write(features_yaml(row))
-    print("generated %d library ports into %s" % (len(rows), ROOT))
+        generated += 1
+    print("generated %d library ports, skipped %d manual recipe ports (%d catalog rows total)"
+          % (generated, skipped, len(rows)))
 
 
 if __name__ == "__main__":

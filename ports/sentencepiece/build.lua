@@ -1,5 +1,5 @@
 -- sentencepiece 0.2.0 -- gcpkg port definition.
--- SentencePiece tokenizer; bundled protobuf-lite/absl, tests off; jobs=2 caps the memory-heavy trainer TUs.
+-- SentencePiece tokenizer; bundled protobuf-lite/absl, tests off; ctx.jobs scales the memory-heavy trainer TUs.
 
 local recipe = require("gcpkg.recipe")
 
@@ -26,7 +26,6 @@ return recipe.cmake {
           SPM_ENABLE_NFKC_COMPILE = "OFF",
         },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = {

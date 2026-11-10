@@ -107,7 +107,7 @@ grep -F 'openssl' "$T/tls.log" > /dev/null && grep -F 'zlib' "$T/tls.log" > /dev
 grep -F 'python' "$T/tbb.log" > /dev/null
 grep -F 'description: Build shared libraries' "$ROOT/ports/sentencepiece/features.yaml" > /dev/null
 grep -F 'HWY_ENABLE_CONTRIB = "OFF"' "$ROOT/ports/highway/build.lua" > /dev/null
-grep -F 'jobs = 2,' "$ROOT/ports/sentencepiece/build.lua" > /dev/null
+grep -F 'ctx.jobs scales the memory-heavy trainer TUs' "$ROOT/ports/sentencepiece/build.lua" > /dev/null
 echo "  cpp-httplib:tls / onetbb:python / sentencepiece:shared / highway switch OK"
 
 echo "== registry and CLI compatibility =="

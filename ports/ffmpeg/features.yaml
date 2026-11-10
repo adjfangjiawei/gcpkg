@@ -1,0 +1,20 @@
+schema: 1
+port: ffmpeg
+
+# FFmpeg static libraries with source-port x264/x265/LAME/libass codecs
+# License files are installed under share/doc/ffmpeg.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

@@ -78,8 +78,17 @@ META = {
     "fontconfig": dict(e=ex(["fontconfig"]), args=["--disable-docs"],
                        n="Font configuration on freetype + expat."),
     "harfbuzz": dict(e=ex(["harfbuzz"], includes=["@PREFIX@/include", "@PREFIX@/include/harfbuzz"]),
-                     opts={"tests": "disabled", "docs": "disabled"},
-                     n="Text shaping engine; Meson, depends on freetype + glib."),
+                     opts={
+                         "default_library": "static",
+                         "tests": "disabled", "docs": "disabled",
+                         "doc_tests": "false", "utilities": "disabled",
+                         "introspection": "disabled", "benchmark": "disabled",
+                         "cairo": "disabled", "chafa": "disabled",
+                         "gobject": "disabled", "icu": "disabled",
+                         "png": "disabled", "zlib": "disabled",
+                         "freetype": "enabled", "glib": "enabled",
+                     },
+                     n="Text shaping engine; static Meson build on source-built freetype + glib, no system utilities."),
     "glib": dict(e=ex(["glib-2.0", "gobject-2.0", "gio-2.0"],
                       includes=["@PREFIX@/include", "@PREFIX@/include/glib-2.0",
                                 "@LIBDIR@/glib-2.0/include"]),
@@ -135,6 +144,10 @@ CUSTOM = {
 PRE_BUILD = '''    pre_build = function(ctx)
         if not fs.isfile(ctx.src .. '/configure') then
             ctx.exec({ 'autoreconf', '-fi' }, { cwd = ctx.src, log = ctx.log })
+        end
+        -- Static libbrotlidec needs libbrotlicommon; pkg-config does not add it.
+        if ctx.name == "fontconfig" then
+            ctx.env.LIBS = "-lbrotlicommon " .. (ctx.env.LIBS or "")
         end
     end,
 '''
@@ -273,15 +286,24 @@ def features_yaml(row):
     return "\n".join(lines) + "\n"
 
 
+# R20_MANUAL_SKIP: glib is a hand-written 2.90.1 source port; the legacy
+# 2.84.4 catalog row is informational only and must not overwrite it.
+MANUAL_SKIP = {"glib"}
+
+
 def main():
     with open(TSV, newline="") as f:
         rows = list(csv.DictReader(f, delimiter="\t"))
+    generated = 0
     for row in rows:
+        if row["name"] in MANUAL_SKIP:
+            continue
+        generated += 1
         d = os.path.join(ROOT, row["name"])
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, "build.lua"), "w").write(build_lua(row))
         open(os.path.join(d, "features.yaml"), "w").write(features_yaml(row))
-    print("generated %d ports into %s" % (len(rows), ROOT))
+    print("generated %d ports into %s" % (generated, ROOT))
 
 
 if __name__ == "__main__":

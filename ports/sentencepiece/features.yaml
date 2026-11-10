@@ -1,7 +1,7 @@
 schema: 1
 port: sentencepiece
 
-# SentencePiece tokenizer; bundled protobuf-lite/absl, tests off; jobs=2 caps the memory-heavy trainer TUs.
+# SentencePiece tokenizer; bundled protobuf-lite/absl, tests off; ctx.jobs scales the memory-heavy trainer TUs.
 features:
   no-tests:
     default: true

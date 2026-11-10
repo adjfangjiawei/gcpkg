@@ -50,7 +50,7 @@ end
 
 local function dependencyPrefixes(ctx)
     local out = {}
-    for _, m in ipairs(ctx.all_dependencies or {}) do
+    for _, m in ipairs(ctx.dependencies or {}) do
         if m.prefix then
             out[#out + 1] = m.prefix
         end

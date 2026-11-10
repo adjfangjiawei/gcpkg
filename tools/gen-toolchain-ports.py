@@ -124,8 +124,7 @@ META = {
                                 "SPM_ENABLE_NFKC_COMPILE": "OFF"},
                           optional={"shared": dict(requires=[],
                                                    args=["-DSPM_ENABLE_SHARED=ON"])},
-                          jobs=2,
-                          n="SentencePiece tokenizer; bundled protobuf-lite/absl, tests off; jobs=2 caps the memory-heavy trainer TUs."),
+                          n="SentencePiece tokenizer; bundled protobuf-lite/absl, tests off; ctx.jobs scales the memory-heavy trainer TUs."),
 }
 
 PRE_BUILD = '''    pre_build = function(ctx)
@@ -195,8 +194,6 @@ def build_lua(row):
         out += ["    cmake = {",
                 "        defines = %s," % TBL(meta.get("defs", {}), 10),
                 "        args = {},"]
-        if meta.get("jobs"):
-            out.append("        jobs = %d," % meta["jobs"])
         out += ["    },"]
     out.append(exports_block(meta["e"]))
     out.append("}")

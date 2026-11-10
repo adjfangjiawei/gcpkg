@@ -28,7 +28,6 @@ return recipe.cmake {
             FTXUI_QUIET = "ON",
           },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = { "@PREFIX@/include" },

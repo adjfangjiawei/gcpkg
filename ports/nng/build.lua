@@ -27,7 +27,6 @@ return recipe.cmake {
             NNG_ENABLE_NNGCAT = "OFF",
           },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = { "@PREFIX@/include" },

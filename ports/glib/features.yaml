@@ -1,8 +1,8 @@
 schema: 1
 port: glib
 
-# GLib core; Meson, depends on libffi + zlib + pcre2 (existing L0 ports).
-# Feature switches for this port.
+# GLib 2.90.1 upgraded in place; static Meson build on source-built libffi/zlib/pcre2
+# License files are installed under share/doc/glib.
 features:
   no-tests:
     default: true

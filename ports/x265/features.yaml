@@ -1,0 +1,20 @@
+schema: 1
+port: x265
+
+# x265 3.4 static HEVC encoder source port for FFmpeg
+# License files are installed under share/doc/x265.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

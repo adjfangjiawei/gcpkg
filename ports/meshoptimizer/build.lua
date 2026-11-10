@@ -27,7 +27,6 @@ return recipe.cmake {
             MESHOPT_WERROR = "OFF",
           },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = { "@PREFIX@/include" },

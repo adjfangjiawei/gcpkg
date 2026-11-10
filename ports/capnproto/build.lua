@@ -25,7 +25,6 @@ return recipe.cmake {
           EXTERNAL_CAPNP = "OFF",
         },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = {

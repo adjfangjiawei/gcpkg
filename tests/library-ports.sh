@@ -16,6 +16,37 @@ CATALOG="$ROOT/tools/library-catalog.tsv"
 NAMES="$(tail -n +2 "$CATALOG" | cut -f1)"
 N="$(echo "$NAMES" | wc -w)"
 
+[ "$N" -eq 68 ] || { echo "expected 68 catalog rows, got $N"; exit 1; }
+python3 - "$ROOT" "$CATALOG" <<'PY'
+import csv, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+with open(sys.argv[2], newline='') as f:
+    rows = list(csv.DictReader(f, delimiter='\t'))
+assert len(rows) == 68, len(rows)
+manual = [r for r in rows if r['generator'] == 'manual']
+assert len(manual) == 15, len(manual)
+port_dirs = [p for p in (root / 'ports').iterdir() if p.is_dir()]
+assert len(port_dirs) == 346, len(port_dirs)
+for r in rows:
+    build = (root / 'ports' / r['name'] / 'build.lua').read_text()
+    assert r['version'] in build, r['name']
+    assert r['url'] in build, r['name']
+    assert r['sha256'] in build, r['name']
+    assert 'https://' in build and ('license_files' in build or 'share/doc' in build or '"share", "doc"' in build), r['name']
+readme = (root / 'README.md').read_text()
+docs = (root / 'docs/PORTS.md').read_text()
+assert '346 个 port' in readme
+assert '346 个 port' in docs
+assert '展开全部 346 个 port' in docs
+block = docs.split('<details>', 1)[1].split('</details>', 1)[0]
+table_rows = [ln for ln in block.splitlines() if ln.startswith('| `')]
+assert len(table_rows) == 346, len(table_rows)
+runner = root.parent / 'r18-real' / 'run.sh'
+if runner.exists():
+    assert '68-library' in runner.read_text()
+print('  68 catalog rows, 346 ports, 15 manual recipes, docs/runner counts OK')
+PY
+
 [ -x "$BIN" ] || { echo "build gcpkg first: cmake -S . -B build && cmake --build build -j"; exit 1; }
 [ -x "$ROOT/setup-gcpkg-toolchain.sh" ] || { echo "missing setup-gcpkg-toolchain.sh"; exit 1; }
 [ "$N" -eq "$(tail -n +2 "$CATALOG" | wc -l)" ] || { echo "catalog row count mismatch: $N"; exit 1; }
@@ -131,7 +162,7 @@ mkdir -p "$STORE" "$LOGS" "$PROJECT"
     for name in $NAMES; do echo "  - $name"; done
 } > "$PROJECT/gcpkg.yaml"
 TIMEOUT=$((N * 180))
-JOBS="${GCPKG_LIBRARY_PORTS_JOBS:-4}"
+JOBS="${GCPKG_LIBRARY_PORTS_JOBS:-$(nproc)}"
 timeout "$TIMEOUT" env GCPKG_CONFIG="$GCPKG_CONFIG" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
     GCPKG_HOME="$GCPKG_HOME" "$BIN" install -C "$PROJECT" \
     --store "$STORE" --ports "$PORTS" -j "$JOBS" > "$LOGS/install.log" 2>&1 || {

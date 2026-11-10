@@ -27,6 +27,10 @@ return recipe.autotools {
         if not fs.isfile(ctx.src .. '/configure') then
             ctx.exec({ 'autoreconf', '-fi' }, { cwd = ctx.src, log = ctx.log })
         end
+        -- Static libbrotlidec needs libbrotlicommon; pkg-config does not add it.
+        if ctx.name == "fontconfig" then
+            ctx.env.LIBS = "-lbrotlicommon " .. (ctx.env.LIBS or "")
+        end
     end,
     exports = {
       includes = {

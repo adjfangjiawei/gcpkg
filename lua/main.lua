@@ -4,6 +4,7 @@
 local util = require("gcpkg.util")
 
 gcpkg.util = util
+require("gcpkg.net").clear_hash_cache()
 gcpkg.path = util.join
 gcpkg.fs = require("gcpkg.fs")
 gcpkg.log = require("gcpkg.log")

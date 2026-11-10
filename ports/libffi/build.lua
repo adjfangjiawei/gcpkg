@@ -16,7 +16,11 @@ return recipe.autotools {
     },
     dependencies = {},
     autotools = {
-        args = { "--disable-docs", "--disable-multi-os-directory" },
+        -- libffi 3.4.8 re-execs itself into a per-target builddir when
+        -- configure is called with an absolute path; gcpkg already owns the
+        -- out-of-tree build directory, so keep the Autotools run in srcdir.
+        args = { "--disable-docs", "--disable-multi-os-directory",
+                 "--enable-builddir=no" },
     },
     exports = {
         includes = { "@PREFIX@/include" },

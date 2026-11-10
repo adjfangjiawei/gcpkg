@@ -26,7 +26,6 @@ return recipe.cmake {
             USE_BOOST_REGEX = "OFF",
           },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = { "@PREFIX@/include" },

@@ -1,0 +1,20 @@
+schema: 1
+port: sdl3
+
+# SDL3 static library with source-built ALSA/udev/dbus ports, no X11/EGL/Vulkan
+# License files are installed under share/doc/sdl3.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

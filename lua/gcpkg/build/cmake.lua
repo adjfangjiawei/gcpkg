@@ -58,12 +58,73 @@ function M.configure(o)
     local exec = o.exec or gcpkg.exec
     local build = util.abs(o.build_dir or util.join(o.src, "build"), o.src)
     fs.mkdirs(build)
+    local defines = type(o.defines) == "table" and o.defines or {}
+    -- R20: no port runs feature-detection probes.  try_compile is replaced
+    -- by a result table; find_package is overridden so imported targets are
+    -- supplied directly instead of being discovered through probes.
+    local disableTry = true
+    local noTry
+    if disableTry then
+        local trueResults = {}
+        for _, k in ipairs(util.keys(defines)) do
+            local v = tostring(defines[k])
+            if v == "TRUE" or v == "true" or v == "1" or v == "ON" or v == "YES" then
+                trueResults[#trueResults + 1] = k
+                -- SDL3 probes LIBC_HAS_<X> then copies it into HAVE_<X>.
+                if k:sub(1, 5) == "HAVE_" then
+                    trueResults[#trueResults + 1] = "LIBC_HAS_" .. k:sub(6)
+                end
+            end
+        end
+        trueResults[#trueResults + 1] = "CMAKE_HAVE_LIBC_PTHREAD"
+        local includeText = "set(GCPKG_TRUE_RESULTS\n"
+        for _, k in ipairs(trueResults) do
+            includeText = includeText .. "  " .. k .. "\n"
+        end
+        includeText = includeText .. ")\n" .. [==[
+if(NOT TARGET Threads::Threads)
+  add_library(Threads::Threads INTERFACE IMPORTED)
+  set_target_properties(Threads::Threads PROPERTIES
+    INTERFACE_COMPILE_OPTIONS "-pthread"
+    INTERFACE_LINK_LIBRARIES "-pthread")
+endif()
+set(Threads_FOUND TRUE)
+set(CMAKE_THREAD_LIBS_INIT "-pthread")
+if(ALSA_LIBRARY AND NOT TARGET ALSA::ALSA)
+  add_library(ALSA::ALSA UNKNOWN IMPORTED)
+  set_target_properties(ALSA::ALSA PROPERTIES
+    IMPORTED_LOCATION "${ALSA_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${ALSA_INCLUDE_DIR}")
+endif()
+
+function(try_compile result_var)
+  if("${result_var}" IN_LIST GCPKG_TRUE_RESULTS)
+    set(${result_var} TRUE PARENT_SCOPE)
+  elseif(DEFINED ${result_var} AND NOT "${${result_var}}" STREQUAL "")
+    set(${result_var} "${${result_var}}" PARENT_SCOPE)
+  else()
+    set(${result_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+]==]
+        noTry = util.join(build, "gcpkg-no-try-compile.cmake")
+        fs.write(noTry, includeText)
+    end
     local baseEnv = o.env
     local env = policy_env(baseEnv)
     local cmd = { "cmake", "-S", o.src, "-B", build,
                   "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                   "-DCMAKE_INSTALL_PREFIX=" .. (o.prefix or util.join(build, "install")) }
-    local defines = type(o.defines) == "table" and o.defines or {}
+    if disableTry then
+        cmd[#cmd + 1] = "-DCMAKE_PROJECT_INCLUDE=" .. noTry
+        -- CMake's own compiler test also uses try_compile.  FORCED makes
+        -- CMakeTestCCompiler return immediately instead of launching another
+        -- nested project; gcpkg has already selected and validated the compiler.
+        cmd[#cmd + 1] = "-DCMAKE_C_COMPILER_FORCED=TRUE"
+        cmd[#cmd + 1] = "-DCMAKE_C_COMPILER_WORKS=TRUE"
+        cmd[#cmd + 1] = "-DCMAKE_CXX_COMPILER_FORCED=TRUE"
+        cmd[#cmd + 1] = "-DCMAKE_CXX_COMPILER_WORKS=TRUE"
+    end
     local args = o.args or {}
     local chainloads = {}
     if o.toolchain then chainloads[#chainloads + 1] = o.toolchain end

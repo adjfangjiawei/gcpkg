@@ -1,5 +1,5 @@
 -- harfbuzz 15.1.0 -- gcpkg port definition.
--- Text shaping engine; Meson, depends on freetype + glib.
+-- Text shaping engine; static Meson build on source-built freetype + glib, no system utilities.
 
 local recipe = require("gcpkg.recipe")
 
@@ -20,8 +20,21 @@ return recipe.meson {
       },
     meson = {
         options = {
+          default_library = "static",
           tests = "disabled",
           docs = "disabled",
+          doc_tests = "false",
+          utilities = "disabled",
+          introspection = "disabled",
+          benchmark = "disabled",
+          cairo = "disabled",
+          chafa = "disabled",
+          gobject = "disabled",
+          icu = "disabled",
+          png = "disabled",
+          zlib = "disabled",
+          freetype = "enabled",
+          glib = "enabled",
         },
         args = {},
     },

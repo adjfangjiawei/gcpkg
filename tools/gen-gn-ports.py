@@ -117,12 +117,12 @@ META = {
     "capnproto": dict(e=ex(["capnp", "capnp-rpc", "capnp-json", "capnp-websocket",
                             "capnpc", "kj", "kj-async", "kj-gzip", "kj-http",
                             "kj-test", "kj-tls"], binaries=["@PREFIX@/bin"]),
-                      defs={"CAPNP_LITE": "OFF", "EXTERNAL_CAPNP": "OFF"}, jobs=2,
+                      defs={"CAPNP_LITE": "OFF", "EXTERNAL_CAPNP": "OFF"},
                       n="Cap'n Proto serialization/RPC; static libraries and capnp tools."),
     "gsl": dict(e=ex(["gsl", "gslcblas"], binaries=["@PREFIX@/bin"]),
                 args=[], n="GNU Scientific Library; stock autotools static build."),
     "fftw": dict(e=ex(["fftw3"]),
-                 defs={"ENABLE_THREADS": "OFF", "ENABLE_OPENMP": "OFF"}, jobs=2,
+                 defs={"ENABLE_THREADS": "OFF", "ENABLE_OPENMP": "OFF"},
                  n="FFTW3 discrete Fourier transform library; single-thread static build."),
     "apr": dict(e=ex(["apr-1"], binaries=["@PREFIX@/bin"]),
                 args=["--without-sendfile"],
@@ -201,8 +201,6 @@ def build_lua(row):
             defs.update(meta.get("defs", {}))
             out.append("        defines = %s," % TBL(defs, 10))
         out += ["        args = {},"]
-        if meta.get("jobs"):
-            out.append("        jobs = %d," % meta["jobs"])
         out += ["    },"]
     out.append(exports_block(meta["e"]))
     out.append("}")

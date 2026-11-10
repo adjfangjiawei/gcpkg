@@ -79,7 +79,7 @@ Options:
   --llvm-home=DIR                  select an installed LLVM/Clang binary tree
   --llvm-version=N                 version for `gcpkg llvm install`
   --feature=PORT:NAME, -f ...      enable a feature (prefix '-' disables it)
-  -j N, --jobs=N                   parallel jobs
+  -j N, --jobs=N                   parallel jobs (default: all CPU cores)
   --no-cache                       force rebuild even if the store is fresh
   --verbose                        print every executed command
   -h, --help                       this help

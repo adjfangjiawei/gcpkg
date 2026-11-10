@@ -27,7 +27,6 @@ return recipe.cmake {
             BZIP3_ENABLE_STATIC_EXE = "OFF",
           },
         args = {},
-        jobs = 2,
     },
     exports = {
       includes = { "@PREFIX@/include" },

@@ -1,0 +1,20 @@
+schema: 1
+port: libdecor
+
+# libdecor static Wayland decoration library on source-built Wayland ports
+# License files are installed under share/doc/libdecor.
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]
