@@ -1,21 +1,103 @@
 schema: 1
 port: brotli
 
-# Feature switches are DATA: they inject build flags without
-# editing build.lua, and are resolved from defaults + project
-# gcpkg.yaml + --feature CLI overrides.
+# New-standard (R20) re-audit of the curl L0 dependency chain.
+# Old draft disabled everything by default (no-tests=true, BUILD_TESTING=OFF,
+# BROTLI_DISABLE_TESTS=ON, tools off). Now every upstream capability defaults
+# ON. Positive features inject -D switches via args: (appended after recipe
+# defines and kept by dedup_defines) and/or drive post_install verification.
+# `requires:` is empty by design: brotli is L0 with no gcpkg dependencies.
+# static/shared are the two mutually-exclusive values of BUILD_SHARED_LIBS;
+# static is the default because libcurl links these libs statically.
 features:
-  no-tests:
+  library:
     default: true
-    description: Do not build the upstream test suite
-    args: ["-DBUILD_TESTING=OFF"]
+    description: Build and install libbrotlicommon/libbrotlidec/libbrotlienc
+    args: []
+  no-library:
+    default: false
+    description: Opt out of the library post-install checks
+    conflicts: ["library"]
+    args: []
   static:
     default: true
-    description: Build static libraries
+    description: Build static libraries (BUILD_SHARED_LIBS=OFF)
     args: ["-DBUILD_SHARED_LIBS=OFF"]
     conflicts: ["shared"]
   shared:
     default: false
-    description: Build shared libraries
+    description: Build shared libraries (BUILD_SHARED_LIBS=ON)
     args: ["-DBUILD_SHARED_LIBS=ON"]
     conflicts: ["static"]
+  headers:
+    default: true
+    description: Install the public brotli/ headers
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header checks
+    conflicts: ["headers"]
+    args: []
+  tools:
+    default: true
+    description: Install the brotli command-line tool (built unconditionally upstream)
+    args: []
+  no-tools:
+    default: false
+    description: Opt out of the CLI check
+    conflicts: ["tools"]
+    args: []
+  tests:
+    default: true
+    description: Run the real upstream ctest roundtrip/compatibility suite
+    args: ["-DBROTLI_DISABLE_TESTS=OFF"]
+  no-tests:
+    default: false
+    description: Do not build/run the upstream test suite
+    args: ["-DBROTLI_DISABLE_TESTS=ON"]
+    conflicts: ["tests"]
+  docs:
+    default: true
+    description: Install README/README.md/CONTRIBUTING.md/CHANGELOG.md
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install the upstream LICENSE
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []
+  pkgconfig:
+    default: true
+    description: Install libbrotli{common,dec,enc}.pc pkg-config metadata
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config checks
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Provide brotliConfig.cmake for find_package(brotli CONFIG)
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and run a C consumer (BrotliEncoderCompress/BrotliDecoderDecompress round-trip)
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the C consumer sanity run
+    conflicts: ["sanity"]
+    args: []
