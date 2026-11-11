@@ -1,0 +1,74 @@
+schema: 1
+port: servo-url
+
+# Ada 2.9.2 benchmarks/competitors/servo-url Rust cdylib, packaged from the
+# pinned ada source tree.  It is built with the source/tool port
+# `rust-toolchain` and the offline `rust-crates-vendor` data port through
+# dynamic `requires`.  The C ABI header and CMake imported target make it
+# usable from Ada's C++ benchmark without a configure-time Cargo download.
+features:
+  library:
+    default: true
+    description: Build and install libservo_url.so from Cargo with --offline --locked
+    requires: ["rust-toolchain", "rust-crates-vendor"]
+    args: []
+  no-library:
+    default: false
+    description: Opt out of the Rust cdylib
+    conflicts: ["library"]
+    args: []
+  headers:
+    default: true
+    description: Install the C ABI header servo_url.h
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of servo_url.h
+    conflicts: ["headers"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install servo-urlConfig.cmake/Version with the servo-url imported target
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CMake CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  license:
+    default: true
+    description: Install the Ada 2.9.2 LICENSE-APACHE and LICENSE-MIT files
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license files
+    conflicts: ["license"]
+    args: []
+  tests:
+    default: true
+    description: Run cargo test --offline --locked on the servo-url cdylib
+    requires: ["rust-toolchain", "rust-crates-vendor"]
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the Cargo test
+    conflicts: ["tests"]
+    args: []
+  examples:
+    default: true
+    description: Build a real C++ demo linked against libservo_url.so through servo_url.h
+    args: []
+  no-examples:
+    default: false
+    description: Opt out of the C++ demo
+    conflicts: ["examples"]
+    args: []
+  sanity:
+    default: true
+    description: Run the C++ demo and assert parse_url/parse_url_to_href round-trip behavior
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the C++ sanity run
+    conflicts: ["sanity"]
+    args: []
