@@ -1,37 +1,249 @@
 schema: 1
 port: curl
 
-# Each feature maps directly to a curl CMake switch. Disabling one here also
-# should remove the corresponding dependency from build.lua (the dependency
-# graph and the feature set are separate concerns by design).
+# R20 new-standard re-audit, final port of the curl L0/L1 source chain.
+# Old draft: six negative/partial features ON (no-tests, static, http2, ares,
+# ssh, compression), shared OFF, static/shared conflict; build.lua hardcoded
+# dependencies={"openssl","zlib","brotli","zstd","cares","nghttp2","libssh2"}
+# and forced BUILD_CURL_EXE=OFF, BUILD_TESTING=OFF, BUILD_SHARED_LIBS=OFF,
+# BUILD_STATIC_LIBS=ON. This port instead uses POSITIVE capabilities ON by
+# default and an EMPTY dependencies table. Each external library feature has
+# a dynamic requires edge to one of the seven already-installed source ports;
+# the build graph is produced from features.resolve, not from build.lua.
+#
+# Capability boundary (not a negative feature and not P2-all-features-final):
+# libpsl/libidn2/gssapi/libssh/librtmp/ldap, HTTP/3 stacks, wolfssh, libuv and
+# gsasl have no independent source ports in this chain. Their official CMake
+# options stay OFF, CURL_DISABLE_LDAP/LDAPS=ON, and CMake is pinned so it cannot
+# discover host packages. The threaded resolver is upstream-OFF when c-ares is
+# ON. No independent CA-bundle source port exists either, so CURL_CA_BUNDLE /
+# CURL_CA_PATH are explicitly 'none' and OpenSSL config auto-load is disabled;
+# no /etc/ssl host search is performed at configure time. This is not the
+# 346-port final audit and Ada/CPM comparison switches stay OFF.
 features:
-  no-tests:
+  library:
     default: true
-    description: Do not build curl's test suite
-    args: ["-DBUILD_TESTING=OFF"]
+    description: Build libcurl and verify installed library artifacts
+    args: []
+  no-library:
+    default: false
+    description: Opt out of library artifact checks
+    conflicts: ["library"]
+    args: []
+  headers:
+    default: true
+    description: Install and verify the upstream public curl headers
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of public header checks
+    conflicts: ["headers"]
+    args: []
   static:
     default: true
-    description: Build libcurl.a
-    args: ["-DBUILD_SHARED_LIBS=OFF", "-DBUILD_STATIC_LIBS=ON"]
-    conflicts: ["shared"]
-  shared:
+    description: Build and install static libcurl.a
+    args: ["-DBUILD_STATIC_LIBS=ON"]
+  no-static:
     default: false
-    description: Build libcurl.so
-    args: ["-DBUILD_SHARED_LIBS=ON", "-DBUILD_STATIC_LIBS=OFF"]
+    description: Do not build static libcurl.a
     conflicts: ["static"]
+    args: ["-DBUILD_STATIC_LIBS=OFF"]
+  shared:
+    default: true
+    description: Build and install shared libcurl.so
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+  no-shared:
+    default: false
+    description: Do not build shared libcurl.so
+    conflicts: ["shared"]
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+  cli:
+    default: true
+    description: Build and run the upstream curl command-line tool
+    args: ["-DBUILD_CURL_EXE=ON"]
+  no-cli:
+    default: false
+    description: Do not build the upstream curl command-line tool
+    conflicts: ["cli"]
+    args: ["-DBUILD_CURL_EXE=OFF"]
+  tests:
+    default: true
+    description: Build upstream test dependencies and run the real runtests.pl test-quiet suite
+    conflicts: ["no-cli"]
+    args: ["-DBUILD_TESTING=ON"]
+  no-tests:
+    default: false
+    description: Do not build or run the upstream runtests.pl suite
+    conflicts: ["tests"]
+    args: ["-DBUILD_TESTING=OFF"]
+  examples:
+    default: true
+    description: Build every upstream docs/examples check_PROGRAMS binary via curl-examples
+    args: ["-DBUILD_EXAMPLES=ON"]
+  no-examples:
+    default: false
+    description: Do not build upstream examples
+    conflicts: ["examples"]
+    args: ["-DBUILD_EXAMPLES=OFF"]
+  docs:
+    default: true
+    description: Generate and install all upstream man pages with Perl
+    args: ["-DBUILD_LIBCURL_DOCS=ON", "-DBUILD_MISC_DOCS=ON", "-DENABLE_CURL_MANUAL=ON"]
+  no-docs:
+    default: false
+    description: Do not generate upstream man pages
+    conflicts: ["docs"]
+    args: ["-DBUILD_LIBCURL_DOCS=OFF", "-DBUILD_MISC_DOCS=OFF", "-DENABLE_CURL_MANUAL=OFF"]
+  license:
+    default: true
+    description: Install and verify the upstream license and document files
+    args: []
+  no-license:
+    default: false
+    description: Opt out of license/document checks
+    conflicts: ["license"]
+    args: []
+  openssl:
+    default: true
+    description: Use the separately installed OpenSSL 3.4.1 source port as the TLS backend
+    requires: ["openssl"]
+    args: ["-DCURL_USE_OPENSSL=ON"]
+  no-openssl:
+    default: false
+    description: Opt out of the OpenSSL TLS backend (not a buildable configuration for this port)
+    conflicts: ["openssl"]
+    args: ["-DCURL_USE_OPENSSL=OFF"]
+  zlib:
+    default: true
+    description: Enable upstream zlib compression using the zlib 1.3.1 source port
+    requires: ["zlib"]
+    args: ["-DCURL_ZLIB=ON"]
+  no-zlib:
+    default: false
+    description: Disable zlib compression and its source-port discovery
+    conflicts: ["zlib"]
+    args: ["-DCURL_ZLIB=OFF"]
+  brotli:
+    default: true
+    description: Enable upstream Brotli content decoding using the brotli 1.1.0 source port
+    requires: ["brotli"]
+    args: ["-DCURL_BROTLI=ON"]
+  no-brotli:
+    default: false
+    description: Disable Brotli decoding and its source-port discovery
+    conflicts: ["brotli"]
+    args: ["-DCURL_BROTLI=OFF"]
+  zstd:
+    default: true
+    description: Enable upstream Zstandard content decoding using the zstd 1.5.7 source port
+    requires: ["zstd"]
+    args: ["-DCURL_ZSTD=ON"]
+  no-zstd:
+    default: false
+    description: Disable Zstandard decoding and its source-port discovery
+    conflicts: ["zstd"]
+    args: ["-DCURL_ZSTD=OFF"]
+  cares:
+    default: true
+    description: Enable asynchronous DNS using the c-ares 1.34.5 source port
+    requires: ["cares"]
+    args: ["-DENABLE_ARES=ON"]
+  no-cares:
+    default: false
+    description: Disable asynchronous c-ares DNS and its source-port discovery
+    conflicts: ["cares"]
+    args: ["-DENABLE_ARES=OFF"]
   http2:
     default: true
-    description: HTTP/2 support via nghttp2
+    description: Enable HTTP/2 using the nghttp2 1.65.0 source port
+    requires: ["nghttp2"]
     args: ["-DUSE_NGHTTP2=ON"]
-  ares:
-    default: true
-    description: Asynchronous DNS via c-ares
-    args: ["-DENABLE_ARES=ON"]
+  no-http2:
+    default: false
+    description: Disable HTTP/2 and its source-port discovery
+    conflicts: ["http2"]
+    args: ["-DUSE_NGHTTP2=OFF"]
   ssh:
     default: true
-    description: SCP/SFTP via libssh2
-    args: ["-DUSE_LIBSSH2=ON"]
-  compression:
+    description: Enable SCP/SFTP using the libssh2 1.11.1 source port
+    requires: ["libssh2"]
+    args: ["-DCURL_USE_LIBSSH2=ON"]
+  no-ssh:
+    default: false
+    description: Disable SCP/SFTP and its source-port discovery
+    conflicts: ["ssh"]
+    args: ["-DCURL_USE_LIBSSH2=OFF"]
+  ipv6:
     default: true
-    description: brotli / zstd / zlib content encoding
-    args: ["-DCURL_BROTLI=ON", "-DCURL_ZSTD=ON", "-DCURL_ZLIB=ON"]
+    description: Keep upstream IPv6 support enabled
+    args: ["-DENABLE_IPV6=ON"]
+  no-ipv6:
+    default: false
+    description: Disable upstream IPv6 support
+    conflicts: ["ipv6"]
+    args: ["-DENABLE_IPV6=OFF"]
+  unix-sockets:
+    default: true
+    description: Keep upstream Unix domain socket support enabled
+    args: ["-DENABLE_UNIX_SOCKETS=ON"]
+  no-unix-sockets:
+    default: false
+    description: Disable upstream Unix domain socket support
+    conflicts: ["unix-sockets"]
+    args: ["-DENABLE_UNIX_SOCKETS=OFF"]
+  tls-srp:
+    default: true
+    description: Keep TLS-SRP enabled through source-port OpenSSL
+    args: ["-DCURL_DISABLE_SRP=OFF"]
+  no-tls-srp:
+    default: false
+    description: Disable TLS-SRP support
+    conflicts: ["tls-srp"]
+    args: ["-DCURL_DISABLE_SRP=ON"]
+  picky-compiler:
+    default: true
+    description: Keep upstream PICKY_COMPILER warnings enabled (CURL_WERROR stays OFF)
+    args: ["-DPICKY_COMPILER=ON"]
+  no-picky-compiler:
+    default: false
+    description: Disable upstream picky compiler warnings
+    conflicts: ["picky-compiler"]
+    args: ["-DPICKY_COMPILER=OFF"]
+  pkgconfig:
+    default: true
+    description: Enable pinned pkg-config discovery, libcurl.pc and an independent FindPkgConfig consumer
+    args: ["-DCURL_USE_PKGCONFIG=ON"]
+  no-pkgconfig:
+    default: false
+    description: Disable pkg-config discovery and libcurl.pc checks
+    conflicts: ["pkgconfig"]
+    args: ["-DCURL_USE_PKGCONFIG=OFF"]
+  cmake-package:
+    default: true
+    description: Install and verify the upstream CURLConfig.cmake package and exported targets
+    args: ["-DCURL_ENABLE_EXPORT_TARGET=ON"]
+  no-cmake-package:
+    default: false
+    description: Opt out of upstream CMake package checks
+    conflicts: ["cmake-package"]
+    args: ["-DCURL_ENABLE_EXPORT_TARGET=OFF"]
+  consumers:
+    default: true
+    description: Configure, build and run independent FindPkgConfig, upstream CONFIG and FindCURL consumers
+    conflicts: ["no-pkgconfig", "no-cmake-package"]
+    args: []
+  no-consumers:
+    default: false
+    description: Opt out of independent consumer runs
+    conflicts: ["consumers"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and run a C sanity consumer linked to installed curl and all seven source-port libraries
+    conflicts: ["no-library", "no-headers"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the C sanity consumer
+    conflicts: ["sanity"]
+    args: []
