@@ -1,24 +1,100 @@
 schema: 1
 port: zlib
 
-# Feature switches are DATA: they inject build flags without
-# editing build.lua, and are resolved from defaults + project
-# gcpkg.yaml + --feature CLI overrides.
+# New-standard (R20) re-audit of the curl L0 dependency chain.
+# Every capability zlib actually offers on this platform defaults ON:
+#   - positive features inject CMake -D switches through args: and/or drive
+#     post_install verification, so the flag genuinely changes the build;
+#   - `requires:` is empty by design: zlib is an L0 port with no gcpkg
+#     dependencies (the bottom-up DAG starts here), never a hardcoded dep;
+#   - negative no-* counterparts stay OFF and conflict with their twin, so a
+#     caller can opt out explicitly without editing build.lua.
+# `feature_args()` are appended after recipe defines and win via dedup_defines.
 features:
-  no-examples:
+  library:
     default: true
-    description: Do not build the zlib example programs
-    args: ["-DZLIB_BUILD_EXAMPLES=OFF"]
-  examples:
+    description: Build and install both upstream libz.so (shared) and libz.a (static)
+    args: []
+  no-library:
     default: false
-    description: Build the zlib examples
+    description: Opt out of the library post-install checks
+    conflicts: ["library"]
+    args: []
+  headers:
+    default: true
+    description: Install public headers zlib.h and zconf.h
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header checks
+    conflicts: ["headers"]
+    args: []
+  examples:
+    default: true
+    description: Build upstream example/minigzip programs and register the ctest targets
     args: ["-DZLIB_BUILD_EXAMPLES=ON"]
-    conflicts: ["no-examples"]
+  no-examples:
+    default: false
+    description: Do not build the example programs
+    args: ["-DZLIB_BUILD_EXAMPLES=OFF"]
+    conflicts: ["examples"]
+  tests:
+    default: true
+    description: Run zlib's real ctest suite (example/example64) from the build tree
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the ctest run
+    conflicts: ["tests"]
+    args: []
+  docs:
+    default: true
+    description: Install README/FAQ/INDEX/ChangeLog and the zlib.3 man page
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install the zlib license text into share/doc/zlib
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []
+  pkgconfig:
+    default: true
+    description: Install zlib.pc pkg-config metadata
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config check
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Provide a zlib CONFIG package (ZLIBConfig.cmake) for find_package(zlib CONFIG)
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and run a real C consumer (compress/uncompress round-trip) linked to libz
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the C consumer sanity run
+    conflicts: ["sanity"]
+    args: []
 
-# Additional upstream releases. `gcpkg add zlib@1.2.13` switches BOTH the
-# source tarball and the store key (zlib-1.2.13), so two projects can use
-# different zlib versions simultaneously. All four URLs/SHA256 below were
-# downloaded and hashed; 1.3.1 and 1.2.13 are really compiled by
+# Additional upstream releases: `gcpkg add zlib@1.2.13` switches BOTH the
+# source tarball and the store key. All four were downloaded and hashed.
 versions:
   "1.3.1":
     source:
@@ -35,4 +111,4 @@ versions:
   "1.2.11":
     source:
       url: "https://zlib.net/fossils/zlib-1.2.11.tar.gz"
-      sha256: "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1"
+      sha256: "c3e5e9fdd5004dcb542feda5ee5f0ff0744628baf8ed2dd5d66f8ca1197cb1a1"
