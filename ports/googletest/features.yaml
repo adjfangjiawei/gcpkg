@@ -1,20 +1,156 @@
 schema: 1
 port: googletest
 
-# C++ test framework; installed headers and static libs.
-# Feature switches for this port.
+# New-standard (R20) re-audit of the last old port in the P2 dependency
+# graph.  Old draft: `no-tests` default ON, `static` default ON and
+# `shared` default OFF with a hard conflict, BUILD_GMOCK/INSTALL_GTEST
+# hardcoded, BUILD_SHARED_LIBS=OFF, dependencies={} and no consumer,
+# ctest, example or pkgconfig verification.
+#
+# This port now has 13 positive capabilities, all default ON:
+#   - library / headers / gmock;
+#   - static AND shared libraries, produced by TWO official upstream
+#     configure+build+install passes (upstream has only BUILD_SHARED_LIBS,
+#     so both variants cannot come from one configure);
+#   - gtest/gmock own ctest suites, examples, pthreads, Python tests;
+#   - upstream .pc files, upstream GTest CMake CONFIG package, three
+#     independent CMake consumers and direct static/shared C++ sanity.
+# `dependencies = {}` remains empty: googletest has no independent
+# source-port library dependency.  Threads is the host toolchain's
+# threading primitive; Python3/pkg-config/cmake/ctest are host tools
+# measured once in pre_build.  GTEST_HAS_ABSL stays OFF: enabling the
+# optional Abseil/RE2 integration would require re-auditing those two
+# source ports first (not P2-all-features-final and not the 346-ports
+# final audit).  It is not a negative default-ON feature.
+#
+# `static` and `shared` deliberately do NOT conflict.  The first pass is
+# BUILD_SHARED_LIBS=OFF and runs the full upstream ctest suite; the
+# second pass reconfigures the SAME isolated build dir with
+# BUILD_SHARED_LIBS=ON, keeps tests/examples/Python ON, runs ctest again
+# and installs the shared libraries into the same prefix.  The two
+# compile_commands.json arrays are merged in place before the framework
+# imports the compilation database.  No ctest -E, no source/assertion
+# edits, no static test-number blacklist, no hand-written CONFIG file.
 features:
-  no-tests:
+  library:
     default: true
-    description: Skip the upstream test suite
+    description: Build and install the four gtest/gmock libraries and verify their artifacts
     args: []
+  no-library:
+    default: false
+    description: Opt out of the library artifact checks
+    conflicts: ["library"]
+    args: []
+  headers:
+    default: true
+    description: Install and verify the public gtest/gmock headers
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header checks
+    conflicts: ["headers"]
+    args: []
+  gmock:
+    default: true
+    description: Build the upstream Google Mock subproject via BUILD_GMOCK
+    args: ["-DBUILD_GMOCK=ON"]
+  no-gmock:
+    default: false
+    description: Opt out of Google Mock and its verification
+    conflicts: ["gmock"]
+    args: ["-DBUILD_GMOCK=OFF"]
   static:
     default: true
-    description: Build static libraries
+    description: Install static libgtest.a/libgtest_main.a/libgmock.a/libgmock_main.a from the first official pass
     args: []
-    conflicts: ["shared"]
-  shared:
+  no-static:
     default: false
-    description: Build shared libraries
-    args: []
+    description: Opt out of the static-library verification
     conflicts: ["static"]
+    args: []
+  shared:
+    default: true
+    description: Install shared libgtest.so/libgtest_main.so/libgmock.so/libgmock_main.so from a second official pass
+    args: []
+  no-shared:
+    default: false
+    description: Opt out of the shared-library second pass and verification
+    conflicts: ["shared"]
+    args: []
+  tests:
+    default: true
+    description: Build and run the full upstream gtest/gmock ctest suite in both passes
+    args: ["-Dgtest_build_tests=ON", "-Dgmock_build_tests=ON"]
+  no-tests:
+    default: false
+    description: Opt out of the upstream ctest suites
+    conflicts: ["tests"]
+    args: ["-Dgtest_build_tests=OFF", "-Dgmock_build_tests=OFF"]
+  examples:
+    default: true
+    description: Build and run all ten upstream gtest sample programs
+    args: ["-Dgtest_build_samples=ON"]
+  no-examples:
+    default: false
+    description: Opt out of the upstream sample programs
+    conflicts: ["examples"]
+    args: ["-Dgtest_build_samples=OFF"]
+  pthreads:
+    default: true
+    description: Keep upstream pthread support and the measured host Threads facts
+    args: ["-Dgtest_disable_pthreads=OFF", "-DTHREADS_PREFER_PTHREAD_FLAG=ON"]
+  no-pthreads:
+    default: false
+    description: Disable upstream pthread support
+    conflicts: ["pthreads"]
+    args: ["-Dgtest_disable_pthreads=ON"]
+  python-tests:
+    default: true
+    description: Register and run the 18 upstream googletest Python-driven ctest cases via the measured Python3 interpreter
+    args: []
+  no-python-tests:
+    default: false
+    description: Opt out of Python-driven tests through the official CMAKE_DISABLE_FIND_PACKAGE_Python3 switch
+    conflicts: ["python-tests"]
+    args: ["-DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON"]
+  pkgconfig:
+    default: true
+    description: Verify the four upstream .pc files and pkg-config module metadata
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config verification
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Verify the upstream GTestConfig/GTestTargets CMake CONFIG package
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CMake CONFIG package verification
+    conflicts: ["cmake-package"]
+    args: []
+  consumers:
+    default: true
+    description: Configure, build and run FindPkgConfig, CONFIG and MODULE CMake consumers plus C++ sanity
+    args: []
+  no-consumers:
+    default: false
+    description: Opt out of the independent consumer runs
+    conflicts: ["consumers"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and run direct static and shared C++ gtest/gmock sanity programs
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the direct C++ sanity runs
+    conflicts: ["sanity"]
+    args: []
+
+# Boundary note: GTEST_HAS_ABSL=OFF, no Abseil/RE2 dynamic requires yet;
+# host package registries are disabled; no compiler probe, no network
+# download, no source patch, no ctest -E.  This is not P2-all-features-final
+# and not the 346-ports final audit.
