@@ -1,0 +1,69 @@
+schema: 1
+port: boost-url
+
+# boostorg/url @ boost-1.81.0.  Ada 2.9.2 includes <boost/url/src.hpp> inside
+# its benchmark TU, so the competitor is available as a source-built header
+# port; the static library and local CMake CONFIG are also built for ordinary
+# consumers.  Every capability implemented by this port is ON by default.
+# Upstream finicky/route examples and the full unit suite need Boost.Json,
+# Boost.Regex, Boost.Filesystem, Boost.Container and Boost.Unordered component
+# ports; those are separate bottom-up ports, not host-system searches.
+features:
+  headers:
+    default: true
+    description: Install the Boost.URL header tree, including src.hpp
+    requires: ["boost"]
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header tree
+    conflicts: ["headers"]
+    args: []
+  library:
+    default: true
+    description: Build static libboost_url.a from src/src.cpp using source-built Boost headers
+    requires: ["boost"]
+    args: []
+  no-library:
+    default: false
+    description: Opt out of the static library
+    conflicts: ["library"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install boost_urlConfig.cmake exposing boost_url and Boost::url
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the local CMake CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  examples:
+    default: true
+    description: Build the four upstream examples that require only Boost.URL
+    requires: ["boost"]
+    args: []
+  no-examples:
+    default: false
+    description: Opt out of the basic upstream examples
+    conflicts: ["examples"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and run header-only and library-linked real C++ consumer TUs
+    requires: ["boost"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the real C++ sanity checks
+    conflicts: ["sanity"]
+    args: []
+  license:
+    default: true
+    description: Install LICENSE_1_0.txt
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license file
+    conflicts: ["license"]
+    args: []
