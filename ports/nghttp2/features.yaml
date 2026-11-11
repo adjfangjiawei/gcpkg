@@ -1,21 +1,147 @@
 schema: 1
 port: nghttp2
+
+# New-standard (R20) re-audit of the curl L0 dependency chain.
+# Old draft: `no-tests` and `lib-only` default ON, BUILD_TESTING=OFF,
+# ENABLE_APP/EXAMPLES/HPACK_TOOLS=OFF, BUILD_SHARED_LIBS=OFF and a hardcoded
+# dependencies={"zlib"}. All thirteen library-level upstream capabilities
+# that can be built from already-installed source ports now default ON:
+#   - static AND shared libnghttp2 (the old draft forced them to conflict);
+#   - BUILD_TESTING=ON with ENABLE_FAILMALLOC=ON: upstream's two real ctest
+#     cases (main and failmalloc) are built and run through the `check` target;
+#   - docs/license/pkgconfig/cmake-exports/sanity verify real installed files;
+#   - `zlib` dynamically requires the separately installed zlib source port.
+# Upstream apps/examples/hpack-tools/HTTP3 require Libev, Libevent, Jansson,
+# ngtcp2/nghttp3 (and host find_package discovery). Those source ports do not
+# exist in this chain yet, so build.lua keeps their official switches OFF and
+# disables only those optional find_package calls. This is an explicit
+# capability boundary, not a hidden negative feature and not a claim of
+# P2-all-features-final. dependencies = {} stays empty in build.lua.
 features:
-  no-tests:
+  library:
     default: true
-    description: Do not build the test suite
-    args: ["-DBUILD_TESTING=OFF"]
-  lib-only:
+    description: Build the nghttp2 library and verify its installed artifacts
+    args: []
+  no-library:
+    default: false
+    description: Opt out of the library artifact checks
+    conflicts: ["library"]
+    args: []
+  headers:
     default: true
-    description: Build only libnghttp2 (no h2load / nghttpd tools)
-    args: ["-DENABLE_LIB_ONLY=ON"]
+    description: Install public nghttp2 headers
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header checks
+    conflicts: ["headers"]
+    args: []
   static:
     default: true
-    description: Build libnghttp2.a
-    args: ["-DBUILD_SHARED_LIBS=OFF"]
-    conflicts: ["shared"]
-  shared:
+    description: Build and install static libnghttp2.a
+    args: ["-DBUILD_STATIC_LIBS=ON"]
+  no-static:
     default: false
-    description: Build libnghttp2.so
-    args: ["-DBUILD_SHARED_LIBS=ON"]
+    description: Do not build static libnghttp2.a
     conflicts: ["static"]
+    args: ["-DBUILD_STATIC_LIBS=OFF"]
+  shared:
+    default: true
+    description: Build and install shared libnghttp2.so
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+  no-shared:
+    default: false
+    description: Do not build shared libnghttp2.so
+    conflicts: ["shared"]
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+  tests:
+    default: true
+    description: Build and run the upstream ctest suite through the check target (main + failmalloc); needs static library
+    conflicts: ["no-static"]
+    args: ["-DBUILD_TESTING=ON"]
+  no-tests:
+    default: false
+    description: Do not build/run the upstream ctest suite
+    conflicts: ["tests"]
+    args: ["-DBUILD_TESTING=OFF"]
+  failmalloc:
+    default: true
+    description: Build the upstream failmalloc unit test (ENABLE_FAILMALLOC)
+    args: ["-DENABLE_FAILMALLOC=ON"]
+  no-failmalloc:
+    default: false
+    description: Do not build the upstream failmalloc unit test
+    conflicts: ["failmalloc"]
+    args: ["-DENABLE_FAILMALLOC=OFF"]
+  threads:
+    default: true
+    description: Keep upstream threading enabled with an explicit standard-future platform fact
+    args: ["-DENABLE_THREADS=ON"]
+  no-threads:
+    default: false
+    description: Disable upstream threading
+    conflicts: ["threads"]
+    args: ["-DENABLE_THREADS=OFF"]
+  docs:
+    default: true
+    description: Install the four upstream man pages and README.rst
+    args: ["-DENABLE_DOC=ON"]
+  no-docs:
+    default: false
+    description: Do not install upstream documentation
+    conflicts: ["docs"]
+    args: ["-DENABLE_DOC=OFF"]
+  license:
+    default: true
+    description: Install the upstream COPYING license
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []
+  pkgconfig:
+    default: true
+    description: Verify libnghttp2.pc and run a FindPkgConfig consumer
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config checks
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-exports:
+    default: true
+    description: Verify upstream install(EXPORT) targets; upstream 1.65.0 ships no Config.cmake, so none is fabricated
+    args: []
+  no-cmake-exports:
+    default: false
+    description: Opt out of the exported-target consumer
+    conflicts: ["cmake-exports"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and run a C consumer linked to installed libnghttp2 and source-port zlib
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the C consumer sanity run
+    conflicts: ["sanity"]
+    args: []
+  zlib:
+    default: true
+    description: Use the separately installed zlib source port (never the host libz)
+    requires: ["zlib"]
+    args: []
+  no-zlib:
+    default: false
+    description: Do not search for or link the zlib source port
+    conflicts: ["zlib"]
+    args: ["-DCMAKE_DISABLE_FIND_PACKAGE_ZLIB=ON"]
+
+# Boundary note (not a hidden disable): `ENABLE_APP`, `ENABLE_EXAMPLES`,
+# `ENABLE_HPACK_TOOLS`, `ENABLE_HTTP3`, WITH_LIBXML2/JEMALLOC/MRUBY/
+# NEVERBLEED/LIBBPF/WOLFSSL are kept OFF in build.lua because their source
+# ports are not yet part of this curl chain. Their optional find_package
+# calls are disabled with CMake's official CMAKE_DISABLE_FIND_PACKAGE_<Pkg>
+# switch, leaving only Threads and the dynamically required zlib source port.
+# Not claimed as P2 all-features-final or 346-ports final audit.
