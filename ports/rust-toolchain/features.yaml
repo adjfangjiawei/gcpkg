@@ -1,0 +1,61 @@
+schema: 1
+port: rust-toolchain
+
+# Official Rust 1.75.0 standalone installer installed fully inside the store.
+# This is a tool port: cargo/rustc are exported on dependent ports' PATH.
+# `rust` stays as a separate external declaration, not used for source builds.
+features:
+  toolchain:
+    default: true
+    description: Install the official rustc compiler and its runtime libraries
+    args: []
+  no-toolchain:
+    default: false
+    description: Opt out of rustc
+    conflicts: ["toolchain"]
+    args: []
+  cargo:
+    default: true
+    description: Install the official cargo package manager
+    args: []
+  no-cargo:
+    default: false
+    description: Opt out of cargo
+    conflicts: ["cargo"]
+    args: []
+  std:
+    default: true
+    description: Install the x86_64-unknown-linux-gnu Rust standard library
+    args: []
+  no-std:
+    default: false
+    description: Opt out of the Rust standard library
+    conflicts: ["std"]
+    args: []
+  docs:
+    default: true
+    description: Install the official Rust and Cargo HTML documentation
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the HTML documentation
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install the official LICENSE-APACHE, LICENSE-MIT and COPYRIGHT files
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license files
+    conflicts: ["license"]
+    args: []
+  sanity:
+    default: true
+    description: Run rustc/cargo --version and compile/run a real hello.rs translation unit
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the Rust sanity check
+    conflicts: ["sanity"]
+    args: []
