@@ -1,0 +1,74 @@
+schema: 1
+port: corrosion
+
+# Corrosion 0.4.4 CMake/Rust bridge, built from the official source archive.
+# The Rust generator is compiled with the source/tool port `rust-toolchain`
+# and the offline `rust-crates-vendor` data port through dynamic `requires`.
+features:
+  generator:
+    default: true
+    description: Build and install corrosion-generator from source with cargo --offline --locked
+    requires: ["rust-toolchain", "rust-crates-vendor"]
+    args: []
+  no-generator:
+    default: false
+    description: Opt out of the Rust generator executable
+    conflicts: ["generator"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install CorrosionConfig.cmake/Version and the three upstream CMake modules
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CMake CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: Install README.md, RELEASES.md and doc/src Markdown documentation
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install LICENSE
+    args: []
+  no-license:
+    default: false
+    description: Opt out of LICENSE
+    conflicts: ["license"]
+    args: []
+  tests:
+    default: true
+    description: Run cargo test --offline --locked on the generator and build a real CMake corrosion_import_crate consumer
+    requires: ["rust-toolchain", "rust-crates-vendor"]
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the generator and CMake consumer tests
+    conflicts: ["tests"]
+    args: []
+  examples:
+    default: true
+    description: Build a real C++ consumer linked to a Rust staticlib imported by corrosion
+    requires: ["rust-toolchain", "rust-crates-vendor"]
+    args: []
+  no-examples:
+    default: false
+    description: Opt out of the C++/Rust example
+    conflicts: ["examples"]
+    args: []
+  sanity:
+    default: true
+    description: Run the C++/Rust CMake consumer and assert its output
+    requires: ["rust-toolchain", "rust-crates-vendor"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the C++/Rust sanity run
+    conflicts: ["sanity"]
+    args: []
