@@ -1,0 +1,16 @@
+schema: 1
+port: ddt
+
+features:
+  headers:
+    default: true
+    description: "Install DataDrivenTest.hpp under include/ddt"
+    args: []
+  license:
+    default: true
+    description: "Install the upstream LICENSE file"
+    args: []
+  sanity:
+    default: true
+    description: "Compile a real C++ sanity translation unit"
+    args: []

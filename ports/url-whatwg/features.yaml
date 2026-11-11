@@ -1,0 +1,63 @@
+schema: 1
+port: url-whatwg
+
+# Pinned rmisev/url_whatwg 72bcabf: the upa::url implementation used by
+# ada 2.9.2 benchmarks.  Every capability supported by this source snapshot
+# is ON; the OFF switches need extra tool ports or are unsupported upstream.
+features:
+  install:
+    default: true
+    description: "Build and install libupa_url plus the upa CMake package"
+    requires: ["icu4c72"]
+    args: ["-DURL_INSTALL=ON"]
+  tests:
+    default: true
+    description: "Build and run the upstream doctest and WPT test suite"
+    requires: ["icu4c72", "doctest", "picojson", "ddt", "url-wpt-data"]
+    args: ["-DURL_BUILD_TESTS=ON"]
+  examples:
+    default: true
+    description: "Build the urlparse example"
+    requires: ["json-writer"]
+    args: ["-DURL_BUILD_EXAMPLES=ON"]
+  tools:
+    default: true
+    description: "Build the dumpCharBitSets tool"
+    args: ["-DURL_BUILD_TOOLS=ON"]
+  cxx17:
+    default: true
+    description: "Build with C++17 using the shared triplet toolchain"
+    args: ["-DCMAKE_CXX_STANDARD=17"]
+  cxx11:
+    default: false
+    description: "Opt into the upstream C++11 baseline"
+    conflicts: ["cxx17"]
+    args: ["-DCMAKE_CXX_STANDARD=11"]
+  static:
+    default: true
+    description: "Upstream hardcodes a STATIC library target"
+    args: []
+  shared:
+    default: false
+    description: "Shared build is not supported by this upstream snapshot"
+    args: []
+  amalgamated:
+    default: false
+    description: "single_include amalgamation is absent from the pinned tarball"
+    args: ["-DURL_AMALGAMATED=OFF"]
+  fuzzer:
+    default: false
+    description: "libFuzzer and AFL tool ports are pending"
+    args: ["-DURL_BUILD_FUZZER=OFF"]
+  coverage:
+    default: false
+    description: "Coverage instrumentation tool port is pending"
+    args: ["-DURL_TEST_COVERAGE=OFF", "-DURL_TEST_COVERAGE_CLANG=OFF"]
+  sanitizer:
+    default: false
+    description: "Sanitizer tool port is pending"
+    args: ["-DURL_TEST_SANITIZER=OFF"]
+  valgrind:
+    default: false
+    description: "Valgrind tool port is pending"
+    args: ["-DURL_TEST_VALGRIND=OFF"]
