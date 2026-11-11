@@ -43,6 +43,8 @@ local HEADERS = {
     "linux/ioctl.h", "sys/mount.h", "sys/vfs.h", "linux/magic.h",
     "execinfo.h", "minix/config.h", "vfork.h",
     "wordexp.h", "sys/endian.h", "sys/shm.h",
+    -- ICU4C: ELF data packaging, xlocale compatibility, nl_langinfo(CODESET).
+    "elf.h", "xlocale.h", "langinfo.h",
 }
 
 local FUNCTIONS = {
@@ -76,6 +78,13 @@ local FUNCTIONS = {
     "strnlen", "strtol_l", "strtoull_l", "getrlimit", "setrlimit",
     "sched_getaffinity", "posix_fadvise", "fallocate", "flock",
     "backtrace_symbols_fd",
+    -- ICU4C configure checks.  These are symbol names looked up by the ONE
+    -- shared triplet probe; libraries must not run their own link probes.
+    "popen", "tzset", "_tzset", "nl_langinfo", "strtod_l",
+    "pthread_mutex_lock", "pthread_attr_init", "pthread_mutex_init",
+    "pthread_mutex_destroy", "wcscpy", "floor",
+    "tzname", "_tzname", "timezone", "_timezone", "__timezone",
+    "___timezone",
 }
 
 local TYPES = {
@@ -123,6 +132,7 @@ local PROLOG = [==[
 #include <sys/types.h>
 #include <wchar.h>
 #include <dlfcn.h>
+#include <langinfo.h>
 #define GCPKG_STR2(x) #x
 #define GCPKG_STR(x) GCPKG_STR2(x)
 #if defined(__has_include)
@@ -213,6 +223,11 @@ int main(void) {
 #else
   printf("defined:PTHREAD_MUTEX_RECURSIVE=0\n");
 #endif
+#ifdef __STDC_VERSION__
+  printf("c_standard=%ld\n", (long)__STDC_VERSION__);
+#else
+  printf("c_standard=0\n");
+#endif
 #ifdef __USER_LABEL_PREFIX__
   printf("symbol_prefix=%s\n", GCPKG_STR(__USER_LABEL_PREFIX__));
 #else
@@ -222,6 +237,12 @@ int main(void) {
   printf("defined:__GLIBC___features_h=1\n");
 #else
   printf("defined:__GLIBC___features_h=0\n");
+#endif
+/* ICU uses nl_langinfo(CODESET); CODESET is a POSIX macro in langinfo.h. */
+#ifdef CODESET
+  printf("defined:CODESET=1\n");
+#else
+  printf("defined:CODESET=0\n");
 #endif
 ]==]
 
@@ -378,8 +399,10 @@ local function parseProbe(text)
         local k, v = line:match("^([^=]+)=(.*)$")
         if k then
             if k == "byte_order" or k == "pointer_size" or k == "arch"
-               or k == "os" or k == "compiler_id" or k == "symbol_prefix" then
-                f[k] = (k == "pointer_size") and (tonumber(v) or v) or v
+               or k == "os" or k == "compiler_id" or k == "symbol_prefix"
+               or k == "c_standard" then
+                f[k] = (k == "pointer_size" or k == "c_standard")
+                       and (tonumber(v) or v) or v
             elseif k:sub(1, 5) == "type:" then
                 f.sizes[k:sub(6)] = tonumber(v) or ""
             elseif k:sub(1, 7) == "header:" then
@@ -451,6 +474,9 @@ local function writeFacts(name, f)
         "cxx_standard: " .. scalar(f.cxx_standard),
         "cxx17_capable: " .. scalar(f.cxx17_capable),
         "cxx20_capable: " .. scalar(f.cxx20_capable),
+        "c_standard: " .. scalar(f.c_standard),
+        "c11_capable: " .. scalar(f.c11_capable),
+        "c17_capable: " .. scalar(f.c17_capable),
         "byte_order: " .. tostring(f.byte_order or "unknown"),
         "pointer_size: " .. scalar(f.pointer_size),
         "symbol_prefix: " .. scalar(f.symbol_prefix),
@@ -504,11 +530,17 @@ function M.ensure(opts)
     local src = util.join(probeDir, "platform.c")
     local exe = util.join(probeDir, "platform")
     fs.write(src, M.probe_source())
+    -- The probe resolves libc/libm/libpthread symbols via dlsym(RTLD_DEFAULT).
+    -- Link those runtime libraries into the probe itself so a present symbol
+    -- is not reported absent on platforms where it lives outside libc.
+    local probeLibs = { "-ldl", "-lm", "-lpthread" }
     local ok = pcall(function()
-        gcpkg.exec({ cc, "-O0", "-o", exe, src, "-ldl" }, { quiet = true })
+        gcpkg.exec({ cc, "-O0", "-o", exe, src, "-ldl", "-lm", "-lpthread" },
+                   { quiet = true })
     end)
     if not ok then
-        gcpkg.exec({ cc, "-O0", "-o", exe, src }, { quiet = true })
+        gcpkg.exec({ cc, "-O0", "-o", exe, src, "-lm", "-lpthread" },
+                   { quiet = true })
     end
     local out = gcpkg.capture({ exe }, {})
     if type(out) ~= "string" or out == "" then
@@ -522,6 +554,9 @@ function M.ensure(opts)
     f.cxx_standard = probeCxxStandard(spec)
     f.cxx17_capable = f.cxx_standard >= 201703
     f.cxx20_capable = f.cxx_standard >= 202002
+    f.c_standard = tonumber(f.c_standard) or 0
+    f.c11_capable = f.c_standard >= 201112
+    f.c17_capable = f.c_standard >= 201710
     -- Precedence INSIDE this triplet: matching config.yaml section wins over
     -- the triplet file, which wins over the probe.  Nothing leaks to another
     -- triplet; a flat config.yaml `facts:` is deliberately not consulted.

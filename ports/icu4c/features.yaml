@@ -1,0 +1,169 @@
+schema: 1
+port: icu4c
+
+# ICU4C 76.1.  Every upstream library capability supported on this
+# platform/toolchain is ON by default.  Static and shared are both ON (ICU
+# supports both shapes).  The few OFF switches are not library capabilities:
+# debug conflicts with release, layout-ex needs an unbuilt icu-le-hb port,
+# fuzzer/weak-threads need extra tools, and docs needs a Doxygen tool port.
+features:
+  shared:
+    default: true
+    description: Build shared ICU libraries
+    args: ["--enable-shared"]
+  no-shared:
+    default: false
+    description: Opt out of shared ICU libraries
+    conflicts: ["shared"]
+  static:
+    default: true
+    description: Build static ICU libraries
+    args: ["--enable-static"]
+  no-static:
+    default: false
+    description: Opt out of static ICU libraries
+    conflicts: ["static"]
+  release:
+    default: true
+    description: Release build (default)
+    args: ["--enable-release"]
+  debug:
+    default: false
+    description: Debug build (mutually exclusive with release)
+    args: ["--enable-debug"]
+    conflicts: ["release"]
+  strict:
+    default: true
+    description: Strict compiler options
+    args: ["--enable-strict"]
+  no-strict:
+    default: false
+    description: Opt out of strict compiler options
+    conflicts: ["strict"]
+  draft:
+    default: true
+    description: Draft and internal APIs
+    args: ["--enable-draft"]
+  no-draft:
+    default: false
+    description: Opt out of draft APIs
+    conflicts: ["draft"]
+  renaming:
+    default: true
+    description: Version-suffixed symbols
+    args: ["--enable-renaming"]
+  no-renaming:
+    default: false
+    description: Opt out of symbol renaming
+    conflicts: ["renaming"]
+  tracing:
+    default: true
+    description: Function and data tracing
+    args: ["--enable-tracing"]
+  no-tracing:
+    default: false
+    description: Opt out of tracing
+    conflicts: ["tracing"]
+  plugins:
+    default: true
+    description: ICU plugins
+    args: ["--enable-plugins"]
+  no-plugins:
+    default: false
+    description: Opt out of plugins
+    conflicts: ["plugins"]
+  dyload:
+    default: true
+    description: Dynamic loading
+    args: ["--enable-dyload"]
+  no-dyload:
+    default: false
+    description: Opt out of dynamic loading
+    conflicts: ["dyload"]
+  rpath:
+    default: true
+    description: Store-local runtime path
+    args: ["--enable-rpath"]
+  no-rpath:
+    default: false
+    description: Opt out of rpath
+    conflicts: ["rpath"]
+  auto-cleanup:
+    default: true
+    description: ICU auto cleanup
+    args: ["--enable-auto-cleanup"]
+  no-auto-cleanup:
+    default: false
+    description: Opt out of auto cleanup
+    conflicts: ["auto-cleanup"]
+  extras:
+    default: true
+    description: ICU extras
+    args: ["--enable-extras"]
+  no-extras:
+    default: false
+    description: Opt out of extras
+    conflicts: ["extras"]
+  icuio:
+    default: true
+    description: ICU i/o library
+    args: ["--enable-icuio"]
+  no-icuio:
+    default: false
+    description: Opt out of ICU i/o library
+    conflicts: ["icuio"]
+  tools:
+    default: true
+    description: ICU command-line tools
+    args: ["--enable-tools"]
+  no-tools:
+    default: false
+    description: Opt out of ICU tools
+    conflicts: ["tools"]
+  tests:
+    default: true
+    description: Build and run ICU's own test suite
+    args: ["--enable-tests"]
+  no-tests:
+    default: false
+    description: Opt out of ICU tests
+    conflicts: ["tests"]
+  samples:
+    default: true
+    description: ICU sample programs
+    args: ["--enable-samples"]
+  no-samples:
+    default: false
+    description: Opt out of samples
+    conflicts: ["samples"]
+  icu-config:
+    default: true
+    description: Install icu-config
+    args: ["--enable-icu-config"]
+  no-icu-config:
+    default: false
+    description: Opt out of icu-config
+    conflicts: ["icu-config"]
+  python:
+    default: true
+    description: Source-built Python for ICU's generated configure patch
+    requires: ["python"]
+  no-python:
+    default: false
+    description: Opt out of source-built Python (disables the configure patch)
+    conflicts: ["python"]
+  layoutex:
+    default: false
+    description: Paragraph layout (needs a separate icu-le-hb/HarfBuzz source port)
+    args: ["--enable-layoutex"]
+  fuzzer:
+    default: false
+    description: libFuzzer test targets (tool port pending; not a library capability)
+    args: ["--enable-fuzzer"]
+  weak-threads:
+    default: false
+    description: Weak pthread references (build-shape option, not a library capability)
+    args: ["--enable-weak-threads"]
+  docs:
+    default: false
+    description: Doxygen API docs (tool port pending; not a library capability)
