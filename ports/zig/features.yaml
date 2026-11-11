@@ -1,0 +1,43 @@
+schema: 1
+port: zig
+
+# Official Zig 0.11.0 prebuilt toolchain, installed fully inside the store.
+# This is a tool port (not a C/C++ library): its bin/ is exported so the
+# source-built `zuri` Zig library can call `zig` without any host toolchain.
+features:
+  toolchain:
+    default: true
+    description: Install the official Zig 0.11.0 executable, lib and support files
+    args: []
+  no-toolchain:
+    default: false
+    description: Opt out of the toolchain files
+    conflicts: ["toolchain"]
+    args: []
+  docs:
+    default: true
+    description: Install doc/langref.html into share/doc/zig
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the language reference
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install LICENSE and README.md
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license files
+    conflicts: ["license"]
+    args: []
+  sanity:
+    default: true
+    description: Run zig version and compile/run a real hello.zig translation unit
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the Zig sanity check
+    conflicts: ["sanity"]
+    args: []
