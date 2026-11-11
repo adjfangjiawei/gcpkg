@@ -1,0 +1,46 @@
+schema: 1
+port: rust-crates-vendor
+
+# SHA-verified offline Cargo source bundle for corrosion-generator and the
+# Ada 2.9.2 servo-url competitor.  It is a data port: no dependency on host
+# Rust and no configure-time network.  The sanity/test features consume the
+# source/tool port `rust-toolchain` through dynamic `requires`.
+features:
+  vendor:
+    default: true
+    description: Install all 53 SHA-verified crates with Cargo directory-source checksums
+    args: []
+  no-vendor:
+    default: false
+    description: Opt out of the vendored crate sources
+    conflicts: ["vendor"]
+    args: []
+  license:
+    default: true
+    description: Install LICENSES.md and MANIFEST.sha256
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license and manifest documentation
+    conflicts: ["license"]
+    args: []
+  tests:
+    default: true
+    description: Run cargo test --offline on a real Rust consumer of vendored serde/serde_json/itoa/libc
+    requires: ["rust-toolchain"]
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the offline Rust test
+    conflicts: ["tests"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and run a real offline Rust TU against the vendored crates
+    requires: ["rust-toolchain"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the offline Rust sanity run
+    conflicts: ["sanity"]
+    args: []
