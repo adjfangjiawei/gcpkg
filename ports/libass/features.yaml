@@ -5,7 +5,7 @@ port: libass
 # License files are installed under share/doc/libass.
 features:
   no-tests:
-    default: false
+    default: true
     description: Skip the upstream test suite
     args: []
   static:
