@@ -1,37 +1,99 @@
 schema: 1
 port: boost
 
-# Boost 1.81.0 superproject.  This port installs the complete upstream
-# header tree (which already contains Boost.URL) and a local CONFIG package
-# exposing Boost::system.  All are header-only: no static/shared shape, no
-# library linking to discover.  Doxygen/b2-built compiled Boost libraries
-# are not a library capability of this port.
+# Boost 1.81.0 superproject, source-built with upstream B2.  The old
+# header-only port with a hand-written BoostConfig.cmake is replaced by the
+# real b2 install: compiled Boost.Container, Boost.Filesystem, Boost.Json,
+# Boost.Regex, Boost.System, Boost.Atomic and Boost.URL libraries, plus the
+# official BoostConfig.cmake and per-component CONFIG packages.
 features:
   headers:
     default: true
-    description: Install the full boost/ header tree
+    description: Install the complete upstream boost/ header tree
+    args: []
   no-headers:
     default: false
     description: Opt out of the header tree
+    args: []
     conflicts: ["headers"]
+  container:
+    default: true
+    description: Build and install libboost_container.a with upstream B2
+    args: []
+  no-container:
+    default: false
+    description: Opt out of Boost.Container
+    args: []
+    conflicts: ["container"]
+  filesystem:
+    default: true
+    description: Build and install libboost_filesystem.a with upstream B2
+    args: []
+  no-filesystem:
+    default: false
+    description: Opt out of Boost.Filesystem
+    args: []
+    conflicts: ["filesystem"]
+  json:
+    default: true
+    description: Build and install libboost_json.a with upstream B2
+    args: []
+  no-json:
+    default: false
+    description: Opt out of Boost.Json
+    args: []
+    conflicts: ["json"]
+  regex:
+    default: true
+    description: Build and install libboost_regex.a with upstream B2, ICU disabled
+    args: []
+  no-regex:
+    default: false
+    description: Opt out of Boost.Regex
+    args: []
+    conflicts: ["regex"]
+  system:
+    default: true
+    description: Build and install libboost_system.a with upstream B2
+    args: []
+  no-system:
+    default: false
+    description: Opt out of Boost.System
+    args: []
+    conflicts: ["system"]
+  url:
+    default: true
+    description: Build and install libboost_url.a and official boost_url CONFIG with upstream B2
+    args: []
+  no-url:
+    default: false
+    description: Opt out of Boost.URL
+    args: []
+    conflicts: ["url"]
   cmake-package:
     default: true
-    description: Install BoostConfig.cmake / BoostConfigVersion.cmake with Boost::system
+    description: Use the official b2-generated BoostConfig.cmake (no local hand-written CONFIG)
+    args: []
   no-cmake-package:
     default: false
-    description: Opt out of the local CMake CONFIG package
+    description: Opt out of the official CMake package
+    args: []
     conflicts: ["cmake-package"]
   sanity:
     default: true
-    description: Compile a real translation unit including boost/system and boost/url headers
+    description: Compile and run a real official Boost CONFIG consumer and direct sanity TU
+    args: []
   no-sanity:
     default: false
-    description: Opt out of the compile sanity TU
+    description: Opt out of the CMake consumer and sanity checks
+    args: []
     conflicts: ["sanity"]
   license:
     default: true
     description: Install LICENSE_1_0.txt
+    args: []
   no-license:
     default: false
     description: Opt out of the license file
+    args: []
     conflicts: ["license"]

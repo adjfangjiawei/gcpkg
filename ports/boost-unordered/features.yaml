@@ -1,0 +1,37 @@
+schema: 1
+port: boost-unordered
+
+# Header-only Boost.Unordered 1.81.0 from the pinned Boost superproject
+# tarball.  This is an independent source-built port: it installs the real
+# upstream header tree and compiles a real C++ consumer TU.  No hand-written
+# CONFIG package and no host Boost headers.
+features:
+  headers:
+    default: true
+    description: Install the upstream boost/unordered header tree
+    requires: ["boost"]
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header tree
+    args: []
+    conflicts: ["headers"]
+  sanity:
+    default: true
+    description: Compile and run a real Boost.Unordered consumer TU
+    requires: ["boost"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer TU
+    args: []
+    conflicts: ["sanity"]
+  license:
+    default: true
+    description: Install LICENSE_1_0.txt
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license file
+    args: []
+    conflicts: ["license"]

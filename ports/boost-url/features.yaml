@@ -1,69 +1,109 @@
 schema: 1
 port: boost-url
 
-# boostorg/url @ boost-1.81.0.  Ada 2.9.2 includes <boost/url/src.hpp> inside
-# its benchmark TU, so the competitor is available as a source-built header
-# port; the static library and local CMake CONFIG are also built for ordinary
-# consumers.  Every capability implemented by this port is ON by default.
-# Upstream finicky/route examples and the full unit suite need Boost.Json,
-# Boost.Regex, Boost.Filesystem, Boost.Container and Boost.Unordered component
-# ports; those are separate bottom-up ports, not host-system searches.
+# boostorg/url @ boost-1.81.0.  Ada's comparison flags and the CPM boost_url
+# shim stay OFF.  The static library and official Boost::url target come from
+# the source-built B2 `boost` port (no local hand-written CONFIG).  Upstream
+# tests and all six examples are built with the official CMake files; finicky,
+# route and the WPT example are executed.  The WPT main is an upstream example
+# (disabled in upstream test/CMakeLists.txt), not a registered ctest.
 features:
   headers:
     default: true
-    description: Install the Boost.URL header tree, including src.hpp
+    description: Install the standalone Boost.URL header tree, including src.hpp
     requires: ["boost"]
     args: []
   no-headers:
     default: false
     description: Opt out of the header tree
-    conflicts: ["headers"]
     args: []
+    conflicts: ["headers"]
   library:
     default: true
-    description: Build static libboost_url.a from src/src.cpp using source-built Boost headers
+    description: Install source-built libboost_url.a from the official B2 boost port
     requires: ["boost"]
     args: []
   no-library:
     default: false
     description: Opt out of the static library
-    conflicts: ["library"]
     args: []
+    conflicts: ["library"]
   cmake-package:
     default: true
-    description: Install boost_urlConfig.cmake exposing boost_url and Boost::url
+    description: Prove the official B2 Boost::url CONFIG with an external CMake consumer
+    requires: ["boost"]
     args: []
   no-cmake-package:
     default: false
-    description: Opt out of the local CMake CONFIG package
-    conflicts: ["cmake-package"]
+    description: Opt out of the official CONFIG consumer
     args: []
+    conflicts: ["cmake-package"]
+  tests:
+    default: true
+    description: Build and run upstream extra/limits/unit ctest suite
+    requires: ["boost", "boost-unordered"]
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream ctest suite
+    args: []
+    conflicts: ["tests"]
   examples:
     default: true
-    description: Build the four upstream examples that require only Boost.URL
+    description: Build all six upstream CMake examples
     requires: ["boost"]
     args: []
   no-examples:
     default: false
-    description: Opt out of the basic upstream examples
-    conflicts: ["examples"]
+    description: Opt out of the upstream examples
     args: []
+    conflicts: ["examples"]
+  finicky:
+    default: true
+    description: Build and run the upstream finicky example
+    requires: ["boost"]
+    args: []
+  no-finicky:
+    default: false
+    description: Opt out of the finicky example
+    args: []
+    conflicts: ["finicky"]
+  route:
+    default: true
+    description: Build and run the upstream route example
+    requires: ["boost"]
+    args: []
+  no-route:
+    default: false
+    description: Opt out of the route example
+    args: []
+    conflicts: ["route"]
+  wpt:
+    default: true
+    description: Build and run the upstream WPT example with source and url-wpt-data resources
+    requires: ["boost", "url-wpt-data"]
+    args: []
+  no-wpt:
+    default: false
+    description: Opt out of the WPT example
+    args: []
+    conflicts: ["wpt"]
   sanity:
     default: true
     description: Compile and run header-only and library-linked real C++ consumer TUs
-    requires: ["boost"]
+    requires: ["boost", "boost-unordered"]
     args: []
   no-sanity:
     default: false
     description: Opt out of the real C++ sanity checks
-    conflicts: ["sanity"]
     args: []
+    conflicts: ["sanity"]
   license:
     default: true
-    description: Install LICENSE_1_0.txt
+    description: Install LICENSE_1_0.txt and README.md
     args: []
   no-license:
     default: false
-    description: Opt out of the license file
-    conflicts: ["license"]
+    description: Opt out of the license files
     args: []
+    conflicts: ["license"]
