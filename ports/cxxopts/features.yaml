@@ -1,19 +1,145 @@
 schema: 1
 port: cxxopts
 
-# Header-only C++ option parser.
+# R20 new-standard re-audit of Ada's old cxxopts dependency.  The previous
+# draft had `no-tests` default ON, fake header-only `static` ON / `shared` OFF
+# switches, BUILD_TESTING=OFF, CXXOPTS_BUILD_EXAMPLES/TESTS=OFF and no source
+# dependencies.  cxxopts 3.2.0 upstream is an INTERFACE header-only library:
+# there is no static/shared library to install.  This port therefore removes
+# those fake switches and exposes positive capabilities default ON.
+#
+# Unicode help is ON by default and dynamically requires the source-built
+# icu4c72 72.1 port (ICU 76.1 is C++17-only and cannot pair with C++11; ICU 72.1
+# is C++11-compatible).  Upstream CXXOPTS_USE_UNICODE_HELP uses PkgConfig's
+# `icu-uc`; the port restricts pkg-config to source-port directories and
+# verifies the exported target's ICU properties.  The upstream .pc deliberately
+# has no Libs/Requires, so FindPkgConfig alone cannot prove ICU linkage: a
+# separate CONFIG-Unicode consumer and a direct Unicode sanity binary do.
+#
+# Clang 23's strict two-phase lookup exposes cxxopts 3.2.0's late
+# `parse_value<std::optional>` overload.  The default C++17 pass uses the
+# documented `-fdelayed-template-parsing` compatibility flag, which is not a
+# source patch and does not disable tests.  The opt-out `no-delayed-parsing`
+# selects upstream's C++11 path and conflicts with `tests` because LLVM 23's
+# FuzzedDataProvider requires C++17 and the full ctest suite is a C++17 audit.
+# There is no default-ON negative feature, no `ctest -E`, no test-number
+# blacklist and no hand-written CMake CONFIG.
 features:
+  header:
+    default: true
+    description: Enable upstream install logic and verify the single public cxxopts.hpp header
+    args: ["-DCXXOPTS_ENABLE_INSTALL=ON"]
+  tests:
+    default: true
+    description: Register and run all 3 upstream ctest cases and build the non-ctest fuzzer/link_test targets
+    args: ["-DCXXOPTS_BUILD_TESTS=ON"]
+    conflicts: ["no-tests", "no-delayed-parsing"]
   no-tests:
-    default: true
-    description: Skip the upstream test suite
-    args: []
-  static:
-    default: true
-    description: Build static libraries
-    args: []
-    conflicts: ["shared"]
-  shared:
     default: false
-    description: Build shared libraries
+    description: Opt out of the upstream ctest suite and test-only targets
+    args: ["-DCXXOPTS_BUILD_TESTS=OFF"]
+    conflicts: ["tests"]
+  examples:
+    default: true
+    description: Build and run the upstream example with --help
+    args: ["-DCXXOPTS_BUILD_EXAMPLES=ON"]
+  no-examples:
+    default: false
+    description: Opt out of the upstream example target
+    args: ["-DCXXOPTS_BUILD_EXAMPLES=OFF"]
+    conflicts: ["examples"]
+  warnings:
+    default: true
+    description: Enable the upstream -Wall -Werror -Wextra warning set
+    args: ["-DCXXOPTS_ENABLE_WARNINGS=ON"]
+  no-warnings:
+    default: false
+    description: Opt out of the upstream warning set
+    args: ["-DCXXOPTS_ENABLE_WARNINGS=OFF"]
+    conflicts: ["warnings"]
+  unicode:
+    default: true
+    description: Enable Unicode help through source-built ICU4C 72.1 and verify the exported target
+    requires: ["icu4c72"]
+    args: ["-DCXXOPTS_USE_UNICODE_HELP=ON"]
+    conflicts: ["no-unicode"]
+  no-unicode:
+    default: false
+    description: Opt out of Unicode help and the ICU source-port dependency
+    args: ["-DCXXOPTS_USE_UNICODE_HELP=OFF"]
+    conflicts: ["unicode"]
+  delayed-parsing:
+    default: true
+    description: Use C++17 with Clang -fdelayed-template-parsing for cxxopts 3.2.0 optional overload compatibility
+    args: ["-DCXXOPTS_CXX_STANDARD=17", "-DCMAKE_CXX_FLAGS=-fdelayed-template-parsing"]
+    conflicts: ["no-delayed-parsing"]
+  no-delayed-parsing:
+    default: false
+    description: Select upstream C++11 instead; conflicts with the C++17 full test suite
+    args: ["-DCXXOPTS_CXX_STANDARD=11", "-DCMAKE_CXX_FLAGS="]
+    conflicts: ["delayed-parsing", "tests"]
+  docs:
+    default: true
+    description: Install upstream README, CHANGELOG and INSTALL source documentation
     args: []
-    conflicts: ["static"]
+  no-docs:
+    default: false
+    description: Opt out of upstream source documentation
+    args: []
+    conflicts: ["docs"]
+  license:
+    default: true
+    description: Install the upstream LICENSE into the documentation directory
+    args: []
+  no-license:
+    default: false
+    description: Opt out of installing LICENSE
+    args: []
+    conflicts: ["license"]
+  pkgconfig:
+    default: true
+    description: Install and verify the upstream header-only cxxopts.pc pkg-config file
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of pkg-config verification
+    args: []
+    conflicts: ["pkgconfig", "consumers"]
+  cmake-package:
+    default: true
+    description: Install and verify the upstream cxxopts CMake CONFIG/targets package
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of CMake CONFIG verification
+    args: []
+    conflicts: ["cmake-package", "consumers"]
+  compdb:
+    default: true
+    description: Analyse the official compile_commands.json with source-built Python
+    requires: ["python"]
+    args: []
+  no-compdb:
+    default: false
+    description: Opt out of compile_commands analysis
+    args: []
+    conflicts: ["compdb"]
+  consumers:
+    default: true
+    description: Configure, build and run independent CONFIG, CONFIG-Unicode and FindPkgConfig CMake consumers
+    args: []
+    conflicts: ["no-consumers", "no-cmake-package", "no-pkgconfig"]
+  no-consumers:
+    default: false
+    description: Opt out of independent CMake consumers
+    args: []
+    conflicts: ["consumers"]
+  sanity:
+    default: true
+    description: Compile and run direct header-only and Unicode C++ sanity binaries
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of direct C++ sanity binaries
+    args: []
+    conflicts: ["sanity"]
