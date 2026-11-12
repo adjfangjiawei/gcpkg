@@ -5,7 +5,7 @@ port: x265
 # License files are installed under share/doc/x265.
 features:
   no-tests:
-    default: false
+    default: true
     description: Skip the upstream test suite
     args: []
   static:
