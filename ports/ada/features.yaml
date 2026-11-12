@@ -46,6 +46,17 @@ features:
     description: Opt out of the upstream benchmark executables
     args: []
     conflicts: ["benchmarks"]
+  competition:
+    default: true
+    description: Build all six upstream comparison families from source-built gcpkg ports (ICU/url_whatwg, CURL, Boost::system + Boost.URL, uriparser/urlparser/httpparser, ZURI, servo-url/Rust)
+    requires: ["icu4c72", "url-whatwg", "curl", "boost", "boost-url", "uriparser", "urlparser", "httpparser", "zuri", "servo-url"]
+    args: ["-DADA_COMPETITION=ON", "-DADA_BOOST_URL=ON"]
+    conflicts: ["no-competition"]
+  no-competition:
+    default: false
+    description: Opt out of every comparison benchmark family
+    args: []
+    conflicts: ["competition"]
   static:
     default: true
     description: Build static libraries

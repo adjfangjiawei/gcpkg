@@ -12,18 +12,20 @@
 --   * find_program(ccache) -> no compiler launcher probe;
 --   * find_package(Python3) -> source-built python port executable.
 --
--- R20 P2: ADA_BENCHMARKS is now a default-ON feature backed by source-built
--- ports (benchmark + url-dataset, plus simdjson from tests).  The comparison
--- extras that upstream discovers through system find_package() or downloads
--- at configure time (ICU/url_whatwg, CURL, Boost::url, ZURI, corrosion/Rust,
--- and ADA_COMPETITION's uriparser/urlparser/httpparser) still need their own
--- source ports.  They are explicitly patched out in pre_build (never searched
--- on the host) and reported as remaining bottom-up audit items -- this port
--- is NOT claimed as a full-feature final pass.
+-- R20 P2 full comparison wiring: ADA_BENCHMARKS and ADA_COMPETITION /
+-- ADA_BOOST_URL are default-ON features.  All six competitor families
+-- (ICU/url_whatwg, CURL, Boost::system + Boost.URL, uriparser/urlparser/
+-- httpparser, ZURI, servo-url/Rust) are installed as source-built gcpkg
+-- ports via features.yaml `requires:`.  pre_build replaces the upstream
+-- benchmark comparison tail (host find_package probes + CPM downloads) with
+-- official CONFIG packages and IMPORTED targets from those ports.  No host
+-- search, no configure-time download, no disabled test/example/data file.
+-- This port is NOT claimed as a 346-port final audit.
 
 local recipe = require("gcpkg.recipe")
 local fs = require("gcpkg.fs")
 local triplet = require("gcpkg.triplet")
+local r20 = require("gcpkg.r20")
 
 local CPM_SHIM = [==[
 # gcpkg local CPM shim.  Replaces the upstream network bootstrap
@@ -71,22 +73,119 @@ function(CPMAddPackage)
 endfunction()
 ]==]
 
-local function patch(path, old, new)
+local function patch(path, old, new, applied)
     local s = assert(fs.read(path), "gcpkg: cannot read " .. path)
     local n
     s, n = s:gsub(old, new, 1)
-    assert(n == 1, "gcpkg: expected one match for " .. old .. " in " .. path)
+    if n == 0 then
+        -- Already applied by a previous install over the same source tree.
+        if s:find(applied or new, 1, true) then return end
+        error("gcpkg: expected one match for " .. old .. " in " .. path)
+    end
     fs.write(path, s)
 end
 
 -- Literal replacement (no Lua pattern escaping) for CMake snippets that
 -- contain ${...}, parentheses or brackets.
-local function patch_plain(path, old, new)
+local function patch_plain(path, old, new, applied)
     local s = assert(fs.read(path), "gcpkg: cannot read " .. path)
     local a, b = s:find(old, 1, true)
-    assert(a, "gcpkg: expected literal match in " .. path .. ": " .. old)
+    if not a then
+        if s:find(applied or new, 1, true) then return end
+        error("gcpkg: expected literal match in " .. path .. ": " .. old)
+    end
     fs.write(path, s:sub(1, a - 1) .. new .. s:sub(b + 1))
 end
+
+local COMPETITION_CMAKE = [==[
+# =====================================================================
+# gcpkg R20 / Ada competition families -- source-built gcpkg ports only.
+#
+# Upstream discovered these libraries through host find_package() probes or
+# downloaded them at configure time through CPM.  Both are forbidden here.
+# Every family below is an installed, source-built gcpkg port, resolved via
+# its official CONFIG package (explicit PATHS + NO_DEFAULT_PATH, so nothing
+# is searched on the host) or via an IMPORTED target pointing at the port's
+# compiled lib.  No upstream source file, test, example or data file is
+# modified or disabled.  All seven benchmark executables above this block
+# are kept exactly as upstream defines them.
+# =====================================================================
+option(ADA_COMPETITION "Whether to install various competitors." OFF)
+option(ADA_BOOST_URL "Whether to install boost URL." OFF)
+
+if(ADA_COMPETITION AND ADA_BOOST_URL)
+
+  # 1. ICU (source-built icu4c72) + url_whatwg (source-built url-whatwg).
+  find_package(ICU CONFIG REQUIRED COMPONENTS uc i18n
+    PATHS "${ICU_DIR}" NO_DEFAULT_PATH)
+  find_package(upa CONFIG REQUIRED
+    PATHS "${upa_DIR}" NO_DEFAULT_PATH)                     # upa::url
+  # 2. Boost 1.81 official B2 CONFIG; Boost.URL comes from the source-built
+  #    boost-url port's single-header implementation (src.hpp).
+  find_package(Boost 1.80 CONFIG REQUIRED COMPONENTS system
+    PATHS "${Boost_DIR}" NO_DEFAULT_PATH)
+  # 3. CURL official CONFIG (finds source-built OpenSSL + ZLIB through the
+  #    explicit *_DIR cache vars and the full CMAKE_PREFIX_PATH).
+  find_package(CURL CONFIG REQUIRED
+    PATHS "${CURL_DIR}" NO_DEFAULT_PATH)                    # CURL::libcurl
+  # 4. uriparser official CONFIG.
+  find_package(uriparser CONFIG REQUIRED
+    PATHS "${uriparser_DIR}" NO_DEFAULT_PATH)               # uriparser::uriparser
+  # 5. ZURI (zig-built source port).
+  find_package(zuri CONFIG REQUIRED
+    PATHS "${zuri_DIR}" NO_DEFAULT_PATH)                    # zuri
+  # 6. servo-url (offline Rust/C-ABI source port).
+  find_package(servo-url CONFIG REQUIRED
+    PATHS "${GCPKG_SERVO_URL_DIR}" NO_DEFAULT_PATH)         # servo-url
+
+  # urlparser / httpparser ship no CONFIG; their compiled static libs and
+  # headers come from the source-built gcpkg ports (no configure-time build,
+  # no CPM download, no host -dev package).
+  add_library(urlparser STATIC IMPORTED)
+  set_target_properties(urlparser PROPERTIES
+    IMPORTED_LOCATION "${GCPKG_URLPARSER_LIB}"
+    INTERFACE_INCLUDE_DIRECTORIES "${GCPKG_URLPARSER_INCLUDE}")
+  add_library(httpparser STATIC IMPORTED)
+  set_target_properties(httpparser PROPERTIES
+    IMPORTED_LOCATION "${GCPKG_HTTPPARSER_LIB}"
+    INTERFACE_INCLUDE_DIRECTORIES "${GCPKG_HTTPPARSER_INCLUDE}")
+  add_library(boost_url INTERFACE IMPORTED)
+  set_target_properties(boost_url PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${GCPKG_BOOST_URL_INCLUDE};${GCPKG_BOOST_INCLUDE}")
+
+  # Upstream's own comparison macros; none of them is forced OFF.
+  # ADA_VARIOUS_COMPETITION_ENABLED is intentionally bench/bbc_bench only
+  # (upstream does not enable that block in benchdata).
+  set(_ada_bench_targets bench benchdata bbc_bench)
+  foreach(_t IN LISTS _ada_bench_targets)
+    target_compile_definitions(${_t} PRIVATE
+      ADA_url_whatwg_ENABLED=1
+      ADA_CURL_ENABLED=1
+      ADA_BOOST_ENABLED=1
+      ADA_ZURI_ENABLED=1
+      ADA_RUST_VERSION="${GCPKG_RUST_VERSION}")
+    target_include_directories(${_t} PRIVATE "${GCPKG_CURL_INCLUDE}")
+    target_link_libraries(${_t} PRIVATE
+      upa::url ICU::uc ICU::i18n
+      Boost::system boost_url
+      CURL::libcurl
+      uriparser::uriparser urlparser httpparser
+      zuri servo-url)
+  endforeach()
+  target_compile_definitions(bench PRIVATE ADA_VARIOUS_COMPETITION_ENABLED=1)
+  target_compile_definitions(bbc_bench PRIVATE ADA_VARIOUS_COMPETITION_ENABLED=1)
+  target_compile_definitions(wpt_bench PRIVATE
+    ADA_url_whatwg_ENABLED=1 ADA_RUST_VERSION="${GCPKG_RUST_VERSION}")
+  target_link_libraries(wpt_bench PRIVATE upa::url ICU::uc ICU::i18n servo-url)
+  target_compile_definitions(percent_encode PRIVATE
+    ADA_RUST_VERSION="${GCPKG_RUST_VERSION}")
+  target_link_libraries(percent_encode PRIVATE servo-url)
+  unset(_ada_bench_targets)
+
+else()
+  message(STATUS "gcpkg: ada comparison families disabled by feature gate")
+endif()
+]==]
 
 return recipe.cmake {
     name = "ada",
@@ -126,10 +225,8 @@ return recipe.cmake {
                 -- -DADA_BENCHMARKS=ON last, so disabling the feature removes
                 -- both its build switch and its source-built dependencies.
                 ADA_BENCHMARKS = "OFF",
-                -- Comparison extras: no source ports yet.  Kept explicit and
-                -- patched out of the benchmark CMakeLists (no system search).
-                ADA_COMPETITION = "OFF",
-                ADA_BOOST_URL = "OFF",
+                -- ADA_COMPETITION / ADA_BOOST_URL are feature-driven:
+                -- features.yaml appends -D...=ON last for enabled features.
                 ADA_LOGGING = "OFF",
                 ADA_DEVELOPMENT_CHECKS = "OFF",
                 ADA_SANITIZE = "OFF",
@@ -159,6 +256,86 @@ return recipe.cmake {
             if dataset and dataset.prefix then
                 d.GCPKG_URL_DATASET_DIR = dataset.prefix .. "/share/url-dataset"
             end
+            -- R20 comparison wiring: every competitor + transitive prefix is
+            -- put on CMAKE_PREFIX_PATH explicitly; official CONFIG packages
+            -- are pinned with *_DIR cache vars.  Nothing is left to host
+            -- find_* defaults.  The competition feature's `requires:`
+            -- installs these ports bottom-up; when it is off, ctx.dep for
+            -- boost-url is nil and no comparison define is emitted at all.
+            if ctx.dep("boost-url") then
+                local function prefix_of(name)
+                    local m = ctx.dep(name)
+                    if m and m.prefix then return m.prefix end
+                    for _, x in ipairs(ctx.all_dependencies or {}) do
+                        if x.name == name and x.prefix then
+                            return x.prefix
+                        elseif not x.name and x.prefix then
+                            local k = x.key or ""
+                            if k:sub(1, #name + 1) == name .. "-" then
+                                return x.prefix
+                            end
+                        end
+                    end
+                    error("ada: missing source port " .. name)
+                end
+                local icu = prefix_of("icu4c72")
+                local upa = prefix_of("url-whatwg")
+                local curl = prefix_of("curl")
+                local boost = prefix_of("boost")
+                local urip = prefix_of("uriparser")
+                local servo = prefix_of("servo-url")
+                local zuri = prefix_of("zuri")
+                local openssl = prefix_of("openssl")
+                local zlib = prefix_of("zlib")
+
+                -- Full union: direct feature deps AND all transitive deps.
+                local seen, allp = {}, {}
+                for _, list in ipairs({ ctx.dependencies or {}, ctx.all_dependencies or {} }) do
+                    for _, m in ipairs(list) do
+                        if m.prefix and not seen[m.prefix] then
+                            seen[m.prefix] = true
+                            allp[#allp + 1] = m.prefix
+                        end
+                    end
+                end
+                d.CMAKE_PREFIX_PATH = table.concat(allp, ";")
+
+                d.ICU_DIR = icu .. "/lib/cmake/ICU"
+                d.upa_DIR = upa .. "/lib/cmake/upa"
+                d.Boost_DIR = boost .. "/lib/cmake/Boost-1.81.0"
+                d.boost_headers_DIR = boost .. "/lib/cmake/boost_headers-1.81.0"
+                d.boost_system_DIR = boost .. "/lib/cmake/boost_system-1.81.0"
+                d.CURL_DIR = curl .. "/lib/cmake/CURL"
+                d.OpenSSL_DIR = openssl .. "/lib/cmake/OpenSSL"
+                d.ZLIB_DIR = zlib .. "/lib/cmake/zlib"
+                d.zlib_DIR = zlib .. "/lib/cmake/zlib"
+                d.uriparser_DIR = urip .. "/lib/cmake/uriparser-0.9.7"
+                d.zuri_DIR = zuri .. "/lib/cmake/zuri"
+                d.GCPKG_SERVO_URL_DIR = servo .. "/lib/cmake/servo-url"
+
+                d.GCPKG_URLPARSER_LIB = r20.lib_file(ctx, "urlparser", "urlparser")
+                d.GCPKG_URLPARSER_INCLUDE = r20.dep_include(ctx, "urlparser")
+                d.GCPKG_HTTPPARSER_LIB = r20.lib_file(ctx, "httpparser", "http_parser")
+                d.GCPKG_HTTPPARSER_INCLUDE = r20.dep_include(ctx, "httpparser")
+                d.GCPKG_BOOST_URL_INCLUDE = r20.dep_include(ctx, "boost-url")
+                d.GCPKG_BOOST_INCLUDE = r20.dep_include(ctx, "boost")
+                d.GCPKG_CURL_INCLUDE = r20.dep_include(ctx, "curl")
+
+                -- Real Rust version from the source-built toolchain port.
+                local rustver
+                local rustpfx = "rust-toolchain-"
+                for _, m in ipairs(ctx.all_dependencies or {}) do
+                    local k = m.key or ""
+                    if m.name == "rust-toolchain" or k:sub(1, #rustpfx) == rustpfx then
+                        rustver = m.version or k:match("^rust%-toolchain%-(.+)$")
+                    end
+                end
+                assert(rustver, "ada: missing rust-toolchain source port")
+                d.GCPKG_RUST_VERSION = rustver
+
+                d.CMAKE_FIND_USE_PACKAGE_REGISTRY = "OFF"
+                d.CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY = "OFF"
+            end
             return d
         end,
         args = {},
@@ -184,27 +361,24 @@ return recipe.cmake {
         local pyOff = 'set(Python3_Interpreter_FOUND FALSE)'
         patch(ctx.src .. "/singleheader/CMakeLists.txt",
               "find_package %(Python3 COMPONENTS Interpreter%)",
-              (py and py.prefix) and pyOn or pyOff)
-        -- 5. Benchmarks: keep every upstream benchmark target, but route the
-        --    optional comparison-only discoveries to explicit "unavailable".
-        --    They are configure-time network downloads / system library
-        --    searches, not platform facts, and their source ports are still
-        --    pending.  Nothing here disables a library feature to dodge a
-        --    dependency; the benchmark targets themselves are all built.
-        -- 6. CMAKE_SIZEOF_VOID_P is produced by CMake's own compiler probe,
+              (py and py.prefix) and pyOn or pyOff,
+              "set(Python3_Interpreter_FOUND")
+        -- 5. CMAKE_SIZEOF_VOID_P is produced by CMake's own compiler probe,
         --    which gcpkg short-circuits.  Use the shared pointer-size fact.
         patch_plain(ctx.src .. "/CMakeLists.txt",
                     "CMAKE_SIZEOF_VOID_P EQUAL 8",
                     "GCPKG_POINTER_SIZE EQUAL 8")
+        -- 6. Replace the upstream benchmark comparison tail (host
+        --    find_package probes + configure-time CPM downloads) with real
+        --    source-built gcpkg ports.  Every upstream benchmark target above
+        --    the option(ADA_COMPETITION) line is kept untouched.  Cutting at
+        --    the marker is idempotent and also discards the old "pending"
+        --    FALSE placeholders if the source tree was patched before.
         local b = ctx.src .. "/benchmarks/CMakeLists.txt"
-        patch_plain(b, "find_package(ICU COMPONENTS uc i18n)",
-                    "set(ICU_FOUND FALSE)  # gcpkg: ICU/url_whatwg source port pending")
-        patch_plain(b, "find_package(CURL)",
-                    "set(CURL_FOUND FALSE)  # gcpkg: source-built curl comparison pending")
-        patch_plain(b, "find_package(ZURI QUIET)",
-                    "set(ZURI_FOUND FALSE)  # gcpkg: ZURI source port pending")
-        patch_plain(b, "if(NOT WIN32)",
-                    "set(RUST_FOUND FALSE)  # gcpkg: corrosion/servo-url is a configure-time download\nif(FALSE)")
+        local s = assert(fs.read(b), "gcpkg: cannot read " .. b)
+        local cut = s:find("option(ADA_COMPETITION", 1, true)
+        assert(cut, "gcpkg: missing ADA_COMPETITION marker in " .. b)
+        fs.write(b, s:sub(1, cut - 1) .. COMPETITION_CMAKE)
     end,
     exports = {
       includes = { "@PREFIX@/include" },
