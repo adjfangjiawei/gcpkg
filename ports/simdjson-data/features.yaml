@@ -1,0 +1,51 @@
+schema: 1
+port: simdjson-data
+
+# simdjson 3.10.0's developer-mode test/benchmark data repository, pinned to
+# upstream commit a5b13babe65c1bba7186b41b43d4cbdc20a5c470.  simdjson's
+# dependencies/CMakeLists.txt imports this repository UNCONDITIONALLY through
+# import.cmake, which otherwise calls file(DOWNLOAD) at configure time.  This
+# data-only source port installs the whole upstream CMake LANGUAGES NONE tree
+# (root CMakeLists + jsonchecker/ + jsonexamples/ + Ruby generators) so the
+# dependent can point simdjson_DEPENDENCY_CACHE_DIR at it and get the real
+# INTERFACE test-data / jsonchecker-data / jsonchecker-minefield-data /
+# jsonexamples-data targets with zero configure-time networking.
+# There is no library, no negative default-ON feature and no hand-written
+# CMake CONFIG package.
+features:
+  data:
+    default: true
+    description: Install the complete pinned simdjson-data source tree, including CMakeLists and JSON corpora
+    args: []
+  no-data:
+    default: false
+    description: Opt out of installing the data tree
+    args: []
+    conflicts: ["data"]
+  cmake-data:
+    default: true
+    description: Configure an independent CMake consumer that add_subdirectory()s the installed tree and proves the four INTERFACE data targets
+    args: []
+  no-cmake-data:
+    default: false
+    description: Opt out of the independent data CMake consumer
+    args: []
+    conflicts: ["cmake-data"]
+  docs:
+    default: true
+    description: Install upstream README and license texts when present
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of upstream documentation
+    args: []
+    conflicts: ["docs"]
+  sanity:
+    default: true
+    description: Compile one real C++ translation unit so a data port still records a compile command
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the C++ sanity translation unit
+    args: []
+    conflicts: ["sanity"]
