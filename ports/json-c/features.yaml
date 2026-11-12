@@ -5,7 +5,7 @@ port: json-c
 # build arguments without editing build.lua.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: ["-DBUILD_TESTING=OFF"]
   static:

@@ -4,7 +4,7 @@ port: cmake
 # Built from Kitware's bootstrap (no upstream patch). Exported as a tool port: dependents get its bin/ prepended to PATH.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

@@ -4,7 +4,7 @@ port: libfuse
 # libfuse 3 uses Meson. No guessed -D options: meson setup runs with the upstream defaults plus gcpkg's prefix/sysconfdir confinement.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

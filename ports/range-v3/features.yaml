@@ -4,7 +4,7 @@ port: range-v3
 # Header-only C++ ranges; tests/examples/docs disabled.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

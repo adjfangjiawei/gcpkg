@@ -4,7 +4,7 @@ port: pfr
 # Boost.PFR standalone reflection headers installed under boost/pfr.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

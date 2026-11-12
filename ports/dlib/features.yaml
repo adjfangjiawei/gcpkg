@@ -5,7 +5,7 @@ port: dlib
 # License files are installed under share/doc/dlib.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

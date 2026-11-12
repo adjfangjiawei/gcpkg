@@ -2,7 +2,7 @@ schema: 1
 port: libarchive
 features:
   no-tests:
-    default: true
+    default: false
     description: Do not build the upstream test suite
     args: ["-DENABLE_TEST=OFF"]
   static:

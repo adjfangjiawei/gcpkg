@@ -4,7 +4,7 @@ port: lua
 # Hand-written Makefile: 'make linux' then 'make install INSTALL_TOP=<prefix>'. CC is forced to gcpkg-intercept so compdb is produced.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

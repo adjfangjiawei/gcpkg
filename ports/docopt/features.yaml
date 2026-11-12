@@ -4,7 +4,7 @@ port: docopt
 # C++11 docopt parser; static/shared library built with std::regex.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

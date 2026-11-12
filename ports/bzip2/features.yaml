@@ -5,7 +5,7 @@ port: bzip2
 # inject flags -- build.lua can branch on ctx.features.enabled[...] directly.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip building the bundled test programs
 
   static:

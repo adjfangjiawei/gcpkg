@@ -4,7 +4,7 @@ port: ftxui
 # Functional terminal UI; three static libraries, tests/examples/docs off.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

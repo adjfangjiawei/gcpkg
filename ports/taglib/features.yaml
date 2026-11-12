@@ -4,7 +4,7 @@ port: taglib
 # Audio metadata library; a pinned utfcpp tarball fills the empty git submodule directory.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:
@@ -18,7 +18,7 @@ features:
     args: []
     conflicts: ["static"]
   zlib:
-    default: false
+    default: true
     description: Enable compressed ID3 frames through the gcpkg zlib port
     requires: ["zlib"]
     args: ["-DWITH_ZLIB=ON"]

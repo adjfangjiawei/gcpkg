@@ -5,7 +5,7 @@ port: openvr
 # License files are installed under share/doc/openvr.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

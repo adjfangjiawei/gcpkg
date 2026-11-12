@@ -4,7 +4,7 @@ port: quill
 # Header-only low-latency asynchronous logging; probe links pthread.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

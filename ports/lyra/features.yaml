@@ -4,7 +4,7 @@ port: lyra
 # Header-only CLI parser; whole lyra/ tree installed.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

@@ -4,7 +4,7 @@ port: ninja
 # Ninja build tool, built from source with its stock CMake project.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

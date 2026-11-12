@@ -4,7 +4,7 @@ port: nv-image-codec
 # nvImageCodec requires CUDA >= 12.1 and optionally CV-CUDA (its samples). Both are declared gcpkg ports.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

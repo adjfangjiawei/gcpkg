@@ -4,7 +4,7 @@ port: readerwriterqueue
 # Header-only SPSC C++ queue; two real upstream test TUs are compiled for compdb.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

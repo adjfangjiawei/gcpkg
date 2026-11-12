@@ -4,7 +4,7 @@ port: minizip-ng
 # Modern zip library; zlib compression only, optional codecs/crypto off.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

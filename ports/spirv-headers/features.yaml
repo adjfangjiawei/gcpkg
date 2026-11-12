@@ -4,7 +4,7 @@ port: spirv-headers
 # Khronos SPIR-V headers; include/spirv becomes the installed include/spirv.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

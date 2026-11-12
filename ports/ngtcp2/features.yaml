@@ -5,7 +5,7 @@ port: ngtcp2
 # Feature switches for this port.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:
@@ -19,6 +19,6 @@ features:
     args: []
     conflicts: ["static"]
   tls:
-    default: false
+    default: true
     description: Pull in openssl for this optional capability
     requires: [openssl]

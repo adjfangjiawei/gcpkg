@@ -4,7 +4,7 @@ port: proxygen
 # Top of the Facebook stack: folly -> fizz -> wangle/mvfst -> proxygen (plus cmake and the L0 crypto/compression chain).
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

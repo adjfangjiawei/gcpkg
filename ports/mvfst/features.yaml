@@ -4,7 +4,7 @@ port: mvfst
 # QUIC transport layer for proxygen.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

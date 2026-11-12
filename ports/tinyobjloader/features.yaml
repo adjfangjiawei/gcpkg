@@ -4,7 +4,7 @@ port: tinyobjloader
 # Wavefront OBJ loader plus its bundled earcut dependency.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

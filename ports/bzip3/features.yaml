@@ -4,7 +4,7 @@ port: bzip3
 # bzip3 compression; static libbz3 without apps or native tuning.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

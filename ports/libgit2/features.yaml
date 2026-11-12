@@ -4,7 +4,7 @@ port: libgit2
 # libgit2; real bottom-up zlib dependency, no bundled zlib.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

@@ -4,7 +4,7 @@ port: expected-lite
 # std::expected backport for pre-C++23 compilers.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

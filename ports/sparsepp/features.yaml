@@ -4,7 +4,7 @@ port: sparsepp
 # Header-only sparse hash map derived from Google sparsehash.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

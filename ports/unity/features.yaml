@@ -4,7 +4,7 @@ port: unity
 # Unity C test framework; static library and headers.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

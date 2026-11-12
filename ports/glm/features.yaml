@@ -4,7 +4,7 @@ port: glm
 # OpenGL Mathematics; whole glm/ header tree installed.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

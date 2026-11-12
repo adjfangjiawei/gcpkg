@@ -4,7 +4,7 @@ port: fftw
 # FFTW3 discrete Fourier transform library; single-thread static build.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

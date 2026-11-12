@@ -4,7 +4,7 @@ port: crashpad
 # GN-native Crashpad; pinned mini_chromium and Linux-syscall-support tarballs fill empty submodules.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

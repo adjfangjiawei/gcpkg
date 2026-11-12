@@ -5,7 +5,7 @@ port: eudev
 # License files are installed under share/doc/eudev.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

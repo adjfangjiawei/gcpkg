@@ -4,7 +4,7 @@ port: csv2
 # Amalgamated header-only CSV reader/writer plus bundled mio license.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

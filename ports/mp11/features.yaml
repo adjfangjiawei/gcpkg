@@ -4,7 +4,7 @@ port: mp11
 # Boost.Mp11 C++11 metaprogramming headers; README carries the BSL-1.0 notice.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

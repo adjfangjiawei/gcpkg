@@ -4,7 +4,7 @@ port: nameof
 # Header-only compile-time name reflection for enums, variables and types.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

@@ -5,7 +5,7 @@ port: libdwarf
 # Feature switches for this port.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:
@@ -19,7 +19,7 @@ features:
     args: []
     conflicts: ["static"]
   compression:
-    default: false
+    default: true
     description: Pull in zlib, zstd for this optional capability
     requires: [zlib, zstd]
     args: []

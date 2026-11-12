@@ -5,7 +5,7 @@ port: gflags
 # Feature switches for this port.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

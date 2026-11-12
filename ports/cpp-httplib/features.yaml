@@ -4,7 +4,7 @@ port: cpp-httplib
 # Header-only HTTP/HTTPS library; `tls` feature pulls openssl + zlib.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:
@@ -18,7 +18,7 @@ features:
     args: []
     conflicts: ["static"]
   tls:
-    default: false
+    default: true
     description: Enable openssl, zlib
     requires: [openssl, zlib]
     args: ["-DHTTPLIB_REQUIRE_OPENSSL=ON", "-DHTTPLIB_REQUIRE_ZLIB=ON"]

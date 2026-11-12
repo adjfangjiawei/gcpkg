@@ -4,7 +4,7 @@ port: sentencepiece
 # SentencePiece tokenizer; bundled protobuf-lite/absl, tests off; ctx.jobs scales the memory-heavy trainer TUs.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

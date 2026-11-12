@@ -31,7 +31,7 @@ features:
     args: []
     conflicts: ["examples"]
   select-std:
-    default: false
+    default: true
     description: Force std::any selection (mutually exclusive with select-nonstd)
     args: ["-DANY_LITE_OPT_SELECT_STD=ON"]
     conflicts: ["select-nonstd"]

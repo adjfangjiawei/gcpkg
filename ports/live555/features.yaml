@@ -4,7 +4,7 @@ port: live555
 # Upstream has no install target: ./genMakefiles linux, make, then copy the per-component .a and headers into the gcpkg prefix.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

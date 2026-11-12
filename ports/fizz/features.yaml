@@ -4,7 +4,7 @@ port: fizz
 # Facebook v2026.10.26.00 release line, same tag as folly/wangle/mvfst/proxygen.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

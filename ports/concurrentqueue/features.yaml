@@ -4,7 +4,7 @@ port: concurrentqueue
 # Header-only lock-free queue; installs under include/concurrentqueue.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

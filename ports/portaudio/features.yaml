@@ -5,7 +5,7 @@ port: portaudio
 # Feature switches for this port.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:
@@ -19,7 +19,7 @@ features:
     args: []
     conflicts: ["static"]
   alsa:
-    default: false
+    default: true
     description: Pull in alsa-lib for this optional capability
     requires: [alsa-lib]
     args: ["-DPA_USE_ALSA=ON"]

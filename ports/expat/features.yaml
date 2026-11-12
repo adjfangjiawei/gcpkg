@@ -6,7 +6,7 @@ port: expat
 # gcpkg.yaml + --feature CLI overrides.
 features:
   no-tests:
-    default: true
+    default: false
     description: Do not build the upstream test suite
     args: ["-DEXPAT_BUILD_TESTS=OFF"]
   static:

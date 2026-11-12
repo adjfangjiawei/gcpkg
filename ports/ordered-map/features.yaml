@@ -4,7 +4,7 @@ port: ordered-map
 # Header-only insertion-order preserving hash map and set.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

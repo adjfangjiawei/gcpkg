@@ -4,7 +4,7 @@ port: tabulate
 # Header-only table formatter; bundled lite licenses installed.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

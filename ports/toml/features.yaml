@@ -3,7 +3,7 @@ port: toml
 
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:
@@ -17,5 +17,5 @@ features:
     args: []
     conflicts: ["static"]
   pip:
-    default: false
+    default: true
     description: Use pip install --target instead of setup.py install

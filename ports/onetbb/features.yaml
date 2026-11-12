@@ -4,7 +4,7 @@ port: onetbb
 # oneTBB; `python` feature enables the optional Python module.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:
@@ -18,7 +18,7 @@ features:
     args: []
     conflicts: ["static"]
   python:
-    default: false
+    default: true
     description: Enable python
     requires: [python]
     args: ["-DTBB4PY_BUILD=ON"]

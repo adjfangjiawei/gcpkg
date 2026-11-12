@@ -4,7 +4,7 @@ port: dcgm
 # NVIDIA DCGM open-core tree; needs the local CUDA driver/toolkit ('nvidia' SDK port) and vendor-only diagnostics components.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

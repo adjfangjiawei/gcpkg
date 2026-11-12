@@ -4,7 +4,7 @@ port: unordered-dense
 # Header-only robin-hood hash map/set.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

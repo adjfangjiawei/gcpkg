@@ -5,7 +5,7 @@ port: qt
 # License files are installed under share/doc/qt.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

@@ -4,7 +4,7 @@ port: nng
 # NNG messaging library; static build without TLS or tools.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

@@ -4,7 +4,7 @@ port: ut
 # Boost-ext UT single-header C++20 unit testing framework.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   header-only:

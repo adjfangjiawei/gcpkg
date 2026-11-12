@@ -4,7 +4,7 @@ port: jemalloc
 # jemalloc; ships a generated configure.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:

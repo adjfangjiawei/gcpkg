@@ -4,7 +4,7 @@ port: uthash
 # Header-only C containers; one real upstream test TU is compiled for compdb.
 features:
   no-tests:
-    default: true
+    default: false
     description: Skip the upstream test suite
     args: []
   static:
