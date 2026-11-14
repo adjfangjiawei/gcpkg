@@ -1,13 +1,71 @@
 schema: 1
 port: mp11
 
-# Boost.Mp11 C++11 metaprogramming headers; README carries the BSL-1.0 notice.
+# Boost.Mp11 1.92.0, source-built from the boostorg/mp11 release tag.  The
+# library is a bare header tree, and upstream's own CMakeLists.txt downloads
+# BoostFetch.cmake from GitHub at configure time, so the port installs the
+# headers itself and reproduces the B2 test suite (test/Jamfile) with CTest.
 features:
+  headers:
+    default: true
+    description: Install the upstream boost/mp11 header tree
+    requires: []
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header tree
+    args: []
+    conflicts: ["headers"]
+  tests:
+    default: true
+    description: >-
+      Run upstream's whole test/Jamfile suite (234 targets: 227 run targets and
+      7 compile-only ones) through a generated CMake project and CTest
+    requires: ["boost"]
+    args: []
   no-tests:
     default: false
-    description: Skip the upstream test suite
+    description: Opt out of the upstream test suite
     args: []
-  header-only:
+    conflicts: ["tests"]
+  pkgconfig:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: Install lib/pkgconfig/mp11.pc (upstream ships none)
+    requires: []
     args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the .pc file
+    args: []
+    conflicts: ["pkgconfig"]
+  sanity:
+    default: true
+    description: >-
+      Compile and run a real Boost.Mp11 consumer TU against the installed
+      header tree (compile-time algorithm checks plus mp_for_each /
+      mp_from_sequence / mp_with_index at runtime)
+    requires: ["boost"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer TU
+    args: []
+    conflicts: ["sanity"]
+  docs:
+    default: true
+    description: Install README.md, doc/ and index.html under share/doc/mp11
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation
+    args: []
+    conflicts: ["docs"]
+  license:
+    default: true
+    description: Install the Boost Software License text (BSL-1.0)
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license file
+    args: []
+    conflicts: ["license"]
