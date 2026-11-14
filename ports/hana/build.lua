@@ -331,8 +331,8 @@ return recipe.cmake {
                 "for all " .. tostring(headers) .. " public headers + " ..
                 "issues/github_75 (2 TU ODR check) + example/*.cpp one program each"
             facts[#facts + 1] =
-                "tests_not_used=upstream's test.deploy ExternalProject " ..
-                "(re-configures and re-builds into a fake prefix)"
+                "tests_not_used=upstream's test.deploy hook, which is an " ..
+                "external-project re-configure/re-build into a fake prefix"
         else
             facts[#facts + 1] = "tests_run=0 (feature tests OFF)"
         end

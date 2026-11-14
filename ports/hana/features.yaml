@@ -79,6 +79,7 @@ features:
     description: "BOOST_HANA_ENABLE_DEBUG_MODE (upstream default OFF)"
     requires: []
     args: []
+    conflicts: ["no-debug-mode"]
   no-debug-mode:
     default: true
     description: Leave Hana's debug mode off
