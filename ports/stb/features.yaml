@@ -1,13 +1,89 @@
 schema: 1
 port: stb
 
-# Selected stb single-file C headers; probe is compiled as C11.
+# stb — single-file public-domain C/C++ libraries.  Upstream has no build system
+# and no option() switches; the real switch surface is tests/Makefile, whose three
+# test programs the port builds and runs.  Every feature below is a gcpkg
+# capability that performs a real action and has an explicit opt-out twin.
 features:
+  headers:
+    default: true
+    description: "Install every upstream single-file header (*.h: image, image_write, truetype, rect_pack, textedit, ds, perlin, dxt, easy_font, c_lexer, divide, hexwave, connected_components, herringbone, include, leakcheck, tilemap_editor, voxel_render)"
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  vorbis-source:
+    default: true
+    description: "Install stb_vorbis.c (the one stb library shipped as a C source file, meant to be compiled by the consumer)"
+    args: []
+  no-vorbis-source:
+    default: false
+    description: Opt out of the stb_vorbis.c install
+    conflicts: ["vorbis-source"]
+    args: []
+  deprecated-headers:
+    default: true
+    description: "Also install the headers upstream keeps in deprecated/ (stb.h, stb_sprintf.h, stb_image_resize.h, stb_image_resize2.h) - its own test programs still include them"
+    args: []
+  no-deprecated-headers:
+    default: false
+    description: Opt out of the deprecated/ headers
+    conflicts: ["deprecated-headers"]
+    args: []
+  tests:
+    default: true
+    description: "Build and RUN upstream's aggregate C test binary (its own tests/Makefile file list), compile the C++ compilation test, and run test_siphash / test_png_paeth / stblib_test / image_write_test -DIWT_TEST"
+    args: []
   no-tests:
     default: false
-    description: Skip the upstream test suite
+    description: Opt out of the upstream test programs
+    conflicts: ["tests"]
     args: []
-  header-only:
+  sanity:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "Compile, link and run a C99 consumer against the INSTALLED headers (encode a PNG in memory and decode it back)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  pkgconfig:
+    default: true
+    description: "Install lib/pkgconfig/stb.pc"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Install a CONFIG package (find_package(stb CONFIG) -> stb::stb, links -lm)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md, Release_Notes.txt and the upstream docs/ folder into share/doc/stb"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install the upstream LICENSE into share/doc/stb"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
