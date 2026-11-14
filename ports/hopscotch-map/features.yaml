@@ -1,13 +1,85 @@
 schema: 1
 port: hopscotch-map
 
-# Header-only hopscotch hash map and set.
+# tsl::hopscotch_map 2.3.1.  Upstream's own CMake builds the header-only
+# library and its package config; the test project needs one patch (compiled
+# Boost.Test is not available here) which the port applies to a copy of
+# tests/ inside the build directory, never to the source tree.
 features:
+  install:
+    default: true
+    description: Install the tsl/ header tree and the CMake package config
+    requires: []
+    args: []
+  no-install:
+    default: false
+    description: Opt out of installing anything
+    args: []
+    conflicts: ["install"]
+  cmake-package:
+    default: true
+    description: >-
+      Assert upstream's tsl-hopscotch-mapConfig.cmake / ConfigVersion /
+      Targets export in share/cmake/tsl-hopscotch-map
+    requires: []
+    args: []
+  no-cmake-package:
+    default: false
+    description: Skip the CMake package assertions
+    args: []
+    conflicts: ["cmake-package"]
+  tests:
+    default: true
+    description: >-
+      Build and run upstream's Boost.Test suite (141 test cases) from a patched
+      copy of tests/: header-only Boost.Test, -Werror filtered, links the
+      installed headers
+    requires: ["boost"]
+    args: []
   no-tests:
     default: false
-    description: Skip the upstream test suite
+    description: Opt out of the upstream test suite
     args: []
-  header-only:
+    conflicts: ["tests"]
+  pkgconfig:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: Install lib/pkgconfig/tsl-hopscotch-map.pc (upstream ships none)
+    requires: []
     args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the .pc file
+    args: []
+    conflicts: ["pkgconfig"]
+  sanity:
+    default: true
+    description: >-
+      Compile and run a real tsl::hopscotch_map / hopscotch_set consumer TU
+      against the installed header tree
+    requires: []
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer TU
+    args: []
+    conflicts: ["sanity"]
+  docs:
+    default: true
+    description: Install README.md and doxygen.conf under share/doc/hopscotch-map
+    requires: []
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation
+    args: []
+    conflicts: ["docs"]
+  license:
+    default: true
+    description: Install LICENSE (MIT)
+    requires: []
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license file
+    args: []
+    conflicts: ["license"]
