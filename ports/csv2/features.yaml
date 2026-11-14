@@ -1,13 +1,92 @@
 schema: 1
 port: csv2
 
-# Amalgamated header-only CSV reader/writer plus bundled mio license.
+# Fast CSV parser/writer for modern C++.  Upstream CMakeLists.txt declares
+#   option(CSV2_BUILD_TESTS) option(CSV2_SAMPLES) option(CSV2_DEMO)
+# All three are exposed as features that default ON with an explicit opt-out
+# twin.  Note: CSV2_SAMPLES / CSV2_DEMO are DEAD options in this tag (no
+# samples/ or demo/ directory exists and the CMakeLists never uses them); the
+# port forwards them, records the cache value and says so instead of claiming to
+# build something that upstream does not ship.
 features:
+  headers:
+    default: true
+    description: "Install include/csv2/{mio,parameters,reader,writer}.hpp"
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  tests:
+    default: true
+    description: "Build and run the upstream doctest suite (CSV2_BUILD_TESTS=ON, vendored doctest.hpp, reads test/inputs/*.csv) and require 'Status: SUCCESS'"
+    args: ["-DCSV2_BUILD_TESTS=ON"]
   no-tests:
     default: false
-    description: Skip the upstream test suite
-    args: []
-  header-only:
+    description: "Opt out of the tests capability (same switch as above, reversed)"
+    conflicts: ["tests"]
+    args: ["-DCSV2_BUILD_TESTS=OFF"]
+  samples:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "Forward CSV2_SAMPLES=ON (dead option upstream at this tag: no samples/ directory exists; the port records the accepted cache value)"
+    args: ["-DCSV2_SAMPLES=ON"]
+  no-samples:
+    default: false
+    description: "Opt out of the samples capability (same switch as above, reversed)"
+    conflicts: ["samples"]
+    args: ["-DCSV2_SAMPLES=OFF"]
+  demo:
+    default: true
+    description: "Forward CSV2_DEMO=ON (dead option upstream at this tag: no demo/ target exists; the port records the accepted cache value)"
+    args: ["-DCSV2_DEMO=ON"]
+  no-demo:
+    default: false
+    description: "Opt out of the demo capability (same switch as above, reversed)"
+    conflicts: ["demo"]
+    args: ["-DCSV2_DEMO=OFF"]
+  pkgconfig:
+    default: true
+    description: "Install the csv2.pc that upstream's CMakeLists generates"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Install the upstream CONFIG package for find_package(csv2 CONFIG)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers (reader + writer round trip)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md into share/doc/csv2"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE and the bundled LICENSE.mio (mio memory-mapped IO)"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []

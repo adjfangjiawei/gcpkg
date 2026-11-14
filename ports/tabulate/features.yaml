@@ -1,13 +1,91 @@
 schema: 1
 port: tabulate
 
-# Header-only table formatter; bundled lite licenses installed.
+# Header-only C++ table formatter.  Upstream CMakeLists.txt declares
+#   option(tabulate_BUILD_TESTS), option(SAMPLES)  and the USE_CPP17 cache var.
+# All three are exposed as features that default ON, each with an explicit
+# opt-out twin; the test suite is the real upstream one (16 programs compiled
+# twice = 32 CTest entries) and the samples are really built (and the
+# deterministic ones really run).
 features:
+  headers:
+    default: true
+    description: "Install include/tabulate/*.hpp (the modular headers)"
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  tests:
+    default: true
+    description: "Build and run the upstream CTest suite (tabulate_BUILD_TESTS=ON): 32 entries, modular + single-header flavours"
+    args: ["-Dtabulate_BUILD_TESTS=ON"]
   no-tests:
     default: false
-    description: Skip the upstream test suite
-    args: []
-  header-only:
+    description: "Opt out of the tests capability (same switch as above, reversed)"
+    conflicts: ["tests"]
+    args: ["-Dtabulate_BUILD_TESTS=OFF"]
+  samples:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "Build the 29 upstream sample programs (SAMPLES=ON) and run the deterministic ones"
+    args: ["-DSAMPLES=ON"]
+  no-samples:
+    default: false
+    description: "Opt out of the samples capability (same switch as above, reversed)"
+    conflicts: ["samples"]
+    args: ["-DSAMPLES=OFF"]
+  cpp17:
+    default: true
+    description: "Export tabulate::tabulate requiring C++17 (USE_CPP17=ON); the port checks the installed export file"
+    args: ["-DUSE_CPP17=ON"]
+  no-cpp17:
+    default: false
+    description: "Opt out of the C++17 requirement (USE_CPP17=OFF, i.e. C++11); the port checks the installed export file"
+    conflicts: ["cpp17"]
+    args: ["-DUSE_CPP17=OFF"]
+  pkgconfig:
+    default: true
+    description: Install lib/pkgconfig/tabulate.pc for pkg-config consumers
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install the upstream CONFIG package for find_package(tabulate CONFIG)
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: Compile, link and run a consumer against the INSTALLED headers
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: Install README.md into share/doc/tabulate
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE + the bundled LICENSE.optional-lite / LICENSE.termcolor / LICENSE.variant-lite"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
