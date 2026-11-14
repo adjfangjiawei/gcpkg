@@ -1,16 +1,91 @@
 schema: 1
 port: picojson
 
+# picojson 111c9be -- R20 new-standard header-only source port.
+# The upstream tarball has no build system: gcpkg installs the headers and
+# then verifies every default-ON capability for real (Build and RUN the real upstream test.cc suite (picotest) in both the default and PICOJSON_USE_INT64 configurations).
+# No dependency is downloaded and no host header is probed: the port has no
+# gcpkg dependencies and every TU is compiled by gcpkg's compiler wrapper.
 features:
   headers:
     default: true
-    description: "Install picojson.h under include/picojson"
+    description: Install picojson.h (upstream layout include/picojson.h plus the historical include/picojson/picojson.h) into <prefix>/include
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  tests:
+    default: true
+    description: Build and RUN the real upstream test.cc suite (picotest) in both the default and PICOJSON_USE_INT64 configurations
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test run
+    conflicts: ["tests"]
+    args: []
+  examples:
+    default: true
+    description: Build AND run the upstream example programs
+    args: []
+  no-examples:
+    default: false
+    description: Opt out of the example programs
+    conflicts: ["examples"]
+    args: []
+  example-curl:
+    default: true
+    description: Compile the upstream libcurl-based example against the source-built curl port (not executed, it does live HTTP)
+    requires: [curl]
+    args: []
+  no-example-curl:
+    default: false
+    description: Opt out of the libcurl example
+    conflicts: [example-curl]
+    args: []
+  pkgconfig:
+    default: true
+    description: Install lib/pkgconfig/picojson.pc for pkg-config consumers
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install a CONFIG package for find_package(picojson CONFIG)
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CMake CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: Install the upstream documentation into share/doc/picojson
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
     args: []
   license:
     default: true
-    description: "Install the upstream LICENSE file"
+    description: Install the upstream license text into share/doc/picojson
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
   sanity:
     default: true
-    description: "Compile a real C++ sanity translation unit"
+    description: Compile and RUN a real consumer that exercises the public API
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer sanity run
+    conflicts: ["sanity"]
     args: []

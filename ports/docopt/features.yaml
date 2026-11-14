@@ -1,19 +1,119 @@
 schema: 1
 port: docopt
 
-# C++11 docopt parser; static/shared library built with std::regex.
+# docopt.cpp 0.6.3 -- R20 new-standard re-audit.
+# The three upstream CMake options plus the build shape are all features and
+# all default ON.  static and shared are NOT mutually exclusive here: the port
+# runs one configure/build/install pass per shape, so a consumer of either
+# flavour finds it installed (that is what "default ON" means for a shape).
+# The only option that cannot be on by default is USE_BOOST_REGEX, because it
+# is the alternative regex backend to std::regex (an either/or pair, exactly
+# like any-lite's select-std / select-nonstd) and would need a source-built
+# compiled Boost.Regex.
 features:
-  no-tests:
+  library:
+    default: true
+    description: Build and install libdocopt in both static and shared shape
+    args: []
+  no-library:
     default: false
-    description: Skip the upstream test suite
+    description: Opt out of the library passes
+    conflicts: ["library"]
     args: []
   static:
     default: true
-    description: Build static libraries
+    description: Build libdocopt.a (BUILD_SHARED_LIBS=OFF pass)
     args: []
-    conflicts: ["shared"]
-  shared:
+  no-static:
     default: false
-    description: Build shared libraries
-    args: []
+    description: Do not run the static pass
     conflicts: ["static"]
+    args: []
+  shared:
+    default: true
+    description: Build libdocopt.so (BUILD_SHARED_LIBS=ON pass)
+    args: []
+  no-shared:
+    default: false
+    description: Do not run the shared pass
+    conflicts: ["shared"]
+    args: []
+  tests:
+    default: true
+    description: Build the upstream testcases runner (WITH_TESTS=ON) and run its registered ctest
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    conflicts: ["tests"]
+    args: []
+  examples:
+    default: true
+    description: Build, install and RUN the upstream example (WITH_EXAMPLE=ON)
+    args: []
+  no-examples:
+    default: false
+    description: Opt out of the example program
+    conflicts: ["examples"]
+    args: []
+  std-regex:
+    default: true
+    description: Use std::regex as the regex backend (upstream default); mutually exclusive with boost-regex
+    conflicts: ["boost-regex"]
+    args: []
+  no-std-regex:
+    default: false
+    description: Opt out of the std::regex backend
+    conflicts: ["std-regex"]
+    args: []
+  boost-regex:
+    default: false
+    description: Replace std::regex with Boost.Regex (USE_BOOST_REGEX=ON); needs a compiled Boost.Regex, so it is the opt-in alternative to std-regex
+    requires: ["boost"]
+    conflicts: ["std-regex"]
+    args: []
+  pkgconfig:
+    default: true
+    description: Install the upstream docopt.pc generated from docopt.pc.in
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install the upstream docopt CONFIG package
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CMake CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: Install README.rst into share/doc/docopt
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install LICENSE-MIT and LICENSE-Boost-1.0 into share/doc/docopt
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and RUN a real consumer that parses a usage string with the installed library
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer sanity run
+    conflicts: ["sanity"]
+    args: []

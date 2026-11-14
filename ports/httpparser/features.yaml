@@ -1,45 +1,127 @@
 schema: 1
 port: httpparser
 
-# nodejs/http-parser v2.9.4.  All capabilities this triplet supports are ON
-# by default; static/shared are mutually exclusive build shapes.
+# nodejs/http-parser 2.9.4 -- R20 new-standard re-audit.
+# Every capability the upstream tarball actually offers is an independent
+# feature and defaults ON.  The no-* twins are the explicit opt-outs and
+# conflict with their twin, so a caller can disable one capability without
+# editing build.lua.  Nothing here probes the host: the port is a single C
+# translation unit built by gcpkg's compiler wrapper, and the dependency set
+# is empty (L0), so there is nothing to download or detect.
 features:
+  library:
+    default: true
+    description: Build and install the parser library (libhttp_parser.a and .so)
+    args: []
+  no-library:
+    default: false
+    description: Opt out of building the parser library
+    conflicts: ["library"]
+    args: []
   static:
     default: true
     description: Build libhttp_parser.a from the upstream C source
-  shared:
+    args: []
+  no-static:
     default: false
-    description: Build libhttp_parser.so (mutually exclusive build shape)
+    description: Do not build the static archive
     conflicts: ["static"]
+    args: []
+  shared:
+    default: true
+    description: Build libhttp_parser.so.2.9.4 with the upstream soname
+    args: []
+  no-shared:
+    default: false
+    description: Do not build the shared object
+    conflicts: ["shared"]
+    args: []
+  headers:
+    default: true
+    description: Install http_parser.h into <prefix>/include
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
   tests:
     default: true
-    description: Compile and RUN the upstream strict/fast test.c test binaries
-    conflicts: ["no-tests"]
+    description: Compile and RUN the upstream test.c suite in strict and fast modes
+    args: []
   no-tests:
     default: false
     description: Opt out of the upstream test binaries
     conflicts: ["tests"]
+    args: []
   tools:
     default: true
-    description: Build the contrib/url_parser and contrib/parsertrace tools
-    conflicts: ["no-tools"]
+    description: Build the contrib/url_parser and contrib/parsertrace programs
+    args: []
   no-tools:
     default: false
     description: Opt out of the contrib tools
     conflicts: ["tools"]
+    args: []
   sources:
     default: true
-    description: Install http_parser.c/.h under share/httpparser/src for source-based consumers
-    conflicts: ["no-sources"]
+    description: Install http_parser.c/.h under share/httpparser/src for source consumers
+    args: []
   no-sources:
     default: false
     description: Opt out of the exported source files
     conflicts: ["sources"]
+    args: []
+  pkgconfig:
+    default: true
+    description: Generate and install lib/pkgconfig/http_parser.pc
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install a CONFIG package for find_package(httpparser CONFIG)
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CMake CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: Install README.md and AUTHORS into share/doc/httpparser
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
   license:
     default: true
-    description: Install LICENSE-MIT, AUTHORS and README.md
-    conflicts: ["no-license"]
+    description: Install LICENSE-MIT into share/doc/httpparser
+    args: []
   no-license:
     default: false
-    description: Opt out of the license and documentation files
+    description: Opt out of the license install
     conflicts: ["license"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and RUN a real C consumer against the installed tree
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the C consumer sanity run
+    conflicts: ["sanity"]
+    args: []
+
+# Additional upstream releases: `gcpkg add httpparser@2.9.3` switches both the
+# tarball and the store key.
+versions:
+  "2.9.4":
+    source:
+      url: "https://codeload.github.com/nodejs/http-parser/tar.gz/refs/tags/v2.9.4"
+      sha256: "467b9e30fd0979ee301065e70f637d525c28193449e1b13fbcb1b1fab3ad224f"
