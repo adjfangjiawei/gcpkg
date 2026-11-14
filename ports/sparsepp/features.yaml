@@ -1,13 +1,52 @@
 schema: 1
 port: sparsepp
 
-# Header-only sparse hash map derived from Google sparsehash.
+# Upstream has no build system for the library (headers only) and no options;
+# the only build description is tests/makefile, whose targets the `tests`
+# feature reproduces with the same flags.
 features:
+  tests:
+    default: true
+    description: "Build and run upstream's tests/makefile test programs with its own flags (-O2 -std=c++11 -Wall -pedantic -Wextra -D_XOPEN_SOURCE=700, -DNDEBUG for the two non-default targets): spp_test (prints PASS), spp_alloc_test, spp_bitset_test (num_errors must stay 0), and register the three runs with CTest. perftest1 is a benchmark and is not run"
+    args: []
   no-tests:
     default: false
-    description: Skip the upstream test suite
+    description: Opt out of the upstream test programs
+    conflicts: ["tests"]
     args: []
-  header-only:
+  pkgconfig:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "Write lib/pkgconfig/sparsepp.pc for the installed tree (upstream ships none)"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config file
+    conflicts: ["pkgconfig"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers (sparse_hash_map, sparse_hash_set)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md, CHANGELOG.md, bench.md and the upstream docs/ folder into share/doc/sparsepp"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE into share/doc/sparsepp"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
