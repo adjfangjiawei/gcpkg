@@ -1,13 +1,101 @@
 schema: 1
 port: tinyobjloader
 
-# Wavefront OBJ loader plus its bundled earcut dependency.
+# Upstream CMakeLists.txt options honoured here:
+#   BUILD_SHARED_LIBS / TINYOBJLOADER_USE_DOUBLE /
+#   TINYOBJLOADER_BUILD_TEST_LOADER / TINYOBJLOADER_BUILD_OBJ_STICHER
+# TINYOBJLOADER_WITH_PYTHON and TINYOBJLOADER_PREFER_LOCAL_PYTHON_INSTALLATION
+# stay OFF: they need pybind11 and a Python development installation.
 features:
+  static:
+    default: true
+    description: "Compile a static library (BUILD_SHARED_LIBS=OFF); either/or with shared"
+    conflicts: ["shared"]
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+  shared:
+    default: false
+    description: "Compile a shared library (BUILD_SHARED_LIBS=ON, SOVERSION 2); either/or with static"
+    conflicts: ["static"]
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+  single:
+    default: true
+    description: "Single precision build (TINYOBJLOADER_USE_DOUBLE=OFF): the library is installed as libtinyobjloader; either/or with double"
+    conflicts: ["double"]
+    args: ["-DTINYOBJLOADER_USE_DOUBLE=OFF"]
+  double:
+    default: false
+    description: "Double precision build (TINYOBJLOADER_USE_DOUBLE=ON): the library is installed as libtinyobjloader_double, PUBLIC define TINYOBJLOADER_USE_DOUBLE; either/or with single"
+    conflicts: ["single"]
+    args: ["-DTINYOBJLOADER_USE_DOUBLE=ON"]
+  loader:
+    default: true
+    description: "Build upstream's loader example (TINYOBJLOADER_BUILD_TEST_LOADER=ON) and run it on models/cube.obj, checking the reported vertex/shape counts"
+    args: ["-DTINYOBJLOADER_BUILD_TEST_LOADER=ON"]
+  no-loader:
+    default: false
+    description: Opt out of the loader example run
+    conflicts: ["loader"]
+    args: ["-DTINYOBJLOADER_BUILD_TEST_LOADER=OFF"]
+  obj-sticher:
+    default: true
+    description: "Build and install upstream's obj_sticher tool (TINYOBJLOADER_BUILD_OBJ_STICHER=ON) and run it to merge two bundled models"
+    args: ["-DTINYOBJLOADER_BUILD_OBJ_STICHER=ON"]
+  no-obj-sticher:
+    default: false
+    description: Opt out of the obj_sticher tool
+    conflicts: ["obj-sticher"]
+    args: ["-DTINYOBJLOADER_BUILD_OBJ_STICHER=OFF"]
+  tests:
+    default: true
+    description: "Reproduce upstream's tests/Makefile (`make check`): build tests/tester.cc with -std=c++03 -fsanitize=address, run the acutest binary from tests/ so the relative ../models/ paths resolve, and require its SUCCESS line"
+    args: []
   no-tests:
     default: false
-    description: Skip the upstream test suite
+    description: Opt out of the upstream tester run
+    conflicts: ["tests"]
     args: []
-  header-only:
+  pkgconfig:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "Assert upstream's generated .pc file is installed (lib/pkgconfig/<libraryname>.pc)"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config check
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Assert upstream's CONFIG package is installed (lib/tinyobjloader/cmake, namespace tinyobjloader::)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package check
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED header + library: LoadObj a written-on-the-fly OBJ file and check the vertex/shape counts"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md and pbr-mtl.md into share/doc/tinyobjloader (upstream already installs LICENSE there)"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE into share/doc/tinyobjloader"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
