@@ -1,13 +1,71 @@
 schema: 1
 port: cgltf
 
-# Single-file glTF 2.0 loader and writer.
+# Single-file glTF 2.0 loader/writer.  Upstream has NO build system and no
+# option() switches: it ships cgltf.h, cgltf_write.h and five test programs.
+# The switches below are therefore gcpkg capabilities; each performs a real
+# action and has an explicit opt-out twin.
 features:
+  headers:
+    default: true
+    description: "Install cgltf.h and cgltf_write.h into <prefix>/include"
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  tests:
+    default: true
+    description: "Compile and run the five upstream test programs (test_math, test_strings, test_conversion, test_write, test_write_glb) against a minimal glTF 2.0 document"
+    args: []
   no-tests:
     default: false
-    description: Skip the upstream test suite
+    description: Opt out of the upstream test programs
+    conflicts: ["tests"]
     args: []
-  header-only:
+  sanity:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "Compile, link and run a C99 consumer against the INSTALLED cgltf.h (cgltf_parse round trip)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  pkgconfig:
+    default: true
+    description: "Install lib/pkgconfig/cgltf.pc"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Install a CONFIG package (find_package(cgltf CONFIG) -> cgltf::cgltf)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md into share/doc/cgltf"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install the upstream LICENSE into share/doc/cgltf"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
