@@ -256,6 +256,9 @@ return recipe.cmake {
         fs.mkdirs(docdir)
         fs.mkdirs(vdir)
 
+        assert(on["debug-mode"] ~= on["release-mode"],
+               "gcpkg: hana: exactly one of debug-mode / release-mode must be on")
+
         -- the header tree: 450 headers, notably the umbrella and a few corners
         local headers = 0
         do

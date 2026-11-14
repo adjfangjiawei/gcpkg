@@ -74,18 +74,22 @@ features:
     requires: []
     args: []
     conflicts: ["concept-checks"]
-  debug-mode:
-    default: false
-    description: "BOOST_HANA_ENABLE_DEBUG_MODE (upstream default OFF)"
-    requires: []
-    args: []
-    conflicts: ["no-debug-mode"]
-  no-debug-mode:
+  release-mode:
     default: true
-    description: Leave Hana's debug mode off
+    description: >-
+      Leave Hana's debug mode off (BOOST_HANA_ENABLE_DEBUG_MODE=OFF), the
+      upstream default
     requires: []
     args: []
     conflicts: ["debug-mode"]
+  debug-mode:
+    default: false
+    description: >-
+      BOOST_HANA_ENABLE_DEBUG_MODE=ON (adds Hana's runtime invariant checks; it
+      changes the library configuration, not just the build)
+    requires: []
+    args: []
+    conflicts: ["release-mode"]
   string-udl:
     default: true
     description: "BOOST_HANA_ENABLE_STRING_UDL (upstream default ON, the _s literal)"
