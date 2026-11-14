@@ -1,13 +1,80 @@
 schema: 1
 port: nameof
 
-# Header-only compile-time name reflection for enums, variables and types.
+# Upstream CMakeLists.txt declares three options, all defaulting to
+# PROJECT_IS_TOP_LEVEL.  Two map straight onto a feature/no-feature pair.
+# `NAMEOF_OPT_BUILD_EXAMPLES` cannot be used (see `examples` below), so the
+# examples feature drives the upstream example sources itself.
 features:
+  install:
+    default: true
+    description: "Install nameof.hpp, upstream's CONFIG package (nameof::nameof in lib/cmake/nameof), the generated nameof.pc and LICENSE (NAMEOF_OPT_INSTALL=ON)"
+    args: ["-DNAMEOF_OPT_INSTALL=ON"]
+  no-install:
+    default: false
+    description: Opt out of the install capability (same switch, reversed)
+    conflicts: ["install"]
+    args: ["-DNAMEOF_OPT_INSTALL=OFF"]
+  tests:
+    default: true
+    description: "Build and run the upstream suite (NAMEOF_OPT_BUILD_TESTS=ON): doctest runtime tests at C++17, C++20 and C++23 plus 14 compile-fail tests that assert the expected static_assert text"
+    args: ["-DNAMEOF_OPT_BUILD_TESTS=ON"]
   no-tests:
     default: false
-    description: Skip the upstream test suite
-    args: []
-  header-only:
+    description: Opt out of the tests capability (same switch, reversed)
+    conflicts: ["tests"]
+    args: ["-DNAMEOF_OPT_BUILD_TESTS=OFF"]
+  examples:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "Compile and run upstream's example/example.cpp and example/example_custom_name.cpp. Upstream's own NAMEOF_OPT_BUILD_EXAMPLES is left OFF: the 0.11.0 tarball ships the example sources without example/CMakeLists.txt, so that switch fails at configure time"
+    args: []
+  no-examples:
+    default: false
+    description: Opt out of the example programs
+    conflicts: ["examples"]
+    args: []
+  pkgconfig:
+    default: true
+    description: "Assert upstream's generated nameof.pc is installed (lib/pkgconfig). Needs install; the port fails loudly if install is off"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config check
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Assert upstream's CONFIG package is installed (find_package(nameof CONFIG) -> nameof::nameof). Needs install; the port fails loudly if install is off"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package check
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED header (nameof_type, NAMEOF, NAMEOF(field), nameof_enum). Needs install; the port fails loudly if install is off"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md, CHANGELOG.md and the upstream doc/ folder into share/doc/nameof"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE into share/doc/nameof (upstream also installs it to share/nameof)"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
