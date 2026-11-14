@@ -46,6 +46,40 @@ os.execv(args[0], args)
     return f
 end
 
+-- Upstream's single-header target compiles against the cista.h that
+-- tools/uniter generates.  uniter is a textual include flattener and, when an
+-- include cannot be expanded, it drops the line and prints a comment instead.
+-- That breaks include/cista/containers/string.h, which has
+--
+--     #if __has_include("fmt/ranges.h")
+--     #include "fmt/ranges.h"
+--     namespace fmt { template <...> struct range_format_kind<...>; }
+--     #endif
+--
+-- The include is not inside cista's own include/ directory, so uniter cannot
+-- expand it: the #if survives, the #include disappears, and on any machine that
+-- does have fmt installed the guard is true, so the amalgamation declares a
+-- specialization of a template nobody declared.  The fix is one line - keep an
+-- unexpandable include verbatim - and it is applied to a copy-free edit of
+-- tools/uniter/uniter.cc before the build.
+local UNITER_NEEDLE = [[std::cout << "// " << path << ": " << e.what() << "\n";]]
+local UNITER_PATCH = [[// gcpkg patch: an include that cannot be expanded (for example a system
+            // header named inside a guarded __has_include block) must be kept
+            // verbatim; dropping it keeps the #if but removes the declarations
+            // it guards.
+            (void)e;
+            std::cout << line << "\n";]]
+
+local function patch_uniter(ctx)
+    local p = util.join(ctx.src, "tools", "uniter", "uniter.cc")
+    local src = assert(fs.read(p), "gcpkg: cista: tools/uniter/uniter.cc missing")
+    if src:find(UNITER_PATCH, 1, true) then return end
+    local i, j = src:find(UNITER_NEEDLE, 1, true)
+    assert(i, "gcpkg: cista: tools/uniter/uniter.cc no longer matches the " ..
+              "pattern this port patches; upstream changed uniter")
+    fs.write(p, src:sub(1, i - 1) .. UNITER_PATCH .. src:sub(j + 1))
+end
+
 return recipe.cmake {
     name = "cista",
     version = VERSION,
@@ -60,6 +94,7 @@ return recipe.cmake {
     dependencies = {},
     pre_build = function(ctx)
         warning_filter(ctx)
+        patch_uniter(ctx)
     end,
     cmake = {
         defines = function(ctx)
@@ -118,56 +153,57 @@ return recipe.cmake {
         end
 
         -- tests: upstream's doctest suite ------------------------------------
-        -- Only the modular `cista-test` target is built.  The second upstream
-        -- target, `cista-test-single-header`, is built against the amalgamated
-        -- cista.h that tools/uniter generates, and that amalgamation is broken
-        -- outside an fmt tree: include/cista/containers/string.h has
-        --
-        --     #if __has_include("fmt/ranges.h")
-        --     namespace fmt { template <...> struct range_format_kind<...>; }
-        --     #endif
-        --
-        -- and uniter resolves that __has_include while walking the tree, so
-        -- without fmt the generated file ends up with a stub comment and every
-        -- TU fails with "explicit specialization of undeclared template struct
-        -- 'range_format_kind'".  That is an upstream defect, not a port
-        -- problem; it is recorded in ctest.out instead of being papered over.
+        -- Both EXCLUDE_FROM_ALL targets: the modular cista-test and
+        -- cista-test-single-header, which compiles the same 50 TUs against the
+        -- amalgamated cista.h produced by tools/uniter (patched in pre_build).
         if on["tests"] then
             ctx.exec({ "cmake", "--build", ctx.build_dir, "--parallel",
-                       tostring(ctx.jobs or 4), "--target", "cista-test" },
+                       tostring(ctx.jobs or 4), "--target",
+                       "cista-test", "cista-test-single-header" },
                      { cwd = ctx.build_dir, log = ctx.log, env = ctx.env })
 
-            local exe = util.join(ctx.build_dir, "cista-test")
-            assert(fs.isfile(exe), "gcpkg: cista: cista-test was not built")
-            local out = util.join(ctx.build_dir, "cista-test.out")
-            ctx.exec({ "sh", "-c",
-                       "cd " .. ctx.build_dir .. " && " .. exe .. " > " .. out ..
-                       " 2>&1; echo $? >> " .. out },
-                     { cwd = ctx.build_dir, log = ctx.log, env = ctx.env })
-            local text = assert(fs.read(out), "gcpkg: cista: missing cista-test output")
-            assert(text:find("Status: SUCCESS", 1, true),
-                   "gcpkg: cista: cista-test did not report success: " .. text)
-            assert(not text:find("Status: FAILURE", 1, true),
-                   "gcpkg: cista: cista-test reported failures: " .. text)
-            local cases = tonumber(text:match("test cases:%s*(%d+)") or "0") or 0
-            assert(cases >= 100,
-                   "gcpkg: cista: cista-test ran only " .. cases ..
-                   " test cases, expected the whole suite")
+            local binaries = { "cista-test", "cista-test-single-header" }
+            local exes = {}
+            for _, name in ipairs(binaries) do
+                local exe = util.join(ctx.build_dir, name)
+                assert(fs.isfile(exe), "gcpkg: cista: " .. name .. " was not built")
+                exes[#exes + 1] = { name = name, exe = exe }
+                local out = util.join(ctx.build_dir, name .. ".out")
+                ctx.exec({ "sh", "-c",
+                           "cd " .. ctx.build_dir .. " && " .. exe .. " > " .. out ..
+                           " 2>&1; echo $? >> " .. out },
+                         { cwd = ctx.build_dir, log = ctx.log, env = ctx.env })
+                local text = assert(fs.read(out),
+                                    "gcpkg: cista: missing " .. name .. " output")
+                assert(text:find("Status: SUCCESS", 1, true),
+                       "gcpkg: cista: " .. name .. " did not report success: " .. text)
+                assert(not text:find("Status: FAILURE", 1, true),
+                       "gcpkg: cista: " .. name .. " reported failures: " .. text)
+                local cases = tonumber(text:match("test cases:%s*(%d+)") or "0") or 0
+                assert(cases >= 100,
+                       "gcpkg: cista: " .. name .. " ran only " .. cases ..
+                       " test cases, expected the whole suite")
+            end
 
-            -- register the run with CTest so the pass is visible there too
+            -- register both runs with CTest so the pass is visible there too
             local driver = util.join(ctx.build_dir, "upstream-tests")
             fs.mkdirs(driver)
-            fs.write(util.join(driver, "CMakeLists.txt"), table.concat({
-                "# Generated by the gcpkg cista port: upstream's doctest binary,",
-                "# registered with CTest.",
+            local lines = {
+                "# Generated by the gcpkg cista port: upstream's two doctest",
+                "# binaries, registered with CTest.",
                 "cmake_minimum_required(VERSION 3.16)",
                 "project(cista-upstream-tests LANGUAGES NONE)",
                 "enable_testing()",
-                'add_test(NAME cista-test COMMAND "' .. exe .. '")',
-                'set_tests_properties(cista-test PROPERTIES WORKING_DIRECTORY "' ..
-                    tostring(ctx.build_dir) .. '")',
-                "",
-            }, "\n"))
+            }
+            for _, e in ipairs(exes) do
+                lines[#lines + 1] = 'add_test(NAME ' .. e.name .. ' COMMAND "' ..
+                                    e.exe .. '")'
+                lines[#lines + 1] = "set_tests_properties(" .. e.name ..
+                                    ' PROPERTIES WORKING_DIRECTORY "' ..
+                                    tostring(ctx.build_dir) .. '")'
+            end
+            fs.write(util.join(driver, "CMakeLists.txt"),
+                     table.concat(lines, "\n") .. "\n")
             local dbuild = util.join(driver, "build")
             ctx.exec({ "cmake", "-S", driver, "-B", dbuild },
                      { cwd = ctx.build_dir, log = ctx.log, env = ctx.env })
@@ -182,17 +218,6 @@ return recipe.cmake {
             assert(ctext:find("100% tests passed", 1, true),
                    "gcpkg: cista: ctest did not pass: " .. ctext)
             assert(rc == "0", "gcpkg: cista: ctest exited with " .. rc)
-
-            -- record what was deliberately not run
-            ctx.exec({ "sh", "-c", "cat >> " .. ctest_out .. " <<'NOTE'\n" ..
-                       "not run: cista-test-single-header (upstream target,\n" ..
-                       "  EXCLUDE_FROM_ALL). Its amalgamated cista.h cannot be\n" ..
-                       "  generated without fmt: cista/containers/string.h has an\n" ..
-                       "  #if __has_include(\"fmt/ranges.h\") block that uniter\n" ..
-                       "  mis-resolves, leaving an undeclared range_format_kind\n" ..
-                       "  specialization in the amalgamation. Upstream defect.\n" ..
-                       "NOTE" },
-                     { cwd = ctx.build_dir, log = ctx.log })
         end
 
         if on["docs"] then

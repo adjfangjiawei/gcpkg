@@ -10,7 +10,7 @@ port: cista
 features:
   tests:
     default: true
-    description: "Build and run upstream's doctest suite (EXCLUDE_FROM_ALL upstream): cista-test over the 50 test/*.cc TUs; require doctest's 'Status: SUCCESS' and the full case count, and register the run with CTest. The sibling cista-test-single-header target is not built: its amalgamated cista.h cannot be generated without fmt (see build.lua/ctest.out), an upstream defect"
+    description: "Build and run both of upstream's doctest binaries (EXCLUDE_FROM_ALL upstream): cista-test over the 50 test/*.cc TUs against the modular headers, and cista-test-single-header over the same TUs against the amalgamated cista.h from tools/uniter. Require doctest's 'Status: SUCCESS' and the full case count from each, and register both runs with CTest. tools/uniter/uniter.cc is patched in pre_build so that an include it cannot expand (fmt/ranges.h, named inside a guarded __has_include block) is kept verbatim instead of being dropped"
     args: []
   no-tests:
     default: false
