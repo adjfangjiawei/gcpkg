@@ -1,13 +1,125 @@
 schema: 1
 port: inja
 
-# Amalgamated Jinja-style template engine; depends on nlohmann-json.
+# Header-only Jinja2-like template engine.  Upstream CMakeLists.txt declares
+#   BUILD_TESTING, COVERALLS, INJA_BUILD_TESTS, INJA_ENABLE_CLANG_TIDY,
+#   INJA_EXPORT, INJA_INSTALL, INJA_INSTALL_SINGLE_HEADER, INJA_USE_EMBEDDED_JSON
+# Every one of them is exposed below.  The capabilities that would only ever be a
+# no-op (clang-tidy, coveralls) are modelled as opt-in alternatives of the
+# default `plain-build` capability, because turning them on pulls in external
+# tooling rather than a library feature; everything else defaults ON with an
+# explicit opt-out twin.
 features:
+  install:
+    default: true
+    description: "Install the headers (INJA_INSTALL=ON) plus the generated injaConfig.cmake export"
+    args: ["-DINJA_INSTALL=ON"]
+  no-install:
+    default: false
+    description: "Opt out of the install capability (same switch as above, reversed)"
+    conflicts: ["install"]
+    args: ["-DINJA_INSTALL=OFF"]
+  install-modular:
+    default: true
+    description: "Install the modular headers include/inja/*.hpp (upstream default, INJA_INSTALL_SINGLE_HEADER=OFF); either/or with install-single-header"
+    conflicts: ["install-single-header"]
+    args: ["-DINJA_INSTALL_SINGLE_HEADER=OFF"]
+  install-single-header:
+    default: false
+    description: "Install the amalgamated single header instead (INJA_INSTALL_SINGLE_HEADER=ON); either/or with install-modular"
+    conflicts: ["install-modular"]
+    args: ["-DINJA_INSTALL_SINGLE_HEADER=ON"]
+  use-embedded-json:
+    default: true
+    description: "Use the nlohmann/json header vendored in third_party/ (INJA_USE_EMBEDDED_JSON=ON) and disable find_package(nlohmann_json) so the choice is deterministic; either/or with use-external-json"
+    conflicts: ["use-external-json"]
+    args: ["-DINJA_USE_EMBEDDED_JSON=ON", "-DCMAKE_DISABLE_FIND_PACKAGE_nlohmann_json=ON"]
+  use-external-json:
+    default: false
+    description: "Use the source-built nlohmann-json port instead of the vendored header (INJA_USE_EMBEDDED_JSON=OFF); either/or with use-embedded-json"
+    requires: ["nlohmann-json"]
+    conflicts: ["use-embedded-json"]
+    args: ["-DINJA_USE_EMBEDDED_JSON=OFF"]
+  tests:
+    default: true
+    description: "Build and run the upstream CTest suite (BUILD_TESTING=ON, INJA_BUILD_TESTS=ON): inja_test and single_inja_test, plus the benchmark target"
+    args: ["-DBUILD_TESTING=ON", "-DINJA_BUILD_TESTS=ON"]
   no-tests:
     default: false
-    description: Skip the upstream test suite
-    args: []
-  header-only:
+    description: "Opt out of the tests capability (same switches as above, reversed)"
+    conflicts: ["tests"]
+    args: ["-DBUILD_TESTING=OFF", "-DINJA_BUILD_TESTS=OFF"]
+  plain-build:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "No clang-tidy and no coveralls instrumentation (INJA_ENABLE_CLANG_TIDY=OFF, COVERALLS=OFF): the plain library build"
+    conflicts: ["static-analysis", "coverage"]
+    args: ["-DINJA_ENABLE_CLANG_TIDY=OFF", "-DCOVERALLS=OFF"]
+  no-plain-build:
+    default: false
+    description: Opt out of the plain-build capability
+    conflicts: ["plain-build"]
+    args: []
+  static-analysis:
+    default: false
+    description: "Run clang-tidy over the test target (INJA_ENABLE_CLANG_TIDY=ON); opt-in alternative of plain-build, needs clang-tidy on the pinned LLVM toolchain"
+    conflicts: ["plain-build"]
+    args: ["-DINJA_ENABLE_CLANG_TIDY=ON"]
+  coverage:
+    default: false
+    description: "Instrument the build for coveralls (COVERALLS=ON); opt-in alternative of plain-build"
+    conflicts: ["plain-build"]
+    args: ["-DCOVERALLS=ON"]
+  export-package:
+    default: true
+    description: "Export the build tree to the CMake package registry (INJA_EXPORT=ON)"
+    args: ["-DINJA_EXPORT=ON"]
+  no-export-package:
+    default: false
+    description: "Opt out of the export capability (same switch as above, reversed)"
+    conflicts: ["export-package"]
+    args: ["-DINJA_EXPORT=OFF"]
+  pkgconfig:
+    default: true
+    description: "Install lib/pkgconfig/inja.pc (upstream ships no .pc, the port generates one)"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Assert the upstream injaConfig.cmake export is installed (find_package(inja CONFIG) -> pantor::inja)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package check
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers (render + parse round trip)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md and the upstream doc/ folder into share/doc/inja"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install the upstream LICENSE into share/doc/inja"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
