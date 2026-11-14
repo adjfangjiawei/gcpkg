@@ -1,13 +1,92 @@
 schema: 1
 port: glm
 
-# OpenGL Mathematics; whole glm/ header tree installed.
+# Upstream root CMakeLists.txt options actually honoured here:
+#   GLM_BUILD_LIBRARY / BUILD_SHARED_LIBS / GLM_BUILD_TESTS / GLM_BUILD_INSTALL
+# Semantic tuning switches (GLM_ENABLE_FAST_MATH, GLM_ENABLE_SIMD_*,
+# GLM_FORCE_PURE, GLM_ENABLE_CXX_*) stay at upstream defaults: they change
+# generated code rather than add a capability.
 features:
+  compiled:
+    default: true
+    description: "Build the compiled library (GLM_BUILD_LIBRARY=ON, target glm::glm); either/or with header-only"
+    conflicts: ["header-only"]
+    args: ["-DGLM_BUILD_LIBRARY=ON"]
+  header-only:
+    default: false
+    description: "Header-only mode (GLM_BUILD_LIBRARY=OFF): glm::glm is an INTERFACE target over glm::glm-header-only; either/or with compiled"
+    conflicts: ["compiled", "shared"]
+    args: ["-DGLM_BUILD_LIBRARY=OFF"]
+  static:
+    default: true
+    description: "Compile a static library (BUILD_SHARED_LIBS=OFF); either/or with shared"
+    conflicts: ["shared"]
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+  shared:
+    default: false
+    description: "Compile a shared library (BUILD_SHARED_LIBS=ON); needs the compiled feature"
+    conflicts: ["static"]
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+  tests:
+    default: true
+    description: "Build and run upstream's unit tests (GLM_BUILD_TESTS=ON, GLM_TEST_ENABLE=ON): one program per test file under test/{bug,core,ext,gtc,gtx}, registered with CTest via include(CTest)"
+    args: ["-DGLM_BUILD_TESTS=ON", "-DGLM_TEST_ENABLE=ON"]
   no-tests:
     default: false
-    description: Skip the upstream test suite
-    args: []
-  header-only:
+    description: Opt out of the test programs
+    conflicts: ["tests"]
+    args: ["-DGLM_BUILD_TESTS=OFF"]
+  install:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "Install the header tree plus upstream's CONFIG package (share/glm/glmConfig.cmake, namespace glm::) (GLM_BUILD_INSTALL=ON)"
+    args: ["-DGLM_BUILD_INSTALL=ON"]
+  no-install:
+    default: false
+    description: Opt out of the install capability (same switch, reversed)
+    conflicts: ["install"]
+    args: ["-DGLM_BUILD_INSTALL=OFF"]
+  pkgconfig:
+    default: true
+    description: "Write lib/pkgconfig/glm.pc for the installed tree (upstream ships none); in compiled mode it carries -lglm"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the generated pkg-config file
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Assert upstream's glmConfig.cmake and glmConfigVersion.cmake are installed"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package check
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers (cross, mat4*vec4, quaternion rotation)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install readme.md, manual.md and the upstream doc/ folder into share/doc/glm"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install upstream's copying.txt (and a LICENSE copy of it) into share/doc/glm"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
