@@ -1,13 +1,70 @@
 schema: 1
 port: parallel-hashmap
 
-# Header-only parallel hash maps and btrees.
+# Upstream CMakeLists.txt options honoured here: PHMAP_BUILD_TESTS,
+# PHMAP_BUILD_EXAMPLES and PHMAP_INSTALL.
 features:
+  tests:
+    default: true
+    description: "Build and run upstream's GoogleTest suites (PHMAP_BUILD_TESTS=ON): one executable per tests/*_test.cc, registered with CTest. Upstream would download GoogleTest at configure time; the port patches that block to find_package(GTest CONFIG REQUIRED) and links the gcpkg googletest port, which is why this feature carries the googletest dependency"
+    requires: ["googletest"]
+    args: ["-DPHMAP_BUILD_TESTS=ON"]
   no-tests:
     default: false
-    description: Skip the upstream test suite
-    args: []
-  header-only:
+    description: Opt out of the GoogleTest suites (and of the googletest dependency)
+    conflicts: ["tests"]
+    args: ["-DPHMAP_BUILD_TESTS=OFF"]
+  examples:
     default: true
-    description: Install headers and compile a probe translation unit
+    description: "Build upstream's example programs (PHMAP_BUILD_EXAMPLES=ON) and run the self-contained ones (ex_basic, ex_btree)"
+    args: ["-DPHMAP_BUILD_EXAMPLES=ON"]
+  no-examples:
+    default: false
+    description: Opt out of the example programs
+    conflicts: ["examples"]
+    args: ["-DPHMAP_BUILD_EXAMPLES=OFF"]
+  install:
+    default: true
+    description: "Install the header tree (parallel_hashmap/**) and upstream's phmap INTERFACE target (PHMAP_INSTALL=ON)"
+    args: ["-DPHMAP_INSTALL=ON"]
+  no-install:
+    default: false
+    description: Opt out of the install capability (same switch, reversed)
+    conflicts: ["install"]
+    args: ["-DPHMAP_INSTALL=OFF"]
+  pkgconfig:
+    default: true
+    description: "Write lib/pkgconfig/parallel-hashmap.pc for the installed tree (upstream installs no .pc and no CMake package config, only the INTERFACE target)"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config file
+    conflicts: ["pkgconfig"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers (flat_hash_map, parallel_flat_hash_map, btree_map)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md, CITATION.cff and the upstream doc/ folder into share/doc/parallel-hashmap"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE (Apache-2.0) into share/doc/parallel-hashmap"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
     args: []
