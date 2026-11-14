@@ -1,0 +1,71 @@
+schema: 1
+port: pfr
+
+# Boost.PFR 1.92.0, source-built from the boostorg/pfr release tag.  Header-only
+# library; upstream's CMake has no install rules outside the Boost superproject,
+# so the port installs the header tree itself and drives upstream's own CMake
+# test project (test/CMakeLists.txt) plus its compile-fail set.
+features:
+  headers:
+    default: true
+    description: Install the upstream boost/pfr header tree
+    requires: []
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header tree
+    args: []
+    conflicts: ["headers"]
+  tests:
+    default: true
+    description: >-
+      Run upstream's test suite: 39 test/core/run programs, 8
+      test/core_name/run programs (C++20), test/config/print_config.cpp, and 26
+      compile-fail targets registered with CTest WILL_FAIL
+    requires: ["boost"]
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    args: []
+    conflicts: ["tests"]
+  pkgconfig:
+    default: true
+    description: Install lib/pkgconfig/pfr.pc (upstream ships none)
+    requires: []
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the .pc file
+    args: []
+    conflicts: ["pkgconfig"]
+  sanity:
+    default: true
+    description: >-
+      Compile and run a real Boost.PFR consumer TU against the installed header
+      tree (tuple_size, get, for_each_field, structure_tie, io)
+    requires: ["boost"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer TU
+    args: []
+    conflicts: ["sanity"]
+  docs:
+    default: true
+    description: Install README.md, doc/ and index.html under share/doc/pfr
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation
+    args: []
+    conflicts: ["docs"]
+  license:
+    default: true
+    description: Install LICENSE_1_0.txt (BSL-1.0)
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license file
+    args: []
+    conflicts: ["license"]

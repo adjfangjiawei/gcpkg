@@ -1,0 +1,9 @@
+schema: 1
+port: nv-codec-sdk
+
+# Login-walled archive. Headers (nvEncodeAPI.h, cuviddec.h, nvcuvid.h) plus driver stub libs; depends on the 'nvidia' platform port.
+features:
+  system-sdk:
+    default: true
+    description: Use the local SDK pointed at by $GCPKG_NV_CODEC_SDK_HOME (no download, no compile)
+    args: []

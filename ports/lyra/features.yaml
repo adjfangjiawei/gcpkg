@@ -1,0 +1,71 @@
+schema: 1
+port: lyra
+
+# Upstream's CMakeLists.txt has no options at all (it is a minimal INTERFACE
+# target plus install rules), so there is no install switch to expose.  The
+# features below are the verification capabilities the port provides on top of
+# that, driven by upstream's own Meson (pkg-config) and B2 (test suite) inputs.
+features:
+  tests:
+    default: true
+    description: "Reproduce upstream's tests/build.jam with CMake/CTest: every tests/*_run_test.cpp (plus optional_type_test.cpp) becomes a registered CTest program, and the compile-only programs (base_compile_test, single_include_test against data/single_include, issue_93_test) each get a CTest entry that builds them"
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    conflicts: ["tests"]
+    args: []
+  lib-use-test:
+    default: true
+    description: "Also build and run upstream's tests/lib_use_test, a separate CMake project that does find_package(lyra REQUIRED) and links bfg::lyra from the installed tree"
+    args: []
+  no-lib-use-test:
+    default: false
+    description: Opt out of the external find_package consumer project
+    conflicts: ["lib-use-test"]
+    args: []
+  pkgconfig:
+    default: true
+    description: "Write lib/pkgconfig/lyra.pc (the same metadata upstream's Meson build generates with pkg.generate); upstream's CMake install provides none"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config file
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Assert upstream's CONFIG package is installed (share/lyra/cmake/lyraConfig.cmake + lyraTarget.cmake, namespace bfg::)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package check
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers: parse a valid command line, reject an unknown option"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.adoc, CONTRIBUTING.adoc and the upstream docs/ folder into share/doc/lyra"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE.txt (Boost Software License 1.0) into share/doc/lyra"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []

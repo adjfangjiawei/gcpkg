@@ -1,0 +1,102 @@
+schema: 1
+port: expected-lite
+
+# expected-lite v0.8.0 -- R20 new-standard header-only port.
+# Upstream is a real CMake project with a bundled lest test framework.
+# EVERY upstream CMake option is exposed as a feature and defaults ON;
+# the no-* twin is the explicit opt-out and conflicts with its twin.
+# select-std / select-nonstd are an either/or pair (upstream semantics),
+# so nonstd is the opt-in alternative to the default std selection.
+features:
+  headers:
+    default: true
+    description: "Install the public headers into <prefix>/include"
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  tests:
+    default: true
+    description: "Build and RUN the upstream ctest suite (EXPECTED_LITE_OPT_BUILD_TESTS=ON, bundled lest, C++98/11/14/17 targets)"
+    args: [-DEXPECTED_LITE_OPT_BUILD_TESTS=ON]
+  no-tests:
+    default: false
+    description: "Opt out of the tests capability (same switch as above, reversed)"
+    conflicts: ["tests"]
+    args: [-DEXPECTED_LITE_OPT_BUILD_TESTS=OFF]
+  examples:
+    default: true
+    description: "Build AND run the upstream example programs (EXPECTED_LITE_OPT_BUILD_EXAMPLES=ON)"
+    args: [-DEXPECTED_LITE_OPT_BUILD_EXAMPLES=ON]
+  no-examples:
+    default: false
+    description: "Opt out of the examples capability (same switch as above, reversed)"
+    conflicts: ["examples"]
+    args: [-DEXPECTED_LITE_OPT_BUILD_EXAMPLES=OFF]
+  select-std:
+    default: false
+    description: "Force the std:: implementation in C++17 mode (EXPECTED_LITE_OPT_SELECT_STD=ON); either/or with select-nonstd"
+    conflicts: ["select-nonstd"]
+    args: [-DEXPECTED_LITE_OPT_SELECT_STD=ON]
+  no-select-std:
+    default: false
+    description: "Opt out of the select-std capability (same switch as above, reversed)"
+    conflicts: ["select-std"]
+    args: [-DEXPECTED_LITE_OPT_SELECT_STD=OFF]
+  select-nonstd:
+    default: true
+    description: "Force the nonstd:: implementation in C++17 mode (EXPECTED_LITE_OPT_SELECT_NONSTD=ON); either/or with select-std"
+    conflicts: ["select-std"]
+    args: [-DEXPECTED_LITE_OPT_SELECT_NONSTD=ON]
+  no-select-nonstd:
+    default: false
+    description: "Opt out of the select-nonstd capability (same switch as above, reversed)"
+    conflicts: ["select-nonstd"]
+    args: [-DEXPECTED_LITE_OPT_SELECT_NONSTD=OFF]
+  pkgconfig:
+    default: true
+    description: Install lib/pkgconfig/expected-lite.pc for pkg-config consumers
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install the upstream CONFIG package for find_package(expected-lite CONFIG)
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CMake CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: Install the upstream documentation into share/doc/expected-lite
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install the upstream license text into share/doc/expected-lite
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and RUN a real consumer that exercises the public API
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer sanity run
+    conflicts: ["sanity"]
+    args: []

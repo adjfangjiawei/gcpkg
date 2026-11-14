@@ -1,0 +1,20 @@
+schema: 1
+port: gnutls
+
+# Widest new dependency surface: nettle, gmp, libtasn1, libidn2, libunistring and the existing zlib port.
+# Feature switches for this port.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

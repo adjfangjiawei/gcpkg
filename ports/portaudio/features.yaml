@@ -1,0 +1,25 @@
+schema: 1
+port: portaudio
+
+# Portable audio I/O; `alsa` feature pulls the alsa-lib port.
+# Feature switches for this port.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]
+  alsa:
+    default: true
+    description: Pull in alsa-lib for this optional capability
+    requires: [alsa-lib]
+    args: ["-DPA_USE_ALSA=ON"]

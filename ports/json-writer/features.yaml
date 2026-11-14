@@ -1,0 +1,72 @@
+schema: 1
+port: json-writer
+
+# json-writer 6fa1122 -- R20 new-standard header-only source port.
+# The upstream tarball has no build system: gcpkg installs the headers and
+# then verifies every default-ON capability for real (Build and RUN the documented nested writer scenario and validate its real JSON output (upstream ships no unit-test suite)).
+# No dependency is downloaded and no host header is probed: the port has no
+# gcpkg dependencies and every TU is compiled by gcpkg's compiler wrapper.
+features:
+  headers:
+    default: true
+    description: Install json_writer.h (include/json_writer.h and include/json_writer/json_writer.h) into <prefix>/include
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  tests:
+    default: true
+    description: Build and RUN the documented nested writer scenario and validate its real JSON output (upstream ships no unit-test suite)
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test run
+    conflicts: ["tests"]
+    args: []
+  pkgconfig:
+    default: true
+    description: Install lib/pkgconfig/json-writer.pc for pkg-config consumers
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install a CONFIG package for find_package(json-writer CONFIG)
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CMake CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: Install the upstream documentation into share/doc/json-writer
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install the upstream license text into share/doc/json-writer
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and RUN a real consumer that exercises the public API
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer sanity run
+    conflicts: ["sanity"]
+    args: []

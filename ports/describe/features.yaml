@@ -1,0 +1,72 @@
+schema: 1
+port: describe
+
+# Boost.Describe 1.92.0, source-built from the boostorg/describe release tag.
+# Header-only; upstream's CMake installs nothing outside the Boost superproject
+# and its test/CMakeLists.txt silently skips the whole suite there, so the port
+# installs the headers itself and reproduces test/Jamfile with CTest.
+features:
+  headers:
+    default: true
+    description: Install the upstream boost/describe header tree
+    requires: []
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header tree
+    args: []
+    conflicts: ["headers"]
+  tests:
+    default: true
+    description: >-
+      Run upstream's test/Jamfile: 52 run targets (the test suite plus the
+      header-only examples), 5 compile-only targets and 4 compile-fail targets
+      registered with CTest WILL_FAIL
+    requires: ["boost", "mp11"]
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    args: []
+    conflicts: ["tests"]
+  pkgconfig:
+    default: true
+    description: Install lib/pkgconfig/describe.pc (upstream ships none)
+    requires: []
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the .pc file
+    args: []
+    conflicts: ["pkgconfig"]
+  sanity:
+    default: true
+    description: >-
+      Compile and run a real Boost.Describe consumer TU against the installed
+      header tree (enum, struct members, bases, enum_to_string /
+      enum_from_string round trip, pointer-to-member access)
+    requires: ["boost", "mp11"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer TU
+    args: []
+    conflicts: ["sanity"]
+  docs:
+    default: true
+    description: Install README.md, doc/ and index.html under share/doc/describe
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation
+    args: []
+    conflicts: ["docs"]
+  license:
+    default: true
+    description: Install the Boost Software License text (BSL-1.0)
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license file
+    args: []
+    conflicts: ["license"]

@@ -1,0 +1,21 @@
+schema: 1
+port: expat
+
+# Feature switches are DATA: they inject build flags without
+# editing build.lua, and are resolved from defaults + project
+# gcpkg.yaml + --feature CLI overrides.
+features:
+  no-tests:
+    default: false
+    description: Do not build the upstream test suite
+    args: ["-DEXPAT_BUILD_TESTS=OFF"]
+  static:
+    default: true
+    description: Build static libraries
+    args: ["-DEXPAT_SHARED_LIBS=OFF", "-DBUILD_SHARED_LIBS=OFF"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: ["-DEXPAT_SHARED_LIBS=ON", "-DBUILD_SHARED_LIBS=ON"]
+    conflicts: ["static"]

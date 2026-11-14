@@ -1,0 +1,69 @@
+schema: 1
+port: ada
+
+# R20: every supported capability is ON by default.  `requires:` is the
+# feature gate: the dependency is installed bottom-up ONLY when the feature
+# is enabled, so a user disabling a feature does not build its library.
+features:
+  tests:
+    default: true
+    description: Build ada's own C++ test suite (source-built googletest + simdjson)
+    requires: ["googletest", "simdjson"]
+    args: ["-DBUILD_TESTING=ON", "-DADA_TESTING=ON"]
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    args: []
+    conflicts: ["tests"]
+  tools:
+    default: true
+    description: Build the adaparse CLI (source-built fmt + cxxopts)
+    requires: ["fmt", "cxxopts"]
+    args: ["-DADA_TOOLS=ON"]
+  no-tools:
+    default: false
+    description: Opt out of the adaparse CLI
+    args: []
+    conflicts: ["tools"]
+  amalgamation:
+    default: true
+    description: Generate the single-header amalgamation using source-built Python
+    requires: ["python"]
+    args: []
+  no-amalgamation:
+    default: false
+    description: Opt out of the single-header amalgamation
+    args: []
+    conflicts: ["amalgamation"]
+  benchmarks:
+    default: true
+    description: Build all seven upstream benchmark executables (source-built benchmark + url-dataset)
+    requires: ["benchmark", "url-dataset"]
+    args: ["-DADA_BENCHMARKS=ON"]
+    conflicts: ["no-benchmarks"]
+  no-benchmarks:
+    default: false
+    description: Opt out of the upstream benchmark executables
+    args: []
+    conflicts: ["benchmarks"]
+  competition:
+    default: true
+    description: Build all six upstream comparison families from source-built gcpkg ports (ICU/url_whatwg, CURL, Boost::system + Boost.URL, uriparser/urlparser/httpparser, ZURI, servo-url/Rust)
+    requires: ["icu4c72", "url-whatwg", "curl", "boost", "boost-url", "uriparser", "urlparser", "httpparser", "zuri", "servo-url"]
+    args: ["-DADA_COMPETITION=ON", "-DADA_BOOST_URL=ON"]
+    conflicts: ["no-competition"]
+  no-competition:
+    default: false
+    description: Opt out of every comparison benchmark family
+    args: []
+    conflicts: ["competition"]
+  static:
+    default: true
+    description: Build static libraries
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+    conflicts: ["static"]

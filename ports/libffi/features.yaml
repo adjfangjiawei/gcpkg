@@ -1,0 +1,17 @@
+schema: 1
+port: libffi
+
+# Feature switches are DATA: they inject build flags without
+# editing build.lua, and are resolved from defaults + project
+# gcpkg.yaml + --feature CLI overrides.
+features:
+  static:
+    default: true
+    description: Build static libraries
+    args: ["--disable-shared", "--enable-static"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: ["--enable-shared", "--disable-static"]
+    conflicts: ["static"]

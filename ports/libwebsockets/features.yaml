@@ -1,0 +1,24 @@
+schema: 1
+port: libwebsockets
+
+# Websockets/HTTP on zlib; `tls` feature adds openssl.
+# Feature switches for this port.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]
+  tls:
+    default: true
+    description: Pull in openssl for this optional capability
+    requires: [openssl]

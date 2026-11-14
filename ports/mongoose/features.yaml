@@ -1,0 +1,19 @@
+schema: 1
+port: mongoose
+
+# Single-file embedded networking library; compiled via gcpkg's CC interceptor.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

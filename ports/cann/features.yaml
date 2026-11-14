@@ -1,0 +1,9 @@
+schema: 1
+port: cann
+
+# The .run installers are ~1-2 GB and licence-gated; point GCPKG_CANN_HOME (or ASCEND_HOME_PATH) at an installed toolkit.
+features:
+  system-sdk:
+    default: true
+    description: Use the local SDK pointed at by $GCPKG_CANN_HOME (no download, no compile)
+    args: []

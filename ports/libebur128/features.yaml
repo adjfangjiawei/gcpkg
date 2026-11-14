@@ -1,0 +1,19 @@
+schema: 1
+port: libebur128
+
+# EBU R128 loudness library; static build.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

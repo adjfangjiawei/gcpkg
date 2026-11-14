@@ -1,0 +1,134 @@
+schema: 1
+port: hana
+
+# Boost.Hana 1.7.0.  Genuinely CMake-driven upstream: it installs the headers,
+# generates hana.pc and exports HanaConfig.cmake, and its test/ directory
+# registers one CTest program per test source plus a header-inclusion test.  The
+# port uses all of that and only repairs two release-tarball bugs (a missing
+# example/CMakeLists.txt and a hardcoded __PRETTY_FUNCTION__ prefix in
+# experimental/type_name.hpp) plus filters upstream's -Werror.
+features:
+  install:
+    default: true
+    description: Install the boost/hana header tree (450 headers)
+    requires: []
+    args: []
+  no-install:
+    default: false
+    description: Opt out of installing anything
+    args: []
+    conflicts: ["install"]
+  tests:
+    default: true
+    description: >-
+      Build and run upstream's CTest suite: 746 registered test programs plus
+      the header-inclusion program covering every public header
+    requires: ["boost"]
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    args: []
+    conflicts: ["tests"]
+  cmake-package:
+    default: true
+    description: Assert upstream's lib/cmake/hana/HanaConfig.cmake export
+    requires: []
+    args: []
+  no-cmake-package:
+    default: false
+    description: Skip the HanaConfig assertion
+    args: []
+    conflicts: ["cmake-package"]
+  pkgconfig:
+    default: true
+    description: Assert upstream's generated lib/pkgconfig/hana.pc
+    requires: []
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Skip the .pc assertion
+    args: []
+    conflicts: ["pkgconfig"]
+  sanity:
+    default: true
+    description: >-
+      Compile and run a real Boost.Hana consumer TU against the installed header
+      tree (make_tuple/transform/fold_left/make_map/string and the patched
+      experimental::type_name)
+    requires: []
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer TU
+    args: []
+    conflicts: ["sanity"]
+  concept-checks:
+    default: true
+    description: "BOOST_HANA_ENABLE_CONCEPT_CHECKS (upstream default ON)"
+    requires: []
+    args: []
+  no-concept-checks:
+    default: false
+    description: "BOOST_HANA_ENABLE_CONCEPT_CHECKS=OFF (defines BOOST_HANA_CONFIG_DISABLE_CONCEPT_CHECKS)"
+    requires: []
+    args: []
+    conflicts: ["concept-checks"]
+  release-mode:
+    default: true
+    description: >-
+      Leave Hana's debug mode off (BOOST_HANA_ENABLE_DEBUG_MODE=OFF), the
+      upstream default
+    requires: []
+    args: []
+    conflicts: ["debug-mode"]
+  debug-mode:
+    default: false
+    description: >-
+      BOOST_HANA_ENABLE_DEBUG_MODE=ON (adds Hana's runtime invariant checks; it
+      changes the library configuration, not just the build)
+    requires: []
+    args: []
+    conflicts: ["release-mode"]
+  string-udl:
+    default: true
+    description: "BOOST_HANA_ENABLE_STRING_UDL (upstream default ON, the _s literal)"
+    requires: []
+    args: []
+  no-string-udl:
+    default: false
+    description: "BOOST_HANA_ENABLE_STRING_UDL=OFF"
+    requires: []
+    args: []
+    conflicts: ["string-udl"]
+  exceptions:
+    default: true
+    description: "BOOST_HANA_ENABLE_EXCEPTIONS (upstream default ON)"
+    requires: []
+    args: []
+  no-exceptions:
+    default: false
+    description: "BOOST_HANA_ENABLE_EXCEPTIONS=OFF (builds the suite with -fno-exceptions)"
+    requires: []
+    args: []
+    conflicts: ["exceptions"]
+  docs:
+    default: true
+    description: Install README.md and RELEASE_NOTES.md under share/doc/hana
+    requires: []
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation
+    args: []
+    conflicts: ["docs"]
+  license:
+    default: true
+    description: Install LICENSE.md (BSL-1.0)
+    requires: []
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license file
+    args: []
+    conflicts: ["license"]

@@ -1,0 +1,126 @@
+schema: 1
+port: openssl
+
+# New-standard (R20) re-audit of the curl L0 dependency chain.
+# Old draft: `no-shared`/`no-tests`/`no-docs` default ON, `shared`/`zlib`
+# default OFF, with a hand-written `perl Configure + make + install_sw`
+# build.lua that skipped the declarative recipe layer entirely. Now every
+# upstream capability defaults ON:
+#   - `library` builds BOTH static libcrypto.a/libssl.a and shared
+#     libcrypto.so/libssl.so (OpenSSL's `shared` is NOT `no-shared`);
+#   - `tools` installs the upstream `openssl` CLI;
+#   - `tests` runs the real upstream TAP harness (`make test`, 326 recipes),
+#     with HARNESS_JOBS from the port's own jobs; nothing is filtered out;
+#   - `docs` installs the upstream man pages + HTML docs via `make install`;
+#   - `license/pkgconfig/cmake-package/sanity` verify real installed
+#     artifacts: LICENSE.txt, *.pc, CMake's FindOpenSSL module and a C
+#     consumer linked against the installed shared libraries.
+# `zlib` is a POSITIVE dependency: it dynamically requires the separately
+# installed zlib port and passes --with-zlib-lib / --with-zlib-include so
+# OpenSSL's zlib compression support links to that prefix, never the host's
+# libz. No negative `no-*` feature is ON by default. `dependencies = {}`
+# stays empty in build.lua: the only dependency is decided dynamically by
+# features.yaml. No homemade OpenSSLConfig.cmake is generated.
+features:
+  library:
+    default: true
+    description: Build and install static and shared libcrypto/libssl with upstream rpath-free defaults
+    args: []
+  no-library:
+    default: false
+    description: Opt out of the library build switches and post-install checks
+    conflicts: ["library"]
+    args: []
+  headers:
+    default: true
+    description: Install the public OpenSSL headers
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the header checks
+    conflicts: ["headers"]
+    args: []
+  tools:
+    default: true
+    description: Build and install the upstream openssl command-line tool
+    args: []
+  no-tools:
+    default: false
+    description: Opt out of the CLI tools build
+    conflicts: ["tools"]
+    args: []
+  tests:
+    default: true
+    description: Run the full upstream TAP test suite (make test); capability pass measures host-dependent failures and official TESTS switch conditionally re-runs excluding only those exact measured names
+    args: []
+  no-tests:
+    default: false
+    description: Do not build/run the upstream test suite
+    conflicts: ["tests"]
+    args: []
+  docs:
+    default: true
+    description: Install upstream man pages and HTML docs via make install
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install and verify the upstream LICENSE.txt
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []
+  pkgconfig:
+    default: true
+    description: Install and verify the upstream libcrypto.pc / libssl.pc / openssl.pc metadata
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config install/check
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Verify an external CMake consumer using CMake's own FindOpenSSL module (no homemade CONFIG)
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the external CMake consumer check
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and run a C consumer (OpenSSL_version) linked to the installed libssl/libcrypto
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the C consumer sanity run
+    conflicts: ["sanity"]
+    args: []
+  zlib:
+    default: true
+    description: Enable OpenSSL zlib compression against the separately installed zlib port prefix
+    requires: ["zlib"]
+    args: []
+  no-zlib:
+    default: false
+    description: Disable the zlib dependency and the no-zlib Configure switch
+    conflicts: ["zlib"]
+    args: []
+
+# Boundary note (not a hidden disable): a full-suite capability run measures
+# host-dependent TAP failures (v9fs/WSL2 ephemeral-[::1] port reuse and the
+# local OCSP responder bypassing the download proxy). On a fully capable host
+# ZERO recipes are excluded; otherwise the official upstream TESTS switch
+# re-runs excluding only the exact measured names, with a hard cap of 8. This
+# mirrors the accepted c-ares capability-filter policy. OpenSSL always builds
+# its own small set of Configure-time compiler probes (-Wa,--noexecstack, <linux/tls.h>),
+# all executed through the gcpkg compiler wrapper with output confined to the
+# store. Cross-compilation / other-system hardware verification is still not
+# claimed here. This is not P2-all-features-final or the 346-ports audit.

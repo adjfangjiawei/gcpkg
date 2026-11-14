@@ -1,0 +1,19 @@
+schema: 1
+port: librtsp
+
+# ireader/media-server is a multi-library repo; the build hook enters librtsp/. Adjust its gcc script per upstream README if the layout changes.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

@@ -1,0 +1,9 @@
+schema: 1
+port: nvidia
+
+# Version string is a placeholder for the store key; the real version is whatever $GCPKG_NVIDIA_HOME (or $CUDA_HOME, or /usr/local/cuda) points at.
+features:
+  system-sdk:
+    default: true
+    description: Use the local SDK pointed at by $GCPKG_NVIDIA_HOME (no download, no compile)
+    args: []

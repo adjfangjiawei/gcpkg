@@ -1,0 +1,82 @@
+schema: 1
+port: utfcpp
+
+# UTF-8 with C++ — header-only.  Upstream's root CMakeLists.txt declares no
+# option() at all; the real switch surface used here is its tests/ CTest project
+# (six programs) plus the two install layouts it documents.  Every feature below
+# is ON by default and has an explicit opt-out twin, and every one of them
+# performs a real action.
+features:
+  headers:
+    default: true
+    description: "Install source/utf8.h + source/utf8/*.h as include/utf8.h + include/utf8/ (the layout the upstream README documents)"
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  utf8cpp-layout:
+    default: true
+    description: "Also install the layout upstream's own `cmake --install` produces: include/utf8cpp/{utf8.h,utf8/*.h}"
+    args: []
+  no-utf8cpp-layout:
+    default: false
+    description: Opt out of the secondary include/utf8cpp layout
+    conflicts: ["utf8cpp-layout"]
+    args: []
+  tests:
+    default: true
+    description: "Build the upstream tests/ CTest project (negative, cpp11, cpp17, cpp20, apitests, noexceptionstests with -fno-exceptions) and require 100% tests passed"
+    requires: ["ftest"]
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    conflicts: ["tests"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers (utf8to32/utf32to8/is_valid)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  pkgconfig:
+    default: true
+    description: "Install lib/pkgconfig/utf8cpp.pc"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Install a CONFIG package (find_package(utf8cpp CONFIG) -> utf8cpp::utf8cpp), like upstream's export"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md into share/doc/utfcpp"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install the upstream LICENSE into share/doc/utfcpp"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []

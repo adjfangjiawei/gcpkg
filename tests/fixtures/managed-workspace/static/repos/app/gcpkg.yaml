@@ -1,0 +1,8 @@
+schema: 1
+project: app
+dependencies: []
+depends: [core]
+system: [conan, cmake]
+conan_cmd: ["conan", "install", ".", "--output-folder=@build@"]
+canon_cmd: ["canon", "install", "@canon@"]
+features: {}

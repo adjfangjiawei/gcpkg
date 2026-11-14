@@ -1,0 +1,101 @@
+schema: 1
+port: uni-algo
+
+# Upstream root CMakeLists.txt options:
+#   BUILD_SHARED_LIBS / UNI_ALGO_HEADER_ONLY / UNI_ALGO_INSTALL
+# and upstream's test/ directory is a separate CMake project driven by its own
+# switches (BUILD_UNI_ALGO, TEST_STANDALONE, ...), which the `tests` and
+# `standalone` features use.
+features:
+  compiled:
+    default: true
+    description: "Build the real library (UNI_ALGO_HEADER_ONLY=OFF): one src/data.cpp TU, installed as libuni-algo; either/or with header-only"
+    conflicts: ["header-only"]
+    args: ["-DUNI_ALGO_HEADER_ONLY=OFF"]
+  header-only:
+    default: false
+    description: "Header-only mode (UNI_ALGO_HEADER_ONLY=ON): INTERFACE target, consumers must define UNI_ALGO_STATIC_DATA (the generated .pc does it for them)"
+    conflicts: ["compiled", "shared"]
+    args: ["-DUNI_ALGO_HEADER_ONLY=ON"]
+  static:
+    default: true
+    description: "Compile a static library (BUILD_SHARED_LIBS=OFF); either/or with shared"
+    conflicts: ["shared"]
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+  shared:
+    default: false
+    description: "Compile a shared library (BUILD_SHARED_LIBS=ON); needs the compiled feature"
+    conflicts: ["static"]
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+  install:
+    default: true
+    description: "Install headers, the library, and upstream's CONFIG package in share/uni-algo/cmake (UNI_ALGO_INSTALL=ON)"
+    args: ["-DUNI_ALGO_INSTALL=ON"]
+  no-install:
+    default: false
+    description: Opt out of the install capability (same switch, reversed)
+    conflicts: ["install"]
+    args: ["-DUNI_ALGO_INSTALL=OFF"]
+  tests:
+    default: true
+    description: "Configure, build and run upstream's separate test project (test/) against the library built here (-DBUILD_UNI_ALGO=ON), through ctest; the program ends with ALL TESTS PASSED!"
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test project
+    conflicts: ["tests"]
+    args: []
+  standalone:
+    default: true
+    description: "Also build upstream's standalone-header checks (test/standalone, TEST_STANDALONE=ON): every public header and low-level impl header compiled on its own"
+    args: []
+  no-standalone:
+    default: false
+    description: Opt out of the standalone-header checks
+    conflicts: ["standalone"]
+    args: []
+  pkgconfig:
+    default: true
+    description: "Write lib/pkgconfig/uni-algo.pc for the installed tree (upstream ships none); in header-only mode its Cflags carry -DUNI_ALGO_STATIC_DATA"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the generated pkg-config file
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Assert upstream's CONFIG package is installed (uni-algo-config.cmake + uni-algo-targets.cmake, namespace uni-algo::)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package check
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers (to_uppercase_utf8 / to_lowercase_utf8, linked against the library when compiled)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md, CHANGELOG.md and the upstream doc/ folder into share/doc/uni-algo"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE.md into share/doc/uni-algo"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []

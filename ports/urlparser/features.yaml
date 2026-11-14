@@ -1,0 +1,119 @@
+schema: 1
+port: urlparser
+
+# netmindms/urlparser (pinned 69c09ed) -- R20 new-standard re-audit.
+# The tarball has no build system at all: one header, one implementation TU
+# and one self-contained example.  Every capability it can offer is an
+# independent feature and defaults ON; the no-* twins are explicit opt-outs
+# that conflict with their twin.  The port never downloads anything (it has
+# no dependencies) and never probes the host: gcpkg's compiler wrapper builds
+# the two translation units directly.
+features:
+  library:
+    default: true
+    description: Build and install the parser library (static + shared)
+    args: []
+  no-library:
+    default: false
+    description: Opt out of building the library
+    conflicts: ["library"]
+    args: []
+  static:
+    default: true
+    description: Build liburlparser.a from src/EdUrlParser.cpp
+    args: []
+  no-static:
+    default: false
+    description: Do not build the static archive
+    conflicts: ["static"]
+    args: []
+  shared:
+    default: true
+    description: Build liburlparser.so with a soname
+    args: []
+  no-shared:
+    default: false
+    description: Do not build the shared object
+    conflicts: ["shared"]
+    args: []
+  headers:
+    default: true
+    description: Install EdUrlParser.h into <prefix>/include
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  tests:
+    default: true
+    description: Execute the upstream src/exam.cpp program and assert every parsed URL part (upstream ships no unit-test suite)
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream program run
+    conflicts: ["tests"]
+    args: []
+  example:
+    default: true
+    description: Build AND run the upstream src/exam.cpp example as a real test
+    args: []
+  no-example:
+    default: false
+    description: Opt out of the example program
+    conflicts: ["example"]
+    args: []
+  sources:
+    default: true
+    description: Install the src/ tree under share/urlparser/src for source consumers
+    args: []
+  no-sources:
+    default: false
+    description: Opt out of the exported source tree
+    conflicts: ["sources"]
+    args: []
+  pkgconfig:
+    default: true
+    description: Generate and install lib/pkgconfig/urlparser.pc
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: Install a CONFIG package for find_package(urlparser CONFIG)
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CMake CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: Install README.md into share/doc/urlparser
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: Install LICENSE.md into share/doc/urlparser
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []
+  sanity:
+    default: true
+    description: Compile and RUN a real C++ consumer that asserts every parsed URL part
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer sanity run
+    conflicts: ["sanity"]
+    args: []

@@ -1,0 +1,92 @@
+schema: 1
+port: indicators
+
+# Header-only C++ progress bars.  Upstream CMakeLists.txt declares
+#   option(INDICATORS_BUILD_TESTS) option(INDICATORS_SAMPLES) option(INDICATORS_DEMO)
+# All three are exposed as features that default ON, each with an explicit
+# opt-out twin.  INDICATORS_SAMPLES/INDICATORS_DEMO build real programs and the
+# port really runs them; INDICATORS_BUILD_TESTS is a DEAD option at this tag (no
+# test/ directory exists), which the port forwards and records rather than
+# pretending a suite ran.
+features:
+  headers:
+    default: true
+    description: "Install include/indicators/*.hpp"
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  samples:
+    default: true
+    description: "Build the 17 upstream sample programs (INDICATORS_SAMPLES=ON) and run every one of them under a per-program timeout"
+    args: ["-DINDICATORS_SAMPLES=ON"]
+  no-samples:
+    default: false
+    description: "Opt out of the samples capability (same switch as above, reversed)"
+    conflicts: ["samples"]
+    args: ["-DINDICATORS_SAMPLES=OFF"]
+  demo:
+    default: true
+    description: "Build and run the upstream demo program (INDICATORS_DEMO=ON, demo/demo.cpp)"
+    args: ["-DINDICATORS_DEMO=ON"]
+  no-demo:
+    default: false
+    description: "Opt out of the demo capability (same switch as above, reversed)"
+    conflicts: ["demo"]
+    args: ["-DINDICATORS_DEMO=OFF"]
+  tests:
+    default: true
+    description: "Forward INDICATORS_BUILD_TESTS=ON (dead option upstream at v2.3: no test/ directory exists; the port records the accepted cache value and fails if upstream ever ships a suite that is not run)"
+    args: ["-DINDICATORS_BUILD_TESTS=ON"]
+  no-tests:
+    default: false
+    description: "Opt out of the tests capability (same switch as above, reversed)"
+    conflicts: ["tests"]
+    args: ["-DINDICATORS_BUILD_TESTS=OFF"]
+  pkgconfig:
+    default: true
+    description: "Install the indicators.pc that upstream's CMakeLists generates"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Install the upstream CONFIG package for find_package(indicators CONFIG)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers (ProgressBar + BlockProgressBar)"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md into share/doc/indicators"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE and the bundled LICENSE.termcolor"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []

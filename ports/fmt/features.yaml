@@ -1,0 +1,164 @@
+schema: 1
+port: fmt
+
+# R20 new-standard re-audit of Ada's old fmt dependency.  The previous draft
+# had `no-tests` default ON, static-only, FMT_TEST=OFF, FMT_DOC=OFF and a
+# single BUILD_SHARED_LIBS=OFF pass.  This port exposes positive capabilities
+# default ON; googletest and python are dynamic source-port dependencies
+# gated by the features that need them.
+#
+# Upstream has one BUILD_SHARED_LIBS switch, so static and shared are built
+# by TWO official configure/build/install passes in the same isolated build
+# directory, with the two compile_commands.json arrays merged in place.  The
+# full upstream ctest suite runs in both passes.  fmt's bundled gtest is not
+# compiled: a CMAKE_PROJECT_INCLUDE shim chain-loads gcpkg's no-probe file,
+# finds the source-built googletest CONFIG, provides the `gtest` interface
+# target that upstream's test/CMakeLists expects, and returns from
+# add_subdirectory(gtest).  No source patch, no ctest -E and no test
+# blacklist.
+#
+# FMT_DOC is ON but upstream's add_doc_target() disables the generated HTML
+# target because mkdocs is ABSENT on this host and in the source-built Python;
+# the port installs the upstream source Markdown/CSS/JS documentation instead.
+# FMT_FUZZ, FMT_MODULE, FMT_CUDA_TEST, FMT_WERROR and FMT_SYSTEM_HEADERS are
+# explicit OFF boundaries: fuzzing engine, C++20 modules, CUDA toolkit,
+# -Werror and SYSTEM-header marking are toolchain/engine modes outside this
+# source-port audit.  They are not default-ON negative features.
+features:
+  library:
+    default: true
+    description: Build and install the upstream fmt libraries and verify their artifacts
+    args: ["-DFMT_INSTALL=ON"]
+  no-library:
+    default: false
+    description: Opt out of building and installing the libraries
+    args: []
+    conflicts: ["library"]
+  headers:
+    default: true
+    description: Install and verify the upstream public fmt headers
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of public header verification
+    args: []
+    conflicts: ["headers"]
+  static:
+    default: true
+    description: Install libfmt.a from the official static pass
+    args: []
+  no-static:
+    default: false
+    description: Opt out of the static-library pass
+    args: []
+    conflicts: ["static"]
+  shared:
+    default: true
+    description: Install versioned libfmt.so from the official shared pass
+    args: []
+  no-shared:
+    default: false
+    description: Opt out of the shared-library pass
+    args: []
+    conflicts: ["shared"]
+  tests:
+    default: true
+    description: Register and run the full upstream fmt ctest suite in both passes against source-built googletest
+    requires: ["googletest"]
+    args: ["-DFMT_TEST=ON"]
+  no-tests:
+    default: false
+    description: Opt out of the upstream ctest suite
+    args: []
+    conflicts: ["tests", "pedantic"]
+  pedantic:
+    default: true
+    description: Keep upstream FMT_PEDANTIC expensive tests and warning flags enabled
+    args: ["-DFMT_PEDANTIC=ON"]
+  no-pedantic:
+    default: false
+    description: Opt out of upstream pedantic tests and warning flags
+    args: []
+    conflicts: ["pedantic"]
+  docs:
+    default: true
+    description: Enable upstream FMT_DOC gate and install the upstream source documentation
+    args: ["-DFMT_DOC=ON"]
+  no-docs:
+    default: false
+    description: Opt out of upstream source documentation
+    args: []
+    conflicts: ["docs"]
+  license:
+    default: true
+    description: Install the upstream LICENSE into the documentation directory
+    args: []
+  no-license:
+    default: false
+    description: Opt out of installing the license
+    args: []
+    conflicts: ["license"]
+  unicode:
+    default: true
+    description: Keep upstream Unicode support enabled
+    args: ["-DFMT_UNICODE=ON"]
+  no-unicode:
+    default: false
+    description: Opt out of Unicode support
+    args: []
+    conflicts: ["unicode"]
+  os:
+    default: true
+    description: Keep upstream OS-specific APIs enabled
+    args: ["-DFMT_OS=ON"]
+  no-os:
+    default: false
+    description: Opt out of OS-specific APIs
+    args: []
+    conflicts: ["os"]
+  pkgconfig:
+    default: true
+    description: Install and verify the upstream fmt.pc pkg-config file
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of pkg-config verification
+    args: []
+    conflicts: ["pkgconfig"]
+  cmake-package:
+    default: true
+    description: Install and verify the upstream fmt CMake CONFIG package
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of CMake CONFIG verification
+    args: []
+    conflicts: ["cmake-package"]
+  compdb:
+    default: true
+    description: Merge the static and shared compile_commands.json arrays with source-built Python
+    requires: ["python"]
+    args: []
+  no-compdb:
+    default: false
+    description: Opt out of compile_commands merge verification
+    args: []
+    conflicts: ["compdb"]
+  consumers:
+    default: true
+    description: Configure, build and run independent upstream CONFIG and FindPkgConfig CMake consumers
+    args: []
+  no-consumers:
+    default: false
+    description: Opt out of independent CMake consumers
+    args: []
+    conflicts: ["consumers"]
+  sanity:
+    default: true
+    description: Compile and run direct static and shared C++ fmt sanity binaries
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of direct C++ sanity binaries
+    args: []
+    conflicts: ["sanity"]

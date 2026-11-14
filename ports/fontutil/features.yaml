@@ -1,0 +1,20 @@
+schema: 1
+port: fontutil
+
+# ONE feature description per library. This port installs pkg-config data and
+# autoconf macros only; it has no compiler switches of its own.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Data-only port, always usable from static builds
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Data-only port, always usable from shared builds
+    args: []
+    conflicts: ["static"]

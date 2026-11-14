@@ -1,0 +1,25 @@
+schema: 1
+port: libdwarf
+
+# DWARF reader; `compression` feature pulls zlib + zstd.
+# Feature switches for this port.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]
+  compression:
+    default: true
+    description: Pull in zlib, zstd for this optional capability
+    requires: [zlib, zstd]
+    args: []

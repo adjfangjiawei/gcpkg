@@ -1,0 +1,71 @@
+schema: 1
+port: pprint
+
+# Header-only C++ pretty printer.  Upstream has no build system options at all
+# (its test/CMakeLists.txt declares no option() and registers no CTest entry),
+# so the switches below are gcpkg capabilities: each one performs a real action
+# and is paired with its explicit opt-out.
+features:
+  headers:
+    default: true
+    description: "Install include/pprint.hpp into <prefix>/include"
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  tests:
+    default: true
+    description: "Compile and run the upstream Catch2 suite (test/main.cpp + test_{vector,list,set}.hpp, vendored catch.hpp) and require 'All tests passed'"
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    conflicts: ["tests"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED pprint.hpp"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  pkgconfig:
+    default: true
+    description: "Install lib/pkgconfig/pprint.pc"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Install a CONFIG package (find_package(pprint CONFIG) -> pprint::pprint, requires cxx_std_17)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md (and the upstream test/README.md) into share/doc/pprint"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install the upstream LICENSE into share/doc/pprint"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []

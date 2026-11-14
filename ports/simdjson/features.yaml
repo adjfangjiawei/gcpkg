@@ -1,0 +1,144 @@
+schema: 1
+port: simdjson
+
+# R20 new-standard re-audit of Ada's old simdjson dependency.  The previous
+# draft had `no-tests [on] static [on] shared [off]` plus a recipe that forced
+# SIMDJSON_DEVELOPER_MODE=OFF, BUILD_TESTING=OFF and the old just-library bypass,
+# which makes upstream root CMakeLists.txt return() before tests, examples,
+# tools, benchmarks, fuzzers, singleheader and jsonexamples are even declared.
+# This port turns developer mode ON and keeps EVERY upstream developer target.
+#
+# Upstream dependencies/CMakeLists.txt gates its vendored imports on
+# SIMDJSON_ALLOW_DOWNLOADS: with the offline switch OFF (our default),
+# SIMDJSON_COMPETITION, SIMDJSON_GOOGLE_BENCHMARKS and SIMDJSON_CXXOPTS are
+# forced INTERNAL=OFF by cmake_dependent_option, so no import_dependency() can
+# reach import.cmake's file(DOWNLOAD).  simdjson-data is imported
+# UNCONDITIONALLY, however; instead of a configure-time download the port
+# points simdjson_DEPENDENCY_CACHE_DIR at the source-built simdjson-data port
+# tree.  The four tools and the Google-Benchmark-based benchmarks are still
+# built: a CMAKE_PROJECT_INCLUDE shim supplies the `cxxopts` and
+# `benchmark::benchmark` targets from source-built cxxopts 3.2.0 and
+# benchmark 1.9.1 CONFIG packages.  Competition parsers (12 third-party repos
+# fetched by file(DOWNLOAD)) are the one documented capability boundary; they
+# cannot be enabled without configure-time networking or 12 more source ports.
+#
+# Clang 23 emits -Wdeprecated-literal-operator for upstream 3.10.0's
+# `operator "" _padded` / `operator "" _sv` spelling.  Upstream hardcodes
+# -Werror both on simdjson-internal-flags and, for the 12 quickstart ctest
+# cases that invoke CMAKE_CXX_COMPILER directly, in add_quickstart_test.cmake.
+# CMAKE_CXX_FLAGS=-Wno-error=deprecated-literal-operator covers the normal
+# build; GCPKG_COMPILER_FLAGS covers those raw compiler commands through the
+# framework's own interceptor.  Neither is a source patch, an exclusion
+# filter, a test blacklist nor a disabled test.
+#
+# Every feature below is a positive capability default ON.  The six `no-*`
+# opt-outs only skip post-install verification; no build-affecting feature can
+# be turned off, and there is no default-ON negative feature any more.
+features:
+  shared:
+    default: true
+    description: Build and install the upstream shared libsimdjson.so with SOVERSION and verify a CONFIG shared consumer
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+  static:
+    default: true
+    description: Build and install the upstream companion libsimdjson_static.a and verify a CONFIG static consumer
+    args: ["-DSIMDJSON_BUILD_STATIC_LIB=ON"]
+  threads:
+    default: true
+    description: Enable upstream thread support and the SIMDJSON_THREADS_ENABLED public define
+    args: ["-DSIMDJSON_ENABLE_THREADS=ON"]
+  developer-mode:
+    default: true
+    description: Enable SIMDJSON_DEVELOPER_MODE so all upstream tests, examples, tools, singleheader, benchmarks and fuzzers exist
+    args: ["-DSIMDJSON_DEVELOPER_MODE=ON"]
+    requires: ["simdjson-data"]
+  offline:
+    default: true
+    description: Use upstream's supported no-download switch so import.cmake never reaches file(DOWNLOAD)
+    args: ["-DSIMDJSON_ALLOW_DOWNLOADS=OFF"]
+  tests:
+    default: true
+    description: Register and run the complete upstream ctest suite with no exclusions or test-number blacklist
+    args: ["-DSIMDJSON_BASH=ON"]
+  tools:
+    default: true
+    description: Build and run json2json, jsonstats, jsonpointer and minify via the source-built cxxopts target
+    args: []
+    requires: ["cxxopts"]
+  benchmarks:
+    default: true
+    description: Build the upstream benchmark tree including the three Google-Benchmark targets via source-built benchmark
+    args: []
+    requires: ["benchmark"]
+  fuzz:
+    default: true
+    description: Build all 13 upstream fuzzers with the upstream LINKMAIN reproducer mode
+    args: ["-DSIMDJSON_ENABLE_FUZZING=ON", "-DSIMDJSON_FUZZ_LINKMAIN=ON"]
+  singleheader:
+    default: true
+    description: Generate simdjson.cpp/simdjson.h with amalgamate.py through source-built Python and install the upstream single header
+    args: []
+    requires: ["python"]
+  examples:
+    default: true
+    description: Build and run the upstream quickstart compile examples (C++17/C++14/C++11, exceptions and no-exceptions)
+    args: []
+  clang23-compat:
+    default: true
+    description: Downgrade only Clang 23's deprecated literal-operator diagnostic from -Werror to a warning
+    args: ["-DCMAKE_CXX_FLAGS=-Wno-error=deprecated-literal-operator"]
+  pkgconfig:
+    default: true
+    description: Install and verify the upstream simdjson.pc and an independent FindPkgConfig consumer
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of pkg-config verification
+    args: []
+    conflicts: ["pkgconfig", "consumers"]
+  cmake-package:
+    default: true
+    description: Install and verify the upstream CONFIG/targets package with both exported targets
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of CMake CONFIG verification
+    args: []
+    conflicts: ["cmake-package", "consumers"]
+  consumers:
+    default: true
+    description: Configure, build and run independent CONFIG-shared, CONFIG-static and FindPkgConfig CMake consumers
+    args: []
+    conflicts: ["no-pkgconfig", "no-cmake-package", "no-consumers"]
+  no-consumers:
+    default: false
+    description: Opt out of the independent CMake consumers
+    args: []
+    conflicts: ["consumers"]
+  compdb:
+    default: true
+    description: Analyse the official compile_commands.json with source-built Python
+    args: []
+  no-compdb:
+    default: false
+    description: Opt out of compile_commands analysis
+    args: []
+    conflicts: ["compdb"]
+  sanity:
+    default: true
+    description: Compile and run direct shared and static C++ sanity binaries
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the direct C++ sanity binaries
+    args: []
+    conflicts: ["sanity"]
+  docs:
+    default: true
+    description: Install the upstream README, LICENSE and contributor source documentation
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of upstream source documentation
+    args: []
+    conflicts: ["docs"]

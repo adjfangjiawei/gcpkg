@@ -1,0 +1,19 @@
+schema: 1
+port: cv-cuda
+
+# CV-CUDA needs the local CUDA toolkit ('nvidia' SDK port).
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

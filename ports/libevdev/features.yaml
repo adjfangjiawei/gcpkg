@@ -1,0 +1,20 @@
+schema: 1
+port: libevdev
+
+# ONE feature description per library. Enabled features inject
+# build arguments without editing build.lua.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: ["-Dtests=disabled"]
+  static:
+    default: true
+    description: Build static libraries
+    args: ["-Ddefault_library=static"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: ["-Ddefault_library=shared"]
+    conflicts: ["static"]

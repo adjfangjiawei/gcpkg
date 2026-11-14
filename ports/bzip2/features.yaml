@@ -1,0 +1,19 @@
+schema: 1
+port: bzip2
+
+# Features here demonstrate the other half of the model: YAML does not have to
+# inject flags -- build.lua can branch on ctx.features.enabled[...] directly.
+features:
+  no-tests:
+    default: false
+    description: Skip building the bundled test programs
+
+  static:
+    default: true
+    description: Build libbz2.a (always built by this Makefile)
+    conflicts: ["shared"]
+
+  shared:
+    default: false
+    description: Also build and install libbz2.so.1.0.8 via Makefile-libbz2_so
+    conflicts: ["static"]

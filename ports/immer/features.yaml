@@ -1,0 +1,13 @@
+schema: 1
+port: immer
+
+# Header-only immutable and persistent data structures.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  header-only:
+    default: true
+    description: Install headers and compile a probe translation unit
+    args: []

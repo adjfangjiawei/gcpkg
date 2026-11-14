@@ -1,0 +1,39 @@
+schema: 1
+port: jansson
+
+# JSON C library; complements the existing json-c port.
+# Feature switches for this port.
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]
+
+# Available upstream releases with pinned URL/SHA256.
+versions:
+  "2.15.1":
+    source:
+      url: "https://codeload.github.com/akheron/jansson/tar.gz/refs/tags/v2.15.1"
+      sha256: "dbf95cb0af903f4fb8b61507d96b45b67db7d1479688ede352e1d571394d06f7"
+  "2.14":
+    source:
+      url: "https://codeload.github.com/akheron/jansson/tar.gz/refs/tags/v2.14"
+      sha256: "c739578bf6b764aa0752db9a2fdadcfe921c78f1228c7ec0bb47fa804c55d17b"
+  "2.13.1":
+    source:
+      url: "https://codeload.github.com/akheron/jansson/tar.gz/refs/tags/v2.13.1"
+      sha256: "f22901582138e3203959c9257cf83eba9929ac41d7be4a42557213a22ebcc7a0"
+  "2.12":
+    source:
+      url: "https://codeload.github.com/akheron/jansson/tar.gz/refs/tags/v2.12"
+      sha256: "76260d30e9bbd0ef392798525e8cd7fe59a6450c54ca6135672e3cd6a1642941"

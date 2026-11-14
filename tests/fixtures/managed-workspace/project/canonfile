@@ -1,0 +1,2 @@
+# Legacy `canon` compatibility marker for Conan.
+name = "app"

@@ -1,0 +1,19 @@
+schema: 1
+port: proxygen
+
+# Top of the Facebook stack: folly -> fizz -> wangle/mvfst -> proxygen (plus cmake and the L0 crypto/compression chain).
+features:
+  no-tests:
+    default: false
+    description: Skip the upstream test suite
+    args: []
+  static:
+    default: true
+    description: Build static libraries
+    args: []
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: []
+    conflicts: ["static"]

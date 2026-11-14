@@ -1,0 +1,64 @@
+schema: 1
+port: cista
+
+# Upstream CMakeLists.txt has no user-facing on/off option that maps to a
+# capability: CISTA_HASH selects the hash backend, CISTA_FMT/CISTA_ZERO_OUT/
+# CISTA_USE_MIMALLOC/CISTA_COVERAGE/CISTA_GENERATE_TO_TUPLE are semantic or
+# developer switches, and CISTA_INSTALL is forced on by upstream itself before
+# project().  The features below are the verification capabilities the port
+# provides.
+features:
+  tests:
+    default: true
+    description: "Build and run both of upstream's doctest binaries (EXCLUDE_FROM_ALL upstream): cista-test over the 50 test/*.cc TUs against the modular headers, and cista-test-single-header over the same TUs against the amalgamated cista.h from tools/uniter. Require doctest's 'Status: SUCCESS' and the full case count from each, and register both runs with CTest. tools/uniter/uniter.cc is patched in pre_build so that an include it cannot expand (fmt/ranges.h, named inside a guarded __has_include block) is kept verbatim instead of being dropped"
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test binaries
+    conflicts: ["tests"]
+    args: []
+  pkgconfig:
+    default: true
+    description: "Write lib/pkgconfig/cista.pc for the installed tree (upstream installs none)"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config file
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Assert upstream's CONFIG package is installed (lib/cmake/cista: cistaConfig.cmake, cistaConfigVersion.cmake, cistaTargets.cmake, namespace cista::)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package check
+    conflicts: ["cmake-package"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED headers: serialize a vector<struct> and deserialize it back, plus a to_tuple check"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md into share/doc/cista"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install LICENSE into share/doc/cista"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []

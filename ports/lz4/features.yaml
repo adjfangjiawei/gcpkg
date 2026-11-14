@@ -1,0 +1,21 @@
+schema: 1
+port: lz4
+
+# Feature switches are DATA: they inject build flags without
+# editing build.lua, and are resolved from defaults + project
+# gcpkg.yaml + --feature CLI overrides.
+features:
+  no-tests:
+    default: false
+    description: Do not build the upstream test suite
+    args: ["-DBUILD_TESTING=OFF"]
+  static:
+    default: true
+    description: Build static libraries
+    args: ["-DBUILD_SHARED_LIBS=OFF"]
+    conflicts: ["shared"]
+  shared:
+    default: false
+    description: Build shared libraries
+    args: ["-DBUILD_SHARED_LIBS=ON"]
+    conflicts: ["static"]

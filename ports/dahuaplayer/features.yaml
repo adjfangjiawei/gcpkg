@@ -1,0 +1,9 @@
+schema: 1
+port: dahuaplayer
+
+# Proprietary binary SDK from Dahua's support portal (official SHA256 of the Linux64 V3.044 bundle is published there). No anonymous download, no recompilation.
+features:
+  system-sdk:
+    default: true
+    description: Use the local SDK pointed at by $GCPKG_DAHUAPLAYER_HOME (no download, no compile)
+    args: []

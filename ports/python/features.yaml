@@ -1,0 +1,23 @@
+schema: 1
+port: python
+
+features:
+  no-tests:
+    default: true
+    description: Skip the upstream test suite
+    args: []
+  pic:
+    default: true
+    description: Build position-independent objects so libpython can be linked into loadable modules
+    env:
+      - "CFLAGS=-fPIC"
+  shared:
+    default: true
+    description: Build shared libpython (needed by source-built loadable Python bindings)
+    args: ["--enable-shared"]
+    conflicts: ["static"]
+  static:
+    default: false
+    description: Build static libraries
+    args: ["--disable-shared"]
+    conflicts: ["shared"]

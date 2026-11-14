@@ -1,0 +1,842 @@
+-- gcpkg triplets: ONE platform fact table shared by EVERY port.
+--
+-- A triplet (like a vcpkg triplet) describes the target OS / CPU / compiler and
+-- the platform facts that upstream build systems normally discover with
+-- try_compile / check_* / AC_CHECK_*.  gcpkg never lets a library run those
+-- probes: at the start of an install task it compiles and runs ONE small C
+-- program itself, and injects the resulting table into every port in that
+-- task.  Nothing about x86_64 / little-endian / glibc is hardcoded here.
+--
+-- Precedence, highest first:
+--   1. facts: in <store>/.gcpkg/config.yaml        (user global override)
+--   2. facts: in <store>/.gcpkg/triplets/<n>.yaml  (user triplet override)
+--   3. gcpkg's single probe of the selected compiler
+-- All state lives inside the store (the hard write boundary).
+local M = {}
+
+local BUILTIN = {
+    native = { description = "Auto-probe the host compiler, OS and CPU once per install task" },
+    ["x64-linux-clang"] = { description = "x86_64 Linux / Clang", target = { arch = "x86_64", os = "linux", compiler = "clang" } },
+    ["x64-linux-gcc"] = { description = "x86_64 Linux / GCC", target = { arch = "x86_64", os = "linux", compiler = "gcc" } },
+    ["arm64-linux-clang"] = { description = "AArch64 Linux / Clang", target = { arch = "aarch64", os = "linux", compiler = "clang" } },
+    ["arm64-linux-gcc"] = { description = "AArch64 Linux / GCC", target = { arch = "aarch64", os = "linux", compiler = "gcc" } },
+}
+
+-- The probe covers the union of checks used by the source ports, plus the
+-- usual libc/POSIX surface.  One compile + one run, no per-library probes.
+local HEADERS = {
+    "assert.h", "ctype.h", "dirent.h", "errno.h", "fcntl.h", "float.h",
+    "limits.h", "malloc.h", "memory.h", "setjmp.h", "signal.h", "stdarg.h",
+    "stddef.h", "stdint.h", "stdio.h", "stdlib.h", "string.h", "strings.h",
+    "time.h", "unistd.h", "utime.h", "sys/mman.h", "sys/resource.h",
+    "sys/stat.h", "sys/time.h", "sys/types.h", "sys/wait.h",
+    "stdbool.h", "stdalign.h", "inttypes.h", "wchar.h", "dlfcn.h",
+    "execinfo.h", "sys/ioctl.h", "sys/socket.h", "sys/select.h", "sys/uio.h",
+    "netinet/in.h", "arpa/inet.h", "poll.h", "pthread.h", "getopt.h",
+    "fnmatch.h", "regex.h", "termios.h", "grp.h", "pwd.h", "byteswap.h",
+    "endian.h", "features.h", "stdatomic.h", "complex.h", "locale.h",
+    "math.h", "iconv.h", "sys/epoll.h", "sys/eventfd.h", "sys/inotify.h",
+    "mntent.h", "sys/file.h", "sys/param.h", "sys/statfs.h",
+    "sys/statvfs.h", "printf.h", "linux/perf_event.h",
+    "linux/hw_breakpoint.h", "linux/fsverity.h", "linux/fiemap.h",
+    "linux/blkzoned.h", "ext2fs/ext2_fs.h", "linux/types.h",
+    "linux/ioctl.h", "sys/mount.h", "sys/vfs.h", "linux/magic.h",
+    "execinfo.h", "minix/config.h", "vfork.h",
+    "wordexp.h", "sys/endian.h", "sys/shm.h",
+    -- ICU4C: ELF data packaging, xlocale compatibility, nl_langinfo(CODESET).
+    "elf.h", "xlocale.h", "langinfo.h",
+}
+
+local FUNCTIONS = {
+    "access", "alloca", "atexit", "atoi", "atol", "chmod", "chown",
+    "clock_getcpuclockid", "clock_getres", "clock_gettime", "ctime",
+    "difftime", "fstat", "getenv", "getpagesize", "getrusage",
+    "gettimeofday", "gmtime", "isatty", "localtime", "longjmp", "lstat",
+    "memcmp", "memcpy", "memmove", "memset", "mkdir", "mktime", "mmap",
+    "mprotect", "munmap", "qsort", "raise", "rmdir", "setjmp", "signal",
+    "snprintf", "strcasecmp", "strchr", "strdup", "strerror", "strftime",
+    "stricmp", "strncasecmp", "strnicmp", "strrchr", "strstr", "time",
+    "umask", "utime", "vsnprintf",
+    "malloc", "calloc", "realloc", "free", "posix_memalign", "aligned_alloc",
+    "dlopen", "dlsym", "dlclose", "backtrace", "backtrace_symbols",
+    "asprintf", "vasprintf", "getline", "getopt_long", "mkdtemp", "realpath",
+    "setenv", "unsetenv", "strerror_r", "pthread_create", "pthread_join",
+    "uselocale", "eaccess", "socket", "poll", "fork", "vfork", "getpgrp",
+    "setpgrp", "bcopy", "index", "rindex", "bzero", "vprintf", "doprnt",
+    "epoll_create1", "eventfd", "inotify_init1", "fstatat", "openat",
+    "readlink", "symlink", "getaddrinfo", "arc4random", "getrandom",
+    "explicit_bzero", "memmem", "qsort_r", "reallocarray", "dup3", "pipe2",
+    "accept4", "statx", "copy_file_range", "sendfile", "preadv", "pwritev",
+    "strlcpy", "strlcat", "strcasestr", "strsignal", "sigaction",
+    "sigprocmask", "nanosleep", "sched_yield", "basename", "dirname",
+    "strsep", "syncfs", "clock_nanosleep", "pthread_setname_np",
+    "fchdir", "fdatasync", "ftruncate", "getcwd", "getmntent", "lchown",
+    "localtime_r", "memchr", "mkfifo", "regcomp", "select", "strndup",
+    "strtol", "strtoul", "strtoull", "sysinfo", "uname",
+    "fsync", "fstat", "fstatfs", "fstatvfs", "lseek", "pread", "pwrite",
+    "read", "write", "close", "open", "opendir", "readdir", "stat",
+    "strnlen", "strtol_l", "strtoull_l", "getrlimit", "setrlimit",
+    "sched_getaffinity", "posix_fadvise", "fallocate", "flock",
+    "backtrace_symbols_fd",
+    -- ICU4C configure checks.  These are symbol names looked up by the ONE
+    -- shared triplet probe; libraries must not run their own link probes.
+    "popen", "tzset", "_tzset", "nl_langinfo", "strtod_l",
+    "pthread_mutex_lock", "pthread_attr_init", "pthread_mutex_init",
+    "pthread_mutex_destroy", "wcscpy", "floor",
+    "tzname", "_tzname", "timezone", "_timezone", "__timezone",
+    "___timezone",
+}
+
+local TYPES = {
+    "short", "int", "long", "long long", "__int16", "__int32", "__int64",
+    "void *", "size_t", "ptrdiff_t", "intmax_t", "uintmax_t", "intptr_t",
+    "uintptr_t", "float", "double", "long double", "dev_t", "fpos_t",
+    "mode_t", "off_t", "ssize_t", "time_t", "char", "wchar_t",
+    "unsigned int", "unsigned long", "unsigned long long", "int8_t",
+    "int16_t", "int32_t", "int64_t", "uint8_t", "uint16_t", "uint32_t",
+    "uint64_t", "pid_t", "uid_t", "gid_t",
+}
+
+local HEADER_TMPL = [==[
+#if defined(__has_include)
+#if __has_include(<%s>)
+  printf("header:%s=1\n");
+#else
+  printf("header:%s=0\n");
+#endif
+#else
+  printf("header:%s=1\n");
+#endif
+]==]
+
+local TYPE_TMPL = [==[
+  printf("type:%s=%%zu\n", sizeof(%s));
+]==]
+
+local TYPE_MSVC_TMPL = [==[
+#ifdef _MSC_VER
+  printf("type:%s=%%zu\n", sizeof(%s));
+#else
+  printf("type:%s=\n");
+#endif
+]==]
+
+local PROLOG = [==[
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <sys/types.h>
+#include <wchar.h>
+#include <dlfcn.h>
+#include <langinfo.h>
+#define GCPKG_STR2(x) #x
+#define GCPKG_STR(x) GCPKG_STR2(x)
+#if defined(__has_include)
+#if __has_include(<pthread.h>)
+#include <pthread.h>
+#endif
+#endif
+#if defined(__linux__) && defined(__has_include)
+#if __has_include(<features.h>)
+#include <features.h>
+#endif
+#if __has_include(<linux/fiemap.h>)
+#include <linux/fiemap.h>
+#endif
+#if __has_include(<linux/blkzoned.h>)
+#include <linux/blkzoned.h>
+#endif
+#if __has_include(<ext2fs/ext2_fs.h>)
+#include <ext2fs/ext2_fs.h>
+#endif
+#endif
+static const char *gcpkg_funcs[] = {]==]
+
+local EPILOG = [==[
+NULL};
+int main(void) {
+  unsigned int one = 1;
+  int i;
+  printf("byte_order=%s\n", (*(unsigned char *)&one) ? "little" : "big");
+  printf("pointer_size=%zu\n", sizeof(void *));
+#if defined(__x86_64__) || defined(_M_X64)
+  printf("arch=x86_64\n");
+#elif defined(__aarch64__) || defined(_M_ARM64)
+  printf("arch=aarch64\n");
+#elif defined(__i386__) || defined(_M_IX86)
+  printf("arch=x86\n");
+#elif defined(__arm__) || defined(_M_ARM)
+  printf("arch=arm\n");
+#elif defined(__riscv)
+  printf("arch=riscv\n");
+#elif defined(__powerpc64__)
+  printf("arch=ppc64\n");
+#else
+  printf("arch=unknown\n");
+#endif
+#if defined(__linux__)
+  printf("os=linux\n");
+#elif defined(__APPLE__)
+  printf("os=macos\n");
+#elif defined(_WIN32)
+  printf("os=windows\n");
+#elif defined(__FreeBSD__)
+  printf("os=freebsd\n");
+#else
+  printf("os=unknown\n");
+#endif
+#if defined(__clang__)
+  printf("compiler_id=clang\n");
+#elif defined(__GNUC__)
+  printf("compiler_id=gcc\n");
+#elif defined(_MSC_VER)
+  printf("compiler_id=msvc\n");
+#else
+  printf("compiler_id=unknown\n");
+#endif
+  for (i = 0; gcpkg_funcs[i]; i++)
+    printf("func:%s=%d\n", gcpkg_funcs[i],
+           dlsym(RTLD_DEFAULT, gcpkg_funcs[i]) != NULL ? 1 : 0);
+#ifdef FIEMAP_EXTENT_SHARED
+  printf("defined:FIEMAP_EXTENT_SHARED_linux_fiemap_h=1\n");
+#else
+  printf("defined:FIEMAP_EXTENT_SHARED_linux_fiemap_h=0\n");
+#endif
+#ifdef EXT4_EPOCH_MASK
+  printf("defined:EXT4_EPOCH_MASK_ext2fs_ext2_fs_h=1\n");
+#else
+  printf("defined:EXT4_EPOCH_MASK_ext2fs_ext2_fs_h=0\n");
+#endif
+#ifdef BLKGETZONESZ
+  printf("defined:BLKGETZONESZ_linux_blkzoned_h=1\n");
+#else
+  printf("defined:BLKGETZONESZ_linux_blkzoned_h=0\n");
+#endif
+/* PTHREAD_MUTEX_RECURSIVE is an enum constant in glibc, not a macro.
+   With _GNU_SOURCE the feature macros below prove the enum exists. */
+#if defined(__USE_UNIX98) || defined(__USE_XOPEN2K8) || defined(__USE_GNU)
+  printf("defined:PTHREAD_MUTEX_RECURSIVE=1\n");
+#else
+  printf("defined:PTHREAD_MUTEX_RECURSIVE=0\n");
+#endif
+#ifdef __STDC_VERSION__
+  printf("c_standard=%ld\n", (long)__STDC_VERSION__);
+#else
+  printf("c_standard=0\n");
+#endif
+#ifdef __USER_LABEL_PREFIX__
+  printf("symbol_prefix=%s\n", GCPKG_STR(__USER_LABEL_PREFIX__));
+#else
+  printf("symbol_prefix=\n");
+#endif
+#ifdef __GLIBC__
+  printf("defined:__GLIBC___features_h=1\n");
+#else
+  printf("defined:__GLIBC___features_h=0\n");
+#endif
+/* ICU uses nl_langinfo(CODESET); CODESET is a POSIX macro in langinfo.h. */
+#ifdef CODESET
+  printf("defined:CODESET=1\n");
+#else
+  printf("defined:CODESET=0\n");
+#endif
+]==]
+
+-- A single gcpkg process must support SEVERAL triplets at once.  Cache and
+-- probe artefacts are keyed by triplet name; no value is shared between them.
+local cache = {}
+local currentName = nil
+local cliName = nil
+
+local function getenv(k)
+    local ok, v = pcall(function() return gcpkg.sys.getenv(k) end)
+    return (ok and v) or ""
+end
+
+local function first(...)
+    for i = 1, select("#", ...) do
+        local v = select(i, ...)
+        if type(v) == "string" and v ~= "" then return v end
+    end
+    return ""
+end
+
+local function key(s)
+    return (tostring(s):lower():gsub("[^a-z0-9]", "_"))
+end
+
+local function ackey(s)
+    s = tostring(s):lower():gsub("%s*%*", "_p")
+    return (s:gsub("[^a-z0-9]", "_"))
+end
+
+local function acname(s)
+    return (tostring(s):gsub("[^A-Za-z0-9]", "_"))
+end
+
+function M.probe_source()
+    local out = { PROLOG }
+    for _, f in ipairs(FUNCTIONS) do out[#out + 1] = '"' .. f .. '",' end
+    out[#out + 1] = EPILOG
+    for _, h in ipairs(HEADERS) do
+        out[#out + 1] = string.format(HEADER_TMPL, h, h, h, h)
+    end
+    for _, t in ipairs(TYPES) do
+        if t:match("^__int") then
+            out[#out + 1] = string.format(TYPE_MSVC_TMPL, t, t, t)
+        else
+            out[#out + 1] = string.format(TYPE_TMPL, t, t)
+        end
+    end
+    out[#out + 1] = "  return 0;\n}\n"
+    return table.concat(out, "\n")
+end
+
+function M.dir()
+    local paths = require("gcpkg.paths")
+    local util = require("gcpkg.util")
+    return util.join(paths.state_root(), "triplets")
+end
+
+function M.file(name)
+    local util = require("gcpkg.util")
+    return util.join(M.dir(), name .. ".yaml")
+end
+
+-- User settings in the GLOBAL config file are partitioned by triplet name:
+--   triplets:
+--     native:            { facts: {...}, compiler: {...}, target: {...} }
+--     arm64-linux-gcc:   { facts: {...}, compiler: {...} }
+-- A single flat `facts:` in config.yaml is intentionally NOT read: it would
+-- overwrite every triplet with one value, which is wrong for multi-triplet.
+function M.global_spec(name)
+    local y = require("gcpkg.config").read() or {}
+    local t = type(y.triplets) == "table" and y.triplets or {}
+    local s = t[name]
+    return type(s) == "table" and s or {}
+end
+
+function M.file_spec(name)
+    local fs = require("gcpkg.fs")
+    local yaml = require("gcpkg.yaml")
+    local p = M.file(name)
+    if fs.isfile(p) then return yaml.parse_file(p) or {} end
+    return {}
+end
+
+function M.active(opts)
+    local req = opts and opts.triplet
+    if type(req) == "string" and req ~= "" then return req end
+    if type(cliName) == "string" and cliName ~= "" then return cliName end
+    if type(currentName) == "string" and currentName ~= "" then return currentName end
+    local y = require("gcpkg.config").read() or {}
+    if type(y.triplet) == "string" and y.triplet ~= "" then return y.triplet end
+    return "native"
+end
+
+-- CLI --triplet selects the ACTIVE triplet for this process.  It does NOT
+-- limit gcpkg to one triplet: ensure({triplet=...}) may switch to another
+-- within the same process and both keep their own facts.
+function M.set_cli(name)
+    cliName = name
+    currentName = nil
+    cache = {}
+end
+
+function M.spec(name)
+    local util = require("gcpkg.util")
+    local spec = util.merge(util.merge(util.deepcopy(BUILTIN[name] or {}),
+                                      M.file_spec(name)),
+                            M.global_spec(name))
+    spec.name = name
+    return spec
+end
+
+function M.list()
+    local fs = require("gcpkg.fs")
+    local util = require("gcpkg.util")
+    local names = {}
+    for k in pairs(BUILTIN) do names[#names + 1] = k end
+    if fs.isdir(M.dir()) then
+        for _, f in ipairs(fs.listdir(M.dir()) or {}) do
+            local n = tostring(f):match("^(.*)%.yaml$")
+            if n and n ~= "" and not n:match("%.facts$") then
+                names[#names + 1] = n
+            end
+        end
+    end
+    local y = require("gcpkg.config").read() or {}
+    if type(y.triplets) == "table" then
+        for k in pairs(y.triplets) do names[#names + 1] = k end
+    end
+    names = util.uniq(names)
+    table.sort(names)
+    return names
+end
+
+local function probeCompiler(spec)
+    local c = (type(spec.compiler) == "table" and spec.compiler.cc) or ""
+    return first(c, getenv("GCPKG_CC_REAL"), getenv("CC_REAL"), "cc")
+end
+
+local function probeCxxStandard(spec)
+    local cxx = first((type(spec.compiler) == "table" and spec.compiler.cxx) or "",
+                      getenv("GCPKG_CXX_REAL"), getenv("CXX_REAL"), "c++")
+    local ok, out = pcall(function()
+        return gcpkg.capture({ cxx, "-dM", "-E", "-x", "c++", "/dev/null" }, {})
+    end)
+    if not ok or type(out) ~= "string" then return 0 end
+    return tonumber(out:match("__cplusplus%s+(%d+)")) or 0
+end
+
+local function parseProbe(text)
+    local f = { sizes = {}, headers = {}, functions = {}, defined = {} }
+    for line in tostring(text):gmatch("[^\n]+") do
+        local k, v = line:match("^([^=]+)=(.*)$")
+        if k then
+            if k == "byte_order" or k == "pointer_size" or k == "arch"
+               or k == "os" or k == "compiler_id" or k == "symbol_prefix"
+               or k == "c_standard" then
+                f[k] = (k == "pointer_size" or k == "c_standard")
+                       and (tonumber(v) or v) or v
+            elseif k:sub(1, 5) == "type:" then
+                f.sizes[k:sub(6)] = tonumber(v) or ""
+            elseif k:sub(1, 7) == "header:" then
+                f.headers[k:sub(8)] = tonumber(v) or 0
+            elseif k:sub(1, 5) == "func:" then
+                f.functions[k:sub(6)] = tonumber(v) or 0
+            elseif k:sub(1, 8) == "defined:" then
+                f.defined[k:sub(9)] = tonumber(v) or 0
+            end
+        end
+    end
+    return f
+end
+
+local function applyOverrides(f, ov)
+    if type(ov) ~= "table" then return f end
+    for k, v in pairs(ov) do
+        if k == "headers" or k == "functions" or k == "sizes" or k == "defined" then
+            if type(v) == "table" then
+                for n, x in pairs(v) do f[k][n] = x end
+            end
+        else
+            f[k] = v
+        end
+    end
+    return f
+end
+
+-- YAML parsers commonly turn `0` / `4` into Lua floats.  Normalise scalars
+-- so an explicit user "0" still means "absent" (never "0.0" = non-empty) and
+-- facts files stay human-readable integers.
+local function scalar(v)
+    if v == nil then return "" end
+    if type(v) == "boolean" then return v and "1" or "" end
+    if type(v) == "number" then
+        if v == math.floor(v) then return tostring(math.floor(v)) end
+        return tostring(v)
+    end
+    return tostring(v)
+end
+M.scalar = scalar
+
+local function yesno(v)
+    v = scalar(v)
+    if v == "" or v == "0" or v:lower() == "no" or v:lower() == "false" then
+        return "no"
+    end
+    return "yes"
+end
+
+local function writeFacts(name, f)
+    local fs = require("gcpkg.fs")
+    local util = require("gcpkg.util")
+    fs.mkdirs(M.dir())
+    local l = {
+        "schema: 1",
+        "# gcpkg platform facts for triplet '" .. name .. "'",
+        "# ONE gcpkg probe at install-task start; libraries never probe.",
+        "# Override ONLY THIS TRIPLET in <store>/.gcpkg/config.yaml:",
+        "#   triplets:",
+        "#     " .. name .. ":",
+        "#       facts: { ... }",
+        "# or in <store>/.gcpkg/triplets/" .. name .. ".yaml (lower precedence).",
+        "triplet: " .. name,
+        "compiler: " .. tostring(f.compiler or ""),
+        "arch: " .. tostring(f.arch or "unknown"),
+        "os: " .. tostring(f.os or "unknown"),
+        "compiler_id: " .. tostring(f.compiler_id or "unknown"),
+        "cxx_standard: " .. scalar(f.cxx_standard),
+        "cxx17_capable: " .. scalar(f.cxx17_capable),
+        "cxx20_capable: " .. scalar(f.cxx20_capable),
+        "c_standard: " .. scalar(f.c_standard),
+        "c11_capable: " .. scalar(f.c11_capable),
+        "c17_capable: " .. scalar(f.c17_capable),
+        "byte_order: " .. tostring(f.byte_order or "unknown"),
+        "pointer_size: " .. scalar(f.pointer_size),
+        "symbol_prefix: " .. scalar(f.symbol_prefix),
+        "headers:",
+    }
+    local names = {}
+    for n in pairs(f.headers or {}) do names[#names + 1] = n end
+    table.sort(names)
+    for _, n in ipairs(names) do
+        l[#l + 1] = "  " .. n .. ": " .. scalar(f.headers[n])
+    end
+    l[#l + 1] = "functions:"
+    names = {}
+    for n in pairs(f.functions or {}) do names[#names + 1] = n end
+    table.sort(names)
+    for _, n in ipairs(names) do
+        l[#l + 1] = "  " .. n .. ": " .. scalar(f.functions[n])
+    end
+    l[#l + 1] = "defined:"
+    names = {}
+    for n in pairs(f.defined or {}) do names[#names + 1] = n end
+    table.sort(names)
+    for _, n in ipairs(names) do
+        l[#l + 1] = "  " .. n .. ": " .. scalar(f.defined[n])
+    end
+    l[#l + 1] = "sizes:"
+    names = {}
+    for n in pairs(f.sizes or {}) do names[#names + 1] = n end
+    table.sort(names)
+    for _, n in ipairs(names) do
+        l[#l + 1] = "  " .. n .. ": " .. scalar(f.sizes[n])
+    end
+    fs.write(util.join(M.dir(), name .. ".facts.yaml"),
+             table.concat(l, "\n") .. "\n")
+end
+
+function M.ensure(opts)
+    opts = opts or {}
+    local name = M.active(opts)
+    if cache[name] then currentName = name; return cache[name] end
+    local util = require("gcpkg.util")
+    local fs = require("gcpkg.fs")
+    local spec = M.spec(name)
+    local fileSpec, globalSpec = M.file_spec(name), M.global_spec(name)
+    local cc = probeCompiler(spec)
+    -- Per-triplet probe artefacts: two triplets using different compilers
+    -- must never overwrite each other's generated source / binary.
+    local probeDir = util.join(util.join(require("gcpkg.paths").state_root(),
+                                        "probe"), key(name))
+    fs.mkdirs(probeDir)
+    local src = util.join(probeDir, "platform.c")
+    local exe = util.join(probeDir, "platform")
+    fs.write(src, M.probe_source())
+    -- The probe resolves libc/libm/libpthread symbols via dlsym(RTLD_DEFAULT).
+    -- Link those runtime libraries into the probe itself so a present symbol
+    -- is not reported absent on platforms where it lives outside libc.
+    local probeLibs = { "-ldl", "-lm", "-lpthread" }
+    local ok = pcall(function()
+        gcpkg.exec({ cc, "-O0", "-o", exe, src, "-ldl", "-lm", "-lpthread" },
+                   { quiet = true })
+    end)
+    if not ok then
+        gcpkg.exec({ cc, "-O0", "-o", exe, src, "-lm", "-lpthread" },
+                   { quiet = true })
+    end
+    local out = gcpkg.capture({ exe }, {})
+    if type(out) ~= "string" or out == "" then
+        error("gcpkg triplet probe produced no output (compiler " .. tostring(cc)
+              .. "); set facts in config.yaml triplets." .. name .. ".facts"
+              .. " or in " .. M.file(name))
+    end
+    local f = parseProbe(out)
+    -- Compiler language capability is a platform/toolchain fact too: gcpkg
+    -- determines it once, ports must never hardcode TRUE/FALSE for it.
+    f.cxx_standard = probeCxxStandard(spec)
+    f.cxx17_capable = f.cxx_standard >= 201703
+    f.cxx20_capable = f.cxx_standard >= 202002
+    f.c_standard = tonumber(f.c_standard) or 0
+    f.c11_capable = f.c_standard >= 201112
+    f.c17_capable = f.c_standard >= 201710
+    -- Precedence INSIDE this triplet: matching config.yaml section wins over
+    -- the triplet file, which wins over the probe.  Nothing leaks to another
+    -- triplet; a flat config.yaml `facts:` is deliberately not consulted.
+    applyOverrides(f, fileSpec.facts)
+    applyOverrides(f, globalSpec.facts)
+    f.compiler = cc
+    f.triplet = name
+    writeFacts(name, f)
+    cache[name] = f
+    currentName = name
+    local log = require("gcpkg.log")
+    log.info("  triplet " .. name .. ": one gcpkg probe ("
+             .. tostring(f.byte_order) .. "-endian, " .. tostring(f.pointer_size)
+             .. "-byte pointers, " .. tostring(f.os) .. "/" .. tostring(f.arch)
+             .. "); user facts override; libraries never probe")
+    return f
+end
+
+function M.facts(opts)
+    local name = M.active(opts)
+    if cache[name] then return cache[name] end
+    return M.ensure(opts)
+end
+
+function M.cmake_fact_lines(opts)
+    local f = M.facts(opts)
+    local lines = {}
+    local function emit(kind, name, value)
+        local k = key(kind .. "_" .. tostring(name)):upper()
+        local v = scalar(value)
+        if v == "0" or v:lower() == "false" or v:lower() == "no" then v = "" end
+        lines[#lines + 1] = 'set(GCPKG_FACT_' .. k .. ' "' .. v .. '")'
+    end
+    for n, v in pairs(f.headers or {}) do
+        emit("header", n, v)
+    end
+    for n, v in pairs(f.functions or {}) do
+        emit("func", n, v)
+        emit("symbol", n, v)
+    end
+    for n, v in pairs(f.sizes or {}) do
+        emit("type", n, v)
+    end
+    table.sort(lines)
+    return lines
+end
+
+function M.cmake_defines(opts)
+    local f = M.facts(opts)
+    local big = (tostring(f.byte_order) == "big")
+    return {
+        CMAKE_C_BYTE_ORDER = big and "BIG_ENDIAN" or "LITTLE_ENDIAN",
+        CMAKE_CXX_BYTE_ORDER = big and "BIG_ENDIAN" or "LITTLE_ENDIAN",
+        big_endian = big and "1" or "0",
+        GCPKG_TRIPLET = M.active(opts),
+    }
+end
+
+function M.autotools_args(opts)
+    opts = opts or {}
+    local f = M.facts(opts)
+    local a = {
+        "ac_cv_c_bigendian=" .. ((tostring(f.byte_order) == "big") and "yes" or "no"),
+    }
+    for n, v in pairs(f.headers or {}) do
+        a[#a + 1] = "ac_cv_header_" .. ackey(n) .. "=" .. yesno(v)
+    end
+    for n, v in pairs(f.functions or {}) do
+        a[#a + 1] = "ac_cv_func_" .. ackey(n) .. "=" .. yesno(v)
+    end
+    for n, v in pairs(f.defined or {}) do
+        local yn = yesno(v)
+        a[#a + 1] = "ac_cv_defined_" .. acname(n) .. "=" .. yn
+        -- AC_CHECK_DECL uses ac_cv_have_decl_<NAME>, not ac_cv_defined_*.
+        a[#a + 1] = "ac_cv_have_decl_" .. acname(n) .. "=" .. yn
+    end
+    for n, v in pairs(f.sizes or {}) do
+        if tonumber(v) then
+            local k = ackey(n)
+            a[#a + 1] = "ac_cv_sizeof_" .. k .. "=" .. scalar(v)
+            -- AC_TYPE_* / AC_CHECK_TYPES: a successful sizeof() from the
+            -- single gcpkg probe is proof the type exists on this platform.
+            a[#a + 1] = "ac_cv_c_" .. k .. "=yes"
+            a[#a + 1] = "ac_cv_type_" .. k .. "=yes"
+        end
+    end
+    -- Generic toolchain/framework results: derived from the SAME triplet
+    -- probe, never hardcoded in a port.  These stop AC_PROG_CC, libtool and
+    -- the autoconf framework from compiling trivial test programs.
+    local function truthy(v)
+        local s = scalar(v)
+        return s ~= "" and s ~= "0"
+    end
+    local tc = require("gcpkg.toolchain")
+    -- CC/CXX/CPP in the PORT build env are the gcpkg interceptor wrappers;
+    -- f.compiler is the real compiler used for the one triplet probe.
+    -- Autoconf's AC_PROG_* cache vars MUST keep those wrappers, otherwise
+    -- compile_commands.json loses every translation unit.  os.getenv() in the
+    -- CLI process is NOT the port env, so recipe passes ctx.env explicitly.
+    local ccWrap = first(opts.cc, getenv("CC"), getenv("GCPKG_CC_REAL"),
+                         tostring(f.compiler or "cc"))
+    local cxxWrap = first(opts.cxx, getenv("CXX"), getenv("GCPKG_CXX_REAL"),
+                          "c++")
+    local cppWrap = first(opts.cpp, getenv("CPP"), ccWrap .. " -E")
+    local gnu = (f.compiler_id == "clang" or f.compiler_id == "gcc") and "yes" or "no"
+    local objext = (f.compiler_id == "msvc") and "obj" or "o"
+    local exeext = (f.os == "windows") and ".exe" or ""
+    local x86 = (f.arch == "x86_64" or f.arch == "x86")
+    local build = tc.host_triple()
+    local host = tc.target_triplet()
+    a[#a + 1] = "ac_cv_build=" .. build
+    a[#a + 1] = "ac_cv_host=" .. host
+    a[#a + 1] = "ac_cv_target=" .. host
+    a[#a + 1] = "ac_cv_prog_CC=" .. ccWrap
+    a[#a + 1] = "ac_cv_prog_ac_ct_CC=" .. ccWrap
+    a[#a + 1] = "ac_cv_prog_CPP=" .. cppWrap
+    a[#a + 1] = "ac_cv_prog_CXX=" .. cxxWrap
+    a[#a + 1] = "ac_cv_prog_ac_ct_CXX=" .. cxxWrap
+    a[#a + 1] = "ac_cv_prog_CXXCPP=" .. cxxWrap .. " -E"
+    a[#a + 1] = "ac_cv_objext=" .. objext
+    a[#a + 1] = "ac_cv_exeext=" .. exeext
+    a[#a + 1] = "ac_cv_c_compiler_gnu=" .. gnu
+    a[#a + 1] = "ac_cv_prog_cc_g=yes"
+    a[#a + 1] = "ac_cv_prog_cc_c89="
+    a[#a + 1] = "ac_cv_prog_gcc_traditional=no"
+    a[#a + 1] = "ac_cv_c_const=yes"
+    a[#a + 1] = "ac_cv_c_inline=inline"
+    if truthy((f.headers or {})["stdlib.h"]) then
+        a[#a + 1] = "ac_cv_header_stdc=yes"
+    end
+    if truthy((f.headers or {})["time.h"]) then
+        a[#a + 1] = "ac_cv_header_time=yes"
+    end
+    if truthy((f.headers or {})["dlfcn.h"]) then
+        a[#a + 1] = "ac_cv_header_dlfcn_h=yes"
+    end
+    if truthy((f.functions or {})["dlsym"]) then
+        a[#a + 1] = "ac_cv_search_dlsym=" ..
+                    ((f.os == "linux") and "-ldl" or "none required")
+    end
+    for _, x in ipairs({ { "pthread", "pthread_join" },
+                         { "rt", "clock_gettime" },
+                         { "dl", "dlopen" } }) do
+        if truthy((f.functions or {})[x[2]]) then
+            a[#a + 1] = "ac_cv_lib_" .. x[1] .. "_" .. x[2] .. "=yes"
+        end
+    end
+    -- Autoconf/libtool framework tools.  Values come from the active
+    -- environment first; command names (not absolute paths) stay portable.
+    -- config.status prefixes a RELATIVE INSTALL value with the subdirectory
+    -- path (e.g. ../../../install -c).  On a case-insensitive 9p/WSL mount
+    -- that resolves to the tarball's INSTALL document instead of the system
+    -- install tool, and `make install` recurses forever.  Keep it absolute.
+    local installCmd = first(getenv("GCPKG_INSTALL"), getenv("INSTALL"),
+                             "/usr/bin/install -c")
+    if installCmd:sub(1, 1) ~= "/" and not installCmd:match("^%a:") then
+        installCmd = "/usr/bin/install -c"
+    end
+    local tools = {
+        { "ac_cv_path_install", "INSTALL", installCmd },
+        { "ac_cv_path_mkdir", "MKDIR", "mkdir" },
+        { "ac_cv_path_GREP", "GREP", "grep" },
+        { "ac_cv_path_EGREP", "EGREP", "grep -E" },
+        { "ac_cv_path_SED", "SED", "sed" },
+        { "ac_cv_prog_AWK", "AWK", "awk" },
+        { "ac_cv_prog_LN_S", "LN_S", "ln -s" },
+        { "ac_cv_prog_AR", "AR", "ar" },
+        { "ac_cv_prog_RANLIB", "RANLIB", "ranlib" },
+        { "ac_cv_prog_STRIP", "STRIP", "strip" },
+        { "ac_cv_prog_NM", "NM", "nm" },
+        { "ac_cv_prog_LD", "LD", "ld" },
+        { "ac_cv_prog_OBJDUMP", "OBJDUMP", "objdump" },
+        { "ac_cv_prog_AS", "AS", "as" },
+        { "ac_cv_prog_DLLTOOL", "DLLTOOL", "no" },
+        { "ac_cv_prog_WINDRES", "WINDRES", "no" },
+    }
+    for _, t in ipairs(tools) do
+        a[#a + 1] = t[1] .. "=" .. first(getenv(t[2]), t[3])
+    end
+    a[#a + 1] = "ac_cv_prog_make_make_set=yes"
+    if f.os ~= "macos" then
+        a[#a + 1] = "ac_cv_prog_DSYMUTIL=no"
+        a[#a + 1] = "ac_cv_prog_LIPO=no"
+        a[#a + 1] = "ac_cv_prog_OTOOL=no"
+        a[#a + 1] = "ac_cv_prog_OTOOL64=no"
+        a[#a + 1] = "ac_cv_prog_NMEDIT=no"
+    end
+    if f.os == "linux" then
+        -- HP-UX dlopen shims do not exist on Linux; short-circuit libtool's
+        -- fallback link tests instead of compiling them for every port.
+        a[#a + 1] = "ac_cv_lib_dld_shl_load=no"
+        a[#a + 1] = "ac_cv_lib_svld_dlopen=no"
+        a[#a + 1] = "ac_cv_lib_dld_dld_link=no"
+        a[#a + 1] = "ac_cv_func_shl_load=no"
+        a[#a + 1] = "ac_cv_func_dld_link=no"
+        if truthy((f.functions or {})["fork"]) then
+            a[#a + 1] = "ac_cv_func_fork_works=yes"
+        end
+        if truthy((f.functions or {})["vfork"]) then
+            a[#a + 1] = "ac_cv_func_vfork_works=yes"
+        end
+        if truthy((f.functions or {})["getpgrp"]) then
+            a[#a + 1] = "ac_cv_func_getpgrp_void=yes"
+        end
+        if truthy((f.functions or {})["setpgrp"]) then
+            a[#a + 1] = "ac_cv_func_setpgrp_void=yes"
+        end
+    end
+    -- Results consumed by alsa-lib's patched generated configure.
+    a[#a + 1] = "gcc_have_atomics=" .. ((gnu == "yes") and "yes" or "no")
+    a[#a + 1] = "gcpkg_have_lfs=" .. ((f.os == "linux") and "yes" or "no")
+    a[#a + 1] = "gcpkg_have___thread=" .. ((gnu == "yes") and "yes" or "no")
+    a[#a + 1] = "gcpkg_have_mmx=" .. ((x86 and gnu == "yes") and "yes" or "no")
+    a[#a + 1] = "gcpkg_symbol_prefix=" .. scalar(f.symbol_prefix or "")
+    table.sort(a)
+    return a
+end
+
+function M.set_active(name)
+    local fs = require("gcpkg.fs")
+    local config = require("gcpkg.config")
+    local p = config.path()
+    assert(p and p ~= "", "gcpkg: config path unavailable")
+    local out = {}
+    for _, l in ipairs(fs.isfile(p) and fs.lines(p) or {}) do
+        if not l:match("^%s*triplet%s*:") then out[#out + 1] = l end
+    end
+    out[#out + 1] = "triplet: " .. tostring(name)
+    fs.write(p, table.concat(out, "\n") .. "\n")
+    cache = {}
+    currentName = nil
+    cliName = name
+end
+
+function M.create(name)
+    local fs = require("gcpkg.fs")
+    fs.mkdirs(M.dir())
+    local p = M.file(name)
+    if fs.isfile(p) then error("triplet already exists: " .. p) end
+    fs.write(p, table.concat({
+        "schema: 1",
+        "name: " .. name,
+        "description: User triplet (facts below override gcpkg's probe)",
+        "# compiler:",
+        "#   cc: /path/to/target-cc",
+        "# target:",
+        "#   arch: aarch64",
+        "#   os: linux",
+        "# facts:            # overrides the probe for THIS triplet only;",
+        "#                  # config.yaml triplets." .. name .. ".facts wins over this",
+        "#   byte_order: little",
+        "#   pointer_size: 8",
+        "#   headers:",
+        "#     unistd.h: 1",
+        "#   functions:",
+        "#     atexit: 1",
+        "#   sizes:",
+        "#     \"void *\": 8",
+        "facts: {}",
+        "",
+    }, "\n"))
+    return p
+end
+
+function M.describe(name)
+    name = name or M.active()
+    local f = M.facts({ triplet = name })
+    local l = {
+        "triplet: " .. name,
+        "  compiler      : " .. tostring(f.compiler or ""),
+        "  os / arch     : " .. tostring(f.os) .. " / " .. tostring(f.arch),
+        "  compiler_id   : " .. tostring(f.compiler_id),
+        "  cxx_standard  : " .. tostring(f.cxx_standard) ..
+            " (C++17=" .. tostring(f.cxx17_capable) ..
+            ", C++20=" .. tostring(f.cxx20_capable) .. ")",
+        "  byte_order    : " .. scalar(f.byte_order),
+        "  pointer_size  : " .. scalar(f.pointer_size),
+        "  facts file    : " .. M.dir() .. "/" .. name .. ".facts.yaml",
+    }
+    return table.concat(l, "\n")
+end
+
+return M

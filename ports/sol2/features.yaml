@@ -1,0 +1,84 @@
+schema: 1
+port: sol2
+
+# sol2 3.5.0, header-only C++ <-> Lua binding.  Upstream's CMake does the install
+# (INTERFACE target, include/sol tree, sol2-config.cmake in share/cmake/sol2 and a
+# generated share/pkgconfig/sol2.pc).  The port stops it from fetching and
+# building Lua 5.4.4 itself (SOL2_BUILD_LUA=FALSE -> the gcpkg `lua` port) and
+# replaces the tests' clone-Catch2-at-configure step with the gcpkg `catch2` port.
+features:
+  install:
+    default: true
+    description: Install the include/sol header tree, the CMake config and sol2.pc
+    requires: ["lua"]
+    args: []
+  no-install:
+    default: false
+    description: Opt out of installing anything
+    args: []
+    conflicts: ["install"]
+  tests:
+    default: true
+    description: >-
+      Build and run upstream's Catch2 suite (tests/ with ten areas, one program
+      per area/variant) in a second build directory with SOL2_ENABLE_INSTALL=OFF
+    requires: ["lua", "catch2"]
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of the upstream test suite
+    args: []
+    conflicts: ["tests"]
+  cmake-package:
+    default: true
+    description: Assert upstream's share/cmake/sol2/sol2-config.cmake export
+    requires: []
+    args: []
+  no-cmake-package:
+    default: false
+    description: Skip the CMake package assertions
+    args: []
+    conflicts: ["cmake-package"]
+  pkgconfig:
+    default: true
+    description: Assert upstream's generated share/pkgconfig/sol2.pc
+    requires: []
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Skip the .pc assertion
+    args: []
+    conflicts: ["pkgconfig"]
+  sanity:
+    default: true
+    description: >-
+      Compile and run a real sol2 consumer TU against the installed headers and
+      the gcpkg Lua: state/script round trip, C++ lambda called from Lua, a C++
+      usertype constructed from Lua, and safe_script error handling
+    requires: ["lua"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the consumer TU
+    args: []
+    conflicts: ["sanity"]
+  docs:
+    default: true
+    description: Install README.md and CONTRIBUTING.md under share/doc/sol2
+    requires: []
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation
+    args: []
+    conflicts: ["docs"]
+  license:
+    default: true
+    description: Install LICENSE.txt (MIT)
+    requires: []
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license file
+    args: []
+    conflicts: ["license"]

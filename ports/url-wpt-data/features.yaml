@@ -1,0 +1,36 @@
+schema: 1
+port: url-wpt-data
+
+# Pinned web-platform-tests URL resources required by the old
+# rmisev/url_whatwg 72bcabf WPT test executable.  Data-only source port: the
+# archive is pinned by commit and SHA, and every capability is enabled by
+# default.  No build-time network and no dependency on host test data.
+features:
+  data:
+    default: true
+    description: Install the five pinned WPT URL JSON resources
+    args: []
+  license:
+    default: true
+    description: Install the upstream WPT LICENSE.md
+    args: []
+  sanity:
+    default: true
+    description: Compile a real C++ sanity translation unit for the installed data
+    args: []
+
+  no-data:
+    default: false
+    description: Opt out of the WPT URL JSON resources
+    conflicts: ["data"]
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the upstream license text
+    conflicts: ["license"]
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the sanity translation unit
+    conflicts: ["sanity"]
+    args: []
