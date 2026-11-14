@@ -9,7 +9,8 @@ port: uni-algo
 features:
   compiled:
     default: true
-    description: "Build the real library (UNI_ALGO_HEADER_ONLY=OFF): one src/data.cpp TU, installed as libuni-algo"
+    description: "Build the real library (UNI_ALGO_HEADER_ONLY=OFF): one src/data.cpp TU, installed as libuni-algo; either/or with header-only"
+    conflicts: ["header-only"]
     args: ["-DUNI_ALGO_HEADER_ONLY=OFF"]
   header-only:
     default: false
@@ -18,7 +19,8 @@ features:
     args: ["-DUNI_ALGO_HEADER_ONLY=ON"]
   static:
     default: true
-    description: "Compile a static library (BUILD_SHARED_LIBS=OFF)"
+    description: "Compile a static library (BUILD_SHARED_LIBS=OFF); either/or with shared"
+    conflicts: ["shared"]
     args: ["-DBUILD_SHARED_LIBS=OFF"]
   shared:
     default: false
