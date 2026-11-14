@@ -1,0 +1,72 @@
+schema: 1
+port: ftest
+
+# FTest — the single-header C++98 test framework used by utfcpp's upstream
+# test suite (there it is an unpopulated git submodule, i.e. a download; here it
+# is a real port so the framework is managed by gcpkg).  Upstream ships no
+# build system and no option() switches, so every feature below is a gcpkg
+# capability that performs a real action, paired with its explicit opt-out.
+features:
+  headers:
+    default: true
+    description: "Install ftest.h (and the ftest/ftest.h include alias) into <prefix>/include"
+    args: []
+  no-headers:
+    default: false
+    description: Opt out of the public header install
+    conflicts: ["headers"]
+    args: []
+  tests:
+    default: true
+    description: "Compile the upstream tests/smoke.cpp as C++98, run it, and require [  PASSED  ] and no [  FAILED  ]"
+    args: []
+  no-tests:
+    default: false
+    description: Opt out of running the upstream smoke suite
+    conflicts: ["tests"]
+    args: []
+  sanity:
+    default: true
+    description: "Compile, link and run a consumer against the INSTALLED header tree"
+    args: []
+  no-sanity:
+    default: false
+    description: Opt out of the installed-tree consumer check
+    conflicts: ["sanity"]
+    args: []
+  pkgconfig:
+    default: true
+    description: "Install lib/pkgconfig/ftest.pc"
+    args: []
+  no-pkgconfig:
+    default: false
+    description: Opt out of the pkg-config metadata
+    conflicts: ["pkgconfig"]
+    args: []
+  cmake-package:
+    default: true
+    description: "Install a CONFIG package (find_package(ftest CONFIG) -> ftest::ftest)"
+    args: []
+  no-cmake-package:
+    default: false
+    description: Opt out of the CONFIG package
+    conflicts: ["cmake-package"]
+    args: []
+  docs:
+    default: true
+    description: "Install README.md into share/doc/ftest"
+    args: []
+  no-docs:
+    default: false
+    description: Opt out of the documentation install
+    conflicts: ["docs"]
+    args: []
+  license:
+    default: true
+    description: "Install the upstream LICENSE into share/doc/ftest"
+    args: []
+  no-license:
+    default: false
+    description: Opt out of the license install
+    conflicts: ["license"]
+    args: []
